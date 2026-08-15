@@ -1,6 +1,6 @@
 /* Portal do cliente: estrutura compacta, responsiva e independente da interface do app. */
 .client-main { overflow: clip; }
-.client-access-section { min-height: 100dvh; display: flex; align-items: center; padding: 104px 0 56px; border-bottom: 0; }
+.client-access-section { min-height: 100dvh; display: flex; align-items: center; padding: 88px 0 72px; border-bottom: 0; }
 .client-access-grid { grid-template-columns: minmax(0,1fr) minmax(400px,440px); gap: clamp(48px,6vw,82px); align-items: center; }
 .client-access-grid > *,.client-intro { min-width: 0; max-width: 100%; }
 .client-intro { max-width: 620px; }
@@ -356,7 +356,7 @@
 }
 
 @media (max-width: 680px) {
-  .client-access-section { padding: 92px 0 52px; }
+  .client-access-section { padding: 80px 0 52px; }
   .activation-page .client-access-section { padding: 88px 0 48px; }
   .client-benefits { grid-template-columns: 1fr; }
   .client-benefits > div { min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px; }

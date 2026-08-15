@@ -17,6 +17,8 @@ test('public catalog preserves the selected existing product through authenticat
   assert.match(callback, /parsed\.origin===location\.origin/);
   assert.match(callback, /parsed\.pathname==='\/conta\/checkout'/);
   assert.match(callback, /parsed\.searchParams\.size===1/);
+  assert.match(accountClient, /root\.hidden=true/);
+  assert.match(accountClient, /viewFromPath\(\) !== 'checkout' \|\| !productId/);
 });
 
 test('checkout collects only the approved customer fields and supports PIX plus card', () => {
