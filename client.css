@@ -123,6 +123,15 @@
 .activation-credit[hidden] { display:none; }
 .activation-credit strong { font-size:22px; }
 .activation-credit p { margin:0 0 3px; color:var(--text-2); font-size:10px; line-height:1.55; }
+.activation-page .client-access-section { padding: 104px 0 72px; }
+.activation-page .client-access-grid { align-items: start; }
+.activation-page .client-intro { padding-top: 18px; }
+.activation-card { margin-top: 0; padding: 26px 28px; }
+.activation-card .auth-copy { margin: 18px 0 16px; }
+.activation-card .auth-submit { margin-top: 0; }
+.activation-card .auth-legal { min-height: 16px; margin-top: 12px; }
+.activation-card #activate-approve[hidden],.activation-card .activation-credit[hidden] { display: none !important; }
+.activation-card #activate-approve:disabled { cursor: default; opacity: .62; }
 .checkout-return { min-height: 76px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 14px; margin-bottom: 12px; padding: 14px 18px; border: 1px solid rgba(240,165,0,.25); border-radius: 14px; background: rgba(240,165,0,.05); }
 .checkout-return[hidden] { display: none !important; }
 .checkout-return b { display: block; margin-bottom: 3px; font-size: 12px; }
@@ -289,6 +298,7 @@
 
 @media (max-width: 680px) {
   .client-access-section { padding: 18px 0 58px; }
+  .activation-page .client-access-section { padding: 88px 0 48px; }
   .client-access-topbar { margin-bottom: 30px; }
   .client-benefits { grid-template-columns: 1fr; }
   .client-benefits > div { min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
