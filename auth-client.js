@@ -25,6 +25,7 @@ function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, char
 function formatDate(value, withTime = true) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(date); }
 function money(cents, currency = 'BRL') { return new Intl.NumberFormat('pt-BR', { style:'currency', currency }).format((Number(cents) || 0) / 100); }
 function formatUsageTime(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.ceil((seconds % 3600) / 60); const parts = []; if (days) parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`); if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`); if (minutes && parts.length < 2) parts.push(`${minutes} min`); return parts.join(' e ') || 'menos de 1 minuto'; }
+function remainingUntil(value) { const timestamp = value ? new Date(value).valueOf() : NaN; return Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - Date.now()) / 1000)) : 0; }
 
 function consumePasskeySession() {
   try { const raw = sessionStorage.getItem('paxinbot_passkey_session'); sessionStorage.removeItem('paxinbot_passkey_session'); if (raw) { const value = JSON.parse(raw); if (value?.accessToken) passkeySession = value; } } catch {}
@@ -84,11 +85,11 @@ function renderClientDashboard(payload) {
   document.getElementById('dashboard-greeting').textContent = user ? `Olá, ${displayName}` : 'Entre na sua conta';
   document.getElementById('dashboard-access').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Vitalício' : entitlement.kind === 'usage' ? 'Saldo em uso' : 'Por tempo') : entitlement.availableGrant ? 'Saldo disponível' : 'Sem acesso';
   document.getElementById('dashboard-access-state').textContent = entitlement.active ? 'Ativo' : entitlement.availableGrant ? 'Aguardando sua ativação' : user ? 'Aguardando liberação' : 'Aguardando login';
-  const expires = entitlement.expiresAt ? formatDate(entitlement.expiresAt) : 'Não expira';
-  document.getElementById('dashboard-expiry').textContent = entitlement.kind === 'usage' ? formatUsageTime(entitlement.remainingSeconds) : entitlement.active ? expires : '—';
-  document.getElementById('dashboard-expiry-state').textContent = entitlement.kind === 'usage' ? 'Diminui somente com o app conectado' : entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Definido pelo acesso contratado') : 'Sem dados';
+  const remaining = entitlement.kind === 'usage' ? Number(entitlement.remainingSeconds) || 0 : remainingUntil(entitlement.expiresAt);
+  document.getElementById('dashboard-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Não expira' : formatUsageTime(remaining)) : '—';
+  document.getElementById('dashboard-expiry-state').textContent = entitlement.kind === 'usage' ? 'Diminui somente com o app conectado' : entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Acesso antigo: contagem contínua') : 'Sem dados';
   document.getElementById('subscription-plan').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : entitlement.kind === 'usage' ? 'Saldo de uso ativo' : 'Acesso por tempo') : 'Sem acesso ativo';
-  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : entitlement.kind === 'usage' ? `${formatUsageTime(entitlement.remainingSeconds)} restantes. O saldo pausa quando o aplicativo é fechado.` : `Válido até ${expires}.`) : 'Escolha uma modalidade para começar.';
+  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : entitlement.kind === 'usage' ? `${formatUsageTime(remaining)} restantes. O saldo pausa quando o aplicativo é fechado.` : `${formatUsageTime(remaining)} restantes neste acesso antigo.`) : 'Escolha uma modalidade para começar.';
   document.getElementById('dashboard-devices').textContent = payload?.account?.activeDevices ?? (user ? '—' : 'Protegidos');
   document.getElementById('dashboard-devices-state').textContent = user ? 'Sessões ativas do aplicativo' : 'Autorize depois do login';
   document.getElementById('client-logout').hidden = !user;
