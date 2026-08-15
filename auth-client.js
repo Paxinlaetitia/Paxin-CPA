@@ -11,7 +11,8 @@ const PaxinbotAuth = (() => {
   return { baseUrl, request };
 })();
 
-const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', devices: '/conta/dispositivos', security: '/conta/seguranca', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
+const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
+const accountSectionRoutes = { profile: '/conta/configuracoes', security: '/conta/configuracoes/seguranca', devices: '/conta/configuracoes/dispositivos' };
 let passkeySession = null;
 let passkeyClient = null;
 let currentAccount = null;
@@ -67,7 +68,15 @@ function renderClientDashboard(payload) {
 
 function viewFromPath() {
   const path = location.pathname.replace(/\/$/, '') || '/conta';
+  if (Object.values(accountSectionRoutes).includes(path) || ['/conta/seguranca','/conta/dispositivos'].includes(path)) return 'account';
   return Object.entries(accountRoutes).find(([, route]) => route === path)?.[0] || 'overview';
+}
+
+function accountSectionFromPath() {
+  const path = location.pathname.replace(/\/$/, '') || '/conta';
+  if (path === accountSectionRoutes.security || path === '/conta/seguranca') return 'security';
+  if (path === accountSectionRoutes.devices || path === '/conta/dispositivos') return 'devices';
+  return 'profile';
 }
 
 function setAccountView(view, moveFocus = false, updateUrl = true) {
@@ -75,6 +84,13 @@ function setAccountView(view, moveFocus = false, updateUrl = true) {
   document.querySelectorAll('[data-account-panel]').forEach(panel => { const active = panel === target; panel.hidden = !active; panel.classList.toggle('is-active', active); });
   document.querySelectorAll('[data-account-view]').forEach(button => { const active = button.dataset.accountView === view; button.classList.toggle('is-active', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1; if (active && moveFocus) button.focus(); });
   if (updateUrl && location.protocol !== 'file:' && accountRoutes[view] && location.pathname !== accountRoutes[view]) history.pushState({ accountView:view }, '', accountRoutes[view]);
+}
+
+function setAccountSection(section, moveFocus = false, updateUrl = true) {
+  const target = document.querySelector(`[data-account-section-panel="${section}"]`); if (!target) return;
+  document.querySelectorAll('[data-account-section-panel]').forEach(panel => { const active = panel === target; panel.hidden = !active; panel.classList.toggle('is-active', active); });
+  document.querySelectorAll('[data-account-section]').forEach(button => { const active = button.dataset.accountSection === section; button.classList.toggle('is-active', active); button.setAttribute('aria-selected', String(active)); if (active && moveFocus) button.focus(); });
+  if (updateUrl && location.protocol !== 'file:' && accountSectionRoutes[section] && location.pathname !== accountSectionRoutes[section]) history.pushState({ accountView:'account', accountSection:section }, '', accountSectionRoutes[section]);
 }
 
 async function syncOwnerPanelLink(user) {
@@ -152,18 +168,19 @@ async function registerPasskey() {
 
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]'); consumePasskeySession();
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
+  try { const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
   form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); passkeySession = result.passkeySession || null; const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView('overview'); setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.('Login realizado.'); document.getElementById('client-password').value = ''; } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
   document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); setClientStatus(result.message, true); signup.reset(); setAuthMode('login'); window.showToast?.('Conta criada. Confira seu e-mail.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
   document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
   document.getElementById('passkey-login')?.addEventListener('click', () => loginWithPasskey().catch(error => window.showToast?.(error.message)));
   document.getElementById('passkey-register')?.addEventListener('click', () => registerPasskey().catch(error => window.showToast?.(error.message)));
   document.getElementById('passkey-password-confirm')?.addEventListener('click', async () => { const password = document.getElementById('passkey-password').value; if (!currentAccount?.user?.email || !password) return window.showToast?.('Informe sua senha.'); try { const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password } }); passkeySession = result.passkeySession; document.getElementById('passkey-dialog').close(); document.getElementById('passkey-password').value = ''; await registerPasskey(); } catch (error) { window.showToast?.(error.message); } });
-  document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountView)));
-  document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountOpen, true)));
+  document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => { setAccountView(button.dataset.accountView); if (button.dataset.accountView === 'account') setAccountSection('profile', false, false); }));
+  document.querySelectorAll('[data-account-section]').forEach(button => button.addEventListener('click', () => setAccountSection(button.dataset.accountSection)));
+  document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => { const section = button.dataset.accountSectionOpen; setAccountView(button.dataset.accountOpen, true, !section); if (section) setAccountSection(section, false, true); }));
   document.getElementById('view-account-products')?.addEventListener('click', () => document.getElementById('account-products-list')?.scrollIntoView({ behavior:'smooth', block:'center' }));
   document.querySelector('.portal-nav')?.addEventListener('keydown', event => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; const tabs = [...document.querySelectorAll('[data-account-view]')]; const current = tabs.indexOf(document.activeElement); if (current < 0) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; setAccountView(tabs[next].dataset.accountView, true); });
-  window.addEventListener('popstate', () => setAccountView(viewFromPath(), false, false));
+  window.addEventListener('popstate', () => { setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); });
   document.getElementById('account-profile-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('button'); button.disabled = true; try { const displayName = new FormData(event.currentTarget).get('displayName'); const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'profile', displayName } }); currentAccount.profile = result.data; renderClientDashboard(currentAccount); window.showToast?.('Dados atualizados.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('account-device-list')?.addEventListener('click', async event => { const button = event.target.closest('[data-revoke-device]'); if (!button || !confirm('Revogar o acesso deste computador?')) return; button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeDevice', sessionId:button.dataset.revokeDevice } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Dispositivo revogado.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });
   document.getElementById('revoke-all-devices')?.addEventListener('click', async event => { if (!confirm('Revogar todas as sessões do aplicativo?')) return; event.currentTarget.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeAllDevices' } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Sessões do aplicativo revogadas.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled = false; } });

@@ -2,7 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "redirects": [
-    { "source": "/cliente", "destination": "/conta", "permanent": true }
+    { "source": "/cliente", "destination": "/conta", "permanent": true },
+    { "source": "/conta/seguranca", "destination": "/conta/configuracoes/seguranca", "permanent": true },
+    { "source": "/conta/dispositivos", "destination": "/conta/configuracoes/dispositivos", "permanent": true }
   ],
   "rewrites": [
     { "source": "/conta", "destination": "/cliente" },
