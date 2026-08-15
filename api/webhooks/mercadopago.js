@@ -23,6 +23,9 @@ function mercadoPagoToken() {
   if (token.length < 24) throw new Error('missing_provider_config');
   return token;
 }
+function webhookDiagnostic(event, details = {}) {
+  console.warn(JSON.stringify({ event, ...details }));
+}
 function publicPaymentSnapshot(payment) {
   return {
     statusDetail:String(payment?.status_detail || '').slice(0,100),
@@ -54,10 +57,10 @@ async function sendConfirmation(result) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') return json(res, 405, { ok:false });
+  if (req.method !== 'POST') { webhookDiagnostic('mercadopago_webhook_method_rejected', { method:String(req.method || 'unknown').slice(0,12) }); return json(res, 405, { ok:false, code:'method_not_allowed' }, { allow:'POST' }); }
   const body = await readBody(req);
   const dataId = String(req.query?.['data.id'] || req.query?.id || body?.data?.id || '');
-  if (!verifySignature(req, dataId)) return json(res, 401, { ok:false });
+  if (!verifySignature(req, dataId)) { webhookDiagnostic('mercadopago_webhook_signature_rejected', { reason:process.env.MERCADOPAGO_WEBHOOK_SECRET ? 'invalid_signature' : 'missing_webhook_secret' }); return json(res, 401, { ok:false, code:'invalid_signature' }); }
   const type = String(req.query?.type || body?.type || body?.action || '').toLowerCase();
   const isOrder = type === 'order' || type.startsWith('order.');
   const isPayment = !type || type === 'payment' || type.startsWith('payment.');
@@ -68,7 +71,7 @@ module.exports = async (req, res) => {
       const orderResponse = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
       const order = await orderResponse.json().catch(() => null);
       const payment = order?.transactions?.payments?.[0];
-      if (!orderResponse.ok || !order?.id || !payment?.id) return json(res, 503, { ok:false });
+      if (!orderResponse.ok || !order?.id || !payment?.id) { webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'order', status:Number(orderResponse.status) || 0 }); return json(res, 503, { ok:false, code:'provider_lookup_failed' }); }
       const amountCents = Math.round(Number(payment.paid_amount || payment.amount || order.total_amount) * 100);
       if (!Number.isSafeInteger(amountCents) || amountCents < 0) return json(res, 400, { ok:false });
       const providerStatus = String(payment.status || order.status || '').toLowerCase();
@@ -80,13 +83,13 @@ module.exports = async (req, res) => {
           p_currency:String(order.currency || payment.currency_id || 'BRL'), p_provider_payload:publicOrderSnapshot(order,payment)
         }
       });
-      if (!finalized.response.ok) return json(res, 503, { ok:false });
+      if (!finalized.response.ok) { webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'order', status:Number(finalized.response.status) || 0 }); return json(res, 503, { ok:false, code:'finalization_failed' }); }
       await sendConfirmation(finalized.payload).catch(() => null);
       return json(res, 200, { ok:true });
     }
     const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
     const payment = await paymentResponse.json().catch(() => null);
-    if (!paymentResponse.ok || !payment?.id) return json(res, 503, { ok:false });
+    if (!paymentResponse.ok || !payment?.id) { webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'payment', status:Number(paymentResponse.status) || 0 }); return json(res, 503, { ok:false, code:'provider_lookup_failed' }); }
     const externalReference = String(payment.external_reference || '');
     const amountCents = Math.round(Number(payment.transaction_amount) * 100);
     if (!Number.isSafeInteger(amountCents) || amountCents < 0) return json(res, 400, { ok:false });
@@ -97,10 +100,11 @@ module.exports = async (req, res) => {
         p_currency:String(payment.currency_id || ''), p_provider_payload:publicPaymentSnapshot(payment)
       }
     });
-    if (!finalized.response.ok) return json(res, 503, { ok:false });
+    if (!finalized.response.ok) { webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'payment', status:Number(finalized.response.status) || 0 }); return json(res, 503, { ok:false, code:'finalization_failed' }); }
     await sendConfirmation(finalized.payload).catch(() => null);
     return json(res, 200, { ok:true });
   } catch {
-    return json(res, 503, { ok:false });
+    webhookDiagnostic('mercadopago_webhook_unexpected_failure');
+    return json(res, 503, { ok:false, code:'unexpected_failure' });
   }
 };

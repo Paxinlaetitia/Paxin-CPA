@@ -18,7 +18,9 @@ test('public catalog preserves the selected existing product through authenticat
   assert.match(callback, /parsed\.pathname==='\/conta\/checkout'/);
   assert.match(callback, /parsed\.searchParams\.size===1/);
   assert.match(accountClient, /root\.hidden=true/);
-  assert.match(accountClient, /viewFromPath\(\) !== 'checkout' \|\| !productId/);
+  assert.match(accountClient, /selectedCheckoutIntentMatches\(productId\)/);
+  assert.match(publicClient, /data-select-product/);
+  assert.match(publicClient, /sessionStorage\.setItem\(CHECKOUT_INTENT_KEY/);
 });
 
 test('checkout collects only the approved customer fields and supports PIX plus card', () => {
@@ -58,6 +60,9 @@ test('Mercado Pago webhook supports signed Order events without dropping Checkou
   assert.match(webhook, /providerStatus === 'processed' \? 'approved'/);
   assert.match(webhook, /\/v1\/payments\/\$\{encodeURIComponent\(dataId\)\}/);
   assert.match(webhook, /crypto\.timingSafeEqual/);
+  assert.match(webhook, /code:'invalid_signature'/);
+  assert.match(webhook, /code:'provider_lookup_failed'/);
+  assert.match(webhook, /code:'finalization_failed'/);
 });
 
 test('client locks the payment action and reuses one request id per attempt', () => {

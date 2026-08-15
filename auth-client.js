@@ -11,6 +11,8 @@ const PaxinbotAuth = (() => {
   return { baseUrl, request };
 })();
 const CLIENT_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CHECKOUT_INTENT_KEY='paxinbot_checkout_intent';
+const CHECKOUT_INTENT_MAX_AGE=2*60*60*1000;
 
 const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', checkout:'/conta/checkout', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
 const accountSectionRoutes = { profile: '/conta/configuracoes', security: '/conta/configuracoes/seguranca', devices: '/conta/configuracoes/dispositivos', preferences:'/conta/configuracoes/notificacoes', activity:'/conta/configuracoes/atividade' };
@@ -172,6 +174,11 @@ function selectedCheckoutProductId() {
   return CLIENT_UUID.test(productId || '') ? productId : '';
 }
 
+function selectedCheckoutIntentMatches(productId) {
+  try { const intent=JSON.parse(sessionStorage.getItem(CHECKOUT_INTENT_KEY) || 'null'); return intent?.productId===productId && Number.isFinite(intent?.selectedAt) && Date.now()-intent.selectedAt>=0 && Date.now()-intent.selectedAt<=CHECKOUT_INTENT_MAX_AGE; }
+  catch { return false; }
+}
+
 function newCheckoutRequestId() {
   if (typeof crypto.randomUUID==='function') return crypto.randomUUID();
   const bytes=new Uint8Array(16); crypto.getRandomValues(bytes); bytes[6]=(bytes[6]&15)|64; bytes[8]=(bytes[8]&63)|128;
@@ -181,8 +188,9 @@ function newCheckoutRequestId() {
 async function renderAuthPurchaseContext() {
   const root=document.getElementById('auth-purchase-context'); if (!root) return;
   root.hidden=true; document.getElementById('auth-purchase-name').textContent='—'; document.getElementById('auth-purchase-price').textContent='—';
-  const productId=selectedCheckoutProductId(); if (viewFromPath() !== 'checkout' || !productId) return;
-  try { const response=await fetch('/api/catalog',{ credentials:'include' }); const payload=await response.json(); const product=(payload.data || []).find(item=>item.id===productId); if (!product) return; root.hidden=false; document.getElementById('auth-purchase-name').textContent=product.name; document.getElementById('auth-purchase-price').textContent=`${money(product.priceCents)} · ${productDuration(product)}`; } catch {}
+  const productId=selectedCheckoutProductId();
+  if (viewFromPath() !== 'checkout' || !productId || !selectedCheckoutIntentMatches(productId)) { try { sessionStorage.removeItem(CHECKOUT_INTENT_KEY); } catch {} if (viewFromPath()==='checkout' && location.protocol!=='file:') history.replaceState({},'',accountRoutes.overview); return; }
+  try { const response=await fetch('/api/catalog',{ credentials:'include' }); const payload=await response.json(); const product=(payload.data || []).find(item=>item.id===productId); if (!product) { sessionStorage.removeItem(CHECKOUT_INTENT_KEY); if (location.protocol!=='file:') history.replaceState({},'',accountRoutes.overview); return; } root.hidden=false; document.getElementById('auth-purchase-name').textContent=product.name; document.getElementById('auth-purchase-price').textContent=`${money(product.priceCents)} · ${productDuration(product)}`; } catch {}
 }
 
 function accountSectionFromPath() {

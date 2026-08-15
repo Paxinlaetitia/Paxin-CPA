@@ -1,9 +1,9 @@
 /* Portal do cliente: estrutura compacta, responsiva e independente da interface do app. */
 .client-main { overflow: clip; }
-.client-access-section { min-height: 100dvh; display: flex; align-items: center; padding: 88px 0 72px; border-bottom: 0; }
-.client-access-grid { grid-template-columns: minmax(0,1fr) minmax(400px,440px); gap: clamp(48px,6vw,82px); align-items: center; }
+.client-access-section { min-height: 100dvh; display: flex; align-items: flex-start; padding: 88px 0 72px; border-bottom: 0; }
+.client-access-grid { grid-template-columns: minmax(0,1fr) minmax(400px,440px); gap: clamp(48px,6vw,82px); align-items: start; }
 .client-access-grid > *,.client-intro { min-width: 0; max-width: 100%; }
-.client-intro { max-width: 620px; }
+.client-intro { max-width: 620px; padding-top: 12px; }
 .client-intro h1 { max-width: 620px; margin: 18px 0 20px; font-size: clamp(48px,5vw,68px); line-height: 1; letter-spacing: -.055em; text-wrap: balance; }
 .client-intro > p { max-width: 590px; margin: 0; color: var(--text-2); font-size: 16px; line-height: 1.65; text-wrap: pretty; }
 .client-benefits { gap: 10px; margin-top: 26px; }
@@ -333,7 +333,7 @@
 
 @media (max-width: 920px) {
   .client-access-grid { grid-template-columns: 1fr; gap: 38px; }
-  .client-intro { max-width: 700px; }
+  .client-intro { max-width: 700px; padding-top: 0; }
   .auth-card { width: min(520px,100%); }
   .portal-plan-grid { grid-template-columns: 1fr; }
   .portal-plan-grid article { min-height: 0; }
