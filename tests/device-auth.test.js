@@ -83,6 +83,24 @@ test('desktop endpoint only accepts the opaque token format issued by the server
   assert.equal(called, false);
 });
 
+test('desktop pause closes the metered interval through the dedicated RPC', async () => {
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/paxinbot_service_rate_limit')) return jsonReply(200, true);
+    if (url.endsWith('/paxinbot_pause_desktop_usage')) return jsonReply(200, { active: true, paused: true, remainingSeconds: 2190 });
+    return jsonReply(404, {});
+  };
+  const handler = require('../api/v1/desktop/session');
+  const req = request(); req.method = 'POST'; req.headers.authorization = `Bearer ${'a'.repeat(64)}`;
+  const res = response();
+  await handler(req, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.paused, true);
+  assert.match(calls[1].url, /paxinbot_pause_desktop_usage$/);
+  assert.deepEqual(JSON.parse(calls[1].options.body), { p_token_hash: 'ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb' });
+});
+
 test('database authorization failures are translated without exposing internals', () => {
   const { safeDeviceAuthError } = require('../api/_paxinbot');
   assert.deepEqual(safeDeviceAuthError({ message: 'no_active_access' }), {
