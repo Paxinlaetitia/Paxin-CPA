@@ -80,6 +80,9 @@ function renderClientDashboard(payload) {
   const user = payload?.user; const entitlement = payload?.entitlement || {}; const email = String(user?.email || '');
   const displayName = payload?.profile?.displayName || (email ? email.split('@')[0] : 'Cliente');
   document.body.classList.toggle('client-authenticated', Boolean(user));
+  document.body.classList.toggle('client-guest', !user);
+  document.body.classList.remove('client-auth-pending');
+  document.body.setAttribute('aria-busy', 'false');
   document.getElementById('dashboard-initials').textContent = displayName.slice(0, 2).toUpperCase() || 'PB';
   document.getElementById('dashboard-email').textContent = email || 'Entre para consultar';
   document.getElementById('dashboard-greeting').textContent = user ? `Olá, ${displayName}` : 'Entre na sua conta';

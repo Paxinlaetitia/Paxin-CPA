@@ -23,6 +23,16 @@
 .auth-email-code-form input,#security-code-input { font-variant-numeric: tabular-nums; letter-spacing: .18em; }
 .auth-code-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 
+.client-auth-loader { display: none; min-height: 100vh; place-items: center; padding: 24px; background: #050505; }
+.client-auth-loader > div { display: grid; justify-items: center; gap: 10px; color: var(--text); text-align: center; }
+.client-auth-loader span { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid rgba(240,165,0,.28); border-radius: 14px; background: var(--accent-soft); }
+.client-auth-loader img { width: 34px; filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%); }
+.client-auth-loader b { font-size: 18px; }
+.client-auth-loader p { margin: 0; color: var(--muted); font-size: 11px; text-wrap: pretty; }
+.client-auth-pending .client-auth-loader { display: grid; }
+.client-auth-pending .client-access-section,.client-auth-pending .client-dashboard-preview,.client-auth-pending .site-header,.client-auth-pending .site-footer { display: none !important; }
+.client-guest .client-dashboard-preview { display: none !important; }
+.client-authenticated .client-auth-loader,.client-guest .client-auth-loader { display: none; }
 .client-dashboard-preview { display: none; min-height: 100vh; padding: 112px 0 72px; background: #070707; }
 .client-authenticated .site-header,.client-authenticated .site-footer,.client-authenticated .client-access-section { display: none !important; }
 .client-authenticated .client-dashboard-preview { display: block; min-height: 100vh; padding: 0 0 72px; }
