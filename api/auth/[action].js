@@ -43,11 +43,16 @@ module.exports = async (req, res) => {
   }
   if (action === 'session') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const accessToken = String(body.accessToken || ''); const refreshToken = String(body.refreshToken || '');
-    if (accessToken.length < 80 || refreshToken.length < 20) return json(res, 400, { ok: false, error: 'Sessão de autenticação inválida.' });
+    const body = await readBody(req); const accessToken = String(body.accessToken || ''); const receivedRefreshToken = String(body.refreshToken || '');
+    if (accessToken.length < 80) return json(res, 400, { ok: false, error: 'Sessão de autenticação inválida.' });
     const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${accessToken}` } });
     if (!response.ok || !payload?.id) return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
-    res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken)); return json(res, 200, { ok: true });
+    // Alguns provedores OAuth podem não devolver refresh token no callback
+    // implícito. A sessão por access token continua válida; ela apenas pedirá
+    // novo login ao expirar, em vez de bloquear a primeira entrada.
+    const refreshToken = receivedRefreshToken.length >= 20 ? receivedRefreshToken : '';
+    res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 30 : 60 * 60));
+    return json(res, 200, { ok: true, renewable: Boolean(refreshToken) });
   }
   if (action === 'password') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
