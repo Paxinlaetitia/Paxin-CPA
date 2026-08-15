@@ -14,10 +14,12 @@ test('client portal starts neutral and reveals exactly one authenticated state',
   const client = read('auth-client.js');
 
   assert.match(html, /<body class="client-auth-pending"[^>]+aria-busy="true">/);
+  assert.match(html, /<div data-site-header><\/div>/);
   assert.match(html, /id="client-auth-loader"[^>]+role="status"/);
   assert.match(css, /\.client-auth-pending \.client-access-section[^}]+display: none !important/);
   assert.match(css, /\.client-auth-pending \.client-dashboard-preview[^}]+display: none !important/);
   assert.match(css, /\.client-guest \.client-dashboard-preview \{ display: none !important; \}/);
+  assert.match(css, /\.client-authenticated \.site-header[^}]+display: none !important/);
   assert.match(client, /classList\.toggle\('client-authenticated', Boolean\(user\)\)/);
   assert.match(client, /classList\.toggle\('client-guest', !user\)/);
   assert.match(client, /classList\.remove\('client-auth-pending'\)/);
