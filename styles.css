@@ -499,3 +499,5 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .auth-callback { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 15%, rgba(240,165,0,.11), transparent 35%), var(--bg); }
 .auth-callback .auth-card { width: min(440px, 100%); }
 .auth-callback h1 { margin: 3px 0 0; font-size: 24px; letter-spacing: -.035em; }
+.client-authenticated .client-access-section { display: none; }
+.client-authenticated .client-dashboard-preview { padding-top: 130px; min-height: 100vh; }

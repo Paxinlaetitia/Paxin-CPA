@@ -29,10 +29,19 @@ async function upstream(path, options = {}) {
   return { response, payload };
 }
 async function readBody(req) {
-  // O adaptador da Vercel pode entregar JSON já analisado ou como texto.
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') { try { return JSON.parse(req.body || '{}'); } catch { return {}; } }
-  const chunks = []; for await (const chunk of req) chunks.push(chunk);
+  // O runtime pode fornecer objeto, string, Buffer ou ReadableStream. Só trate
+  // como objeto já analisado quando for um registro simples; streams não têm
+  // as propriedades de autenticação e precisam ser consumidos primeiro.
+  const raw = req.body;
+  if (raw && typeof raw === 'object' && !Buffer.isBuffer(raw) && (Object.getPrototypeOf(raw) === Object.prototype || Object.getPrototypeOf(raw) === null)) return raw;
+  if (typeof raw === 'string') { try { return JSON.parse(raw || '{}'); } catch { return {}; } }
+  if (Buffer.isBuffer(raw) || raw instanceof Uint8Array) { try { return JSON.parse(Buffer.from(raw).toString('utf8') || '{}'); } catch { return {}; } }
+  const source = raw && (typeof raw.getReader === 'function' || typeof raw[Symbol.asyncIterator] === 'function') ? raw : req;
+  const chunks = [];
+  if (typeof source.getReader === 'function') {
+    const reader = source.getReader(); let item;
+    while (!(item = await reader.read()).done) chunks.push(Buffer.from(item.value));
+  } else for await (const chunk of source) chunks.push(Buffer.from(chunk));
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; }
 }
 async function userFromAccess(access) {
