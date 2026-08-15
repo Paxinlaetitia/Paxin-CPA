@@ -120,6 +120,5 @@
 .paxin-calendar-footer .is-primary { border-color: var(--accent); background: var(--accent); color: #15100a; }
 
 @media (max-width: 520px) {
-  .paxin-select-menu,.paxin-calendar-panel { position: fixed; z-index: 400; inset: auto 16px 16px; width: auto; max-height: min(72dvh,560px); overflow-y: auto; }
-  .paxin-select.is-upward .paxin-select-menu,.paxin-calendar.is-upward .paxin-calendar-panel { inset: auto 16px 16px; }
+  .paxin-select-menu,.paxin-calendar-panel { max-height: min(72dvh,560px); overflow-y: auto; }
 }

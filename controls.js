@@ -33,18 +33,12 @@
 
   function positionPopover(root, panel) {
     root.classList.remove('is-upward'); panel.removeAttribute('style');
-    if (window.matchMedia('(max-width: 520px)').matches) return;
     const trigger = root.firstElementChild.getBoundingClientRect();
     const width = root.classList.contains('paxin-calendar') ? Math.min(326, window.innerWidth - 24) : trigger.width;
-    panel.style.position = 'fixed'; panel.style.width = `${width}px`;
-    panel.style.left = `${Math.max(12, Math.min(trigger.left, window.innerWidth - width - 12))}px`;
-    if (root.classList.contains('paxin-calendar')) {
-      panel.style.top = '50%'; panel.style.bottom = 'auto'; panel.style.transform = 'translateY(-50%)'; panel.style.maxHeight = 'calc(100dvh - 24px)'; panel.style.overflowY = 'auto'; return;
-    }
     const desiredHeight = panel.scrollHeight; const below = window.innerHeight - trigger.bottom - 12; const above = trigger.top - 12; const openBelow = below >= Math.min(desiredHeight, 260) || below >= above;
-    panel.style.maxHeight = `${Math.max(180, openBelow ? below : above)}px`; panel.style.overflowY = desiredHeight > (openBelow ? below : above) ? 'auto' : 'visible';
-    if (openBelow) { panel.style.top = `${trigger.bottom + 7}px`; panel.style.bottom = 'auto'; }
-    else { panel.style.top = 'auto'; panel.style.bottom = `${window.innerHeight - trigger.top + 7}px`; }
+    const available = Math.max(120, Math.floor(openBelow ? below : above));
+    root.classList.toggle('is-upward', !openBelow); panel.style.width = `${width}px`; panel.style.maxHeight = `${available}px`; panel.style.overflowY = desiredHeight > available ? 'auto' : 'visible';
+    if (root.classList.contains('paxin-calendar') && trigger.left + width > window.innerWidth - 12) { panel.style.left = 'auto'; panel.style.right = '0'; }
   }
 
   function enhanceSelect(select) {
