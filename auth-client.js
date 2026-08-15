@@ -19,10 +19,7 @@ let currentAccount = null;
 let availableProducts = [];
 let checkoutProduct = null;
 let currentOrderId = null;
-let pendingMfa = null;
-let currentMfa = { enabled:false, factor:null };
-let mfaEnrollment = null;
-let mfaDialogMode = 'enroll';
+let pendingEmailCode = null;
 
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
 function formatDate(value, withTime = true) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(date); }
@@ -41,7 +38,7 @@ function setAuthMode(mode) {
   const creating = mode === 'signup';
   document.getElementById('client-login-form').hidden = creating;
   document.getElementById('client-signup-form').hidden = !creating;
-  document.getElementById('client-mfa-form').hidden = true;
+  document.getElementById('client-email-code-form').hidden = true;
   document.querySelectorAll('.google-button, .passkey-button, .auth-divider').forEach(item => { item.hidden = creating; });
   document.querySelector('.auth-head h2').textContent = creating ? 'Crie sua conta' : 'Entre na sua conta';
   document.getElementById('auth-mode-copy').textContent = creating ? 'Crie uma conta para acompanhar acessos, dispositivos e compras.' : 'Use seu e-mail, Google ou uma passkey já cadastrada.';
@@ -49,30 +46,22 @@ function setAuthMode(mode) {
   document.getElementById('auth-switch').hidden = false;
 }
 
-function setMfaLoginStep(result) {
-  pendingMfa = { factorId:result.factorId, challengeId:result.challengeId, purpose:'login' };
+function setEmailCodeStep(result, purpose = result?.flow || 'login') {
+  pendingEmailCode = { purpose };
   document.getElementById('client-login-form').hidden = true;
   document.getElementById('client-signup-form').hidden = true;
-  document.getElementById('client-mfa-form').hidden = false;
+  document.getElementById('client-email-code-form').hidden = false;
   document.querySelectorAll('.google-button, .passkey-button, .auth-divider').forEach(item => { item.hidden = true; });
   document.getElementById('auth-switch').hidden = true;
-  document.querySelector('.auth-head h2').textContent = 'Verificação em duas etapas';
-  document.getElementById('auth-mode-copy').textContent = 'Sua senha foi confirmada. Falta apenas o código do aplicativo autenticador.';
-  document.getElementById('client-mfa-status').textContent = '';
-  document.getElementById('client-mfa-code').focus();
+  document.querySelector('.auth-head h2').textContent = purpose === 'signup' ? 'Confirme seu e-mail' : 'Verificação em duas etapas';
+  document.getElementById('auth-mode-copy').textContent = purpose === 'signup' ? 'Confirme que este e-mail pertence a você para concluir o cadastro.' : 'Sua senha foi confirmada. Falta apenas o código enviado por e-mail.';
+  document.getElementById('client-email-code-copy').textContent = `${result?.message || 'Enviamos um código de seis dígitos para seu e-mail.'}${result?.emailMasked ? ` Destino: ${result.emailMasked}.` : ''}`;
+  const status = document.getElementById('client-email-code-status'); status.textContent = ''; status.classList.remove('is-error');
+  document.getElementById('client-email-code').focus();
 }
 
-function cancelMfaLogin() {
-  pendingMfa = null; document.getElementById('client-mfa-form').reset(); setAuthMode('login');
-}
-
-function renderMfaStatus(payload) {
-  currentMfa = payload?.enabled ? { enabled:true, factor:payload.factor } : { enabled:false, factor:null };
-  const state = document.getElementById('mfa-state'); const copy = document.getElementById('mfa-copy'); const button = document.getElementById('mfa-configure');
-  if (!state || !copy || !button) return;
-  state.textContent = currentMfa.enabled ? 'ATIVA' : 'DESATIVADA';
-  copy.textContent = currentMfa.enabled ? 'Códigos do aplicativo autenticador são exigidos no login por senha.' : 'Use um aplicativo autenticador ao entrar com e-mail e senha.';
-  button.textContent = currentMfa.enabled ? 'Desativar' : 'Configurar';
+function cancelEmailCode() {
+  pendingEmailCode = null; document.getElementById('client-email-code-form').reset(); setAuthMode('login');
 }
 
 function friendlyPasskeyError(error) {
@@ -252,17 +241,16 @@ async function loadPortalData(basePayload) {
   try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
   const merged = { ...basePayload, profile: account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders, products, preferences, activity, tickets, mfa] = await Promise.all([
+  const [devices, orders, products, preferences, activity, tickets] = await Promise.all([
     PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message })),
     PaxinbotAuth.request('/api/account?action=preferences').then(result => result.data).catch(() => ({})),
     PaxinbotAuth.request('/api/account?action=activity').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/auth/mfa').catch(() => ({ enabled:false, factor:null }))
+    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => [])
   ]);
   renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error, products.checkoutReady);
-  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderMfaStatus(mfa);
+  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets);
 }
 
 async function getPasskeyClient() {
@@ -294,56 +282,25 @@ async function registerPasskey() {
   finally { button.disabled = false; }
 }
 
-function setMfaDialog(mode, enrollment = null) {
-  mfaDialogMode = mode; mfaEnrollment = enrollment;
-  const dialog = document.getElementById('mfa-dialog'); const setup = document.getElementById('mfa-enrollment'); const status = document.getElementById('mfa-config-status');
-  status.textContent = ''; status.classList.remove('is-error'); document.getElementById('mfa-config-form').reset();
-  setup.hidden = mode !== 'enroll';
-  if (mode === 'enroll') {
-    document.getElementById('mfa-dialog-title').textContent = 'Conectar autenticador';
-    document.getElementById('mfa-dialog-copy').textContent = 'Leia o QR Code usando Google Authenticator, Microsoft Authenticator ou outro aplicativo TOTP.';
-    document.getElementById('mfa-config-submit').textContent = 'Ativar proteção';
-    const qrCode = String(enrollment?.qrCode || ''); document.getElementById('mfa-qr-code').src = qrCode.startsWith('data:') ? qrCode : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrCode)}`;
-    document.getElementById('mfa-secret').textContent = enrollment?.secret || '—';
-  } else if (mode === 'disable') {
-    document.getElementById('mfa-dialog-title').textContent = 'Desativar segunda etapa';
-    document.getElementById('mfa-dialog-copy').textContent = 'Confirme um código atual do aplicativo autenticador. A senha continuará funcionando normalmente.';
-    document.getElementById('mfa-config-submit').textContent = 'Confirmar desativação';
-  } else {
-    document.getElementById('mfa-dialog-title').textContent = 'Confirme a segunda etapa';
-    document.getElementById('mfa-dialog-copy').textContent = 'Digite o código do aplicativo autenticador para continuar o cadastro da passkey.';
-    document.getElementById('mfa-config-submit').textContent = 'Confirmar e cadastrar passkey';
-  }
-  if (!dialog.open) dialog.showModal(); setTimeout(() => document.getElementById('mfa-config-code').focus(), 0);
-}
-
-async function openMfaConfiguration() {
-  if (currentMfa.enabled) return setMfaDialog('disable');
-  const result = await PaxinbotAuth.request('/api/auth/mfa-enroll', { method:'POST' }); setMfaDialog('enroll', result);
-}
-
-async function refreshMfaStatus() {
-  const result = await PaxinbotAuth.request('/api/auth/mfa'); renderMfaStatus(result);
-}
-
 async function completeClientLogin(result, message = 'Login realizado.') {
-  passkeySession = result?.passkeySession || null; pendingMfa = null;
+  passkeySession = result?.passkeySession || null; pendingEmailCode = null;
   const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user);
   const returningFromCheckout = new URLSearchParams(location.search).has('checkout'); setAccountView(returningFromCheckout ? 'subscription' : 'overview', false, !returningFromCheckout);
-  setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-mfa-form').reset(); void handleCheckoutReturn();
+  setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-email-code-form').reset(); void handleCheckoutReturn();
 }
 
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]'); consumePasskeySession();
   try { const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
-  form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.mfaRequired) return setMfaLoginStep(result); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
-  document.getElementById('client-mfa-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingMfa) return cancelMfaLogin(); const mfaForm = event.currentTarget; const button = mfaForm.querySelector('[type="submit"]'); const status = document.getElementById('client-mfa-status'); const code = new FormData(mfaForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/mfa-verify', { method:'POST', body:{ factorId:pendingMfa.factorId, challengeId:pendingMfa.challengeId, code } }); await completeClientLogin(result, 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
-  document.getElementById('client-mfa-cancel')?.addEventListener('click', cancelMfaLogin);
-  document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); setClientStatus(result.message, true); signup.reset(); setAuthMode('login'); window.showToast?.('Conta criada. Confira seu e-mail.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
+  form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.verificationRequired) return setEmailCodeStep(result, 'login'); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
+  document.getElementById('client-email-code-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingEmailCode) return cancelEmailCode(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('client-email-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); await completeClientLogin(result, pendingEmailCode?.purpose === 'signup' ? 'E-mail confirmado e conta criada.' : 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
+  document.getElementById('client-email-code-resend')?.addEventListener('click', async event => { const button = event.currentTarget; const status = document.getElementById('client-email-code-status'); button.disabled = true; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/resend-email-code', { method:'POST' }); status.textContent = result.message; } catch (error) { status.textContent = error.message; status.classList.add('is-error'); } finally { button.disabled = false; } });
+  document.getElementById('client-email-code-cancel')?.addEventListener('click', cancelEmailCode);
+  document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); setClientStatus(result.message, true); signup.reset(); if (result.verificationRequired) return setEmailCodeStep(result, 'signup'); await completeClientLogin(result, 'Conta criada.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
   document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
   document.getElementById('passkey-login')?.addEventListener('click', () => loginWithPasskey().catch(error => window.showToast?.(error.message)));
   document.getElementById('passkey-register')?.addEventListener('click', () => registerPasskey().catch(error => window.showToast?.(error.message)));
-  document.getElementById('passkey-password-confirm')?.addEventListener('click', async () => { const password = document.getElementById('passkey-password').value; if (!currentAccount?.user?.email || !password) return window.showToast?.('Informe sua senha.'); try { const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password } }); document.getElementById('passkey-dialog').close(); document.getElementById('passkey-password').value = ''; if (result.mfaRequired) { pendingMfa = { factorId:result.factorId, challengeId:result.challengeId, purpose:'passkey' }; return setMfaDialog('passkey'); } passkeySession = result.passkeySession; await registerPasskey(); } catch (error) { window.showToast?.(error.message); } });
+  document.getElementById('passkey-password-confirm')?.addEventListener('click', async () => { const password = document.getElementById('passkey-password').value; if (!currentAccount?.user?.email || !password) return window.showToast?.('Informe sua senha.'); try { const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password, purpose:'passkey' } }); document.getElementById('passkey-dialog').close(); document.getElementById('passkey-password').value = ''; if (result.verificationRequired) { pendingEmailCode = { purpose:'passkey' }; document.getElementById('security-code-copy').textContent = `${result.message}${result.emailMasked ? ` Destino: ${result.emailMasked}.` : ''}`; document.getElementById('security-code-status').textContent = ''; document.getElementById('security-code-dialog').showModal(); return; } } catch (error) { window.showToast?.(error.message); } });
   document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => { setAccountView(button.dataset.accountView); if (button.dataset.accountView === 'account') setAccountSection('profile', false, false); }));
   document.querySelectorAll('[data-account-section]').forEach(button => button.addEventListener('click', () => setAccountSection(button.dataset.accountSection)));
   document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => { const section = button.dataset.accountSectionOpen; setAccountView(button.dataset.accountOpen, true, !section); if (section) setAccountSection(section, false, true); }));
@@ -371,31 +328,16 @@ async function initClientPage() {
   document.getElementById('account-preferences-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'preferences', productUpdates:document.getElementById('preference-product-updates').checked, supportUpdates:document.getElementById('preference-support-updates').checked } }); renderPreferences(result.data); renderActivity((await PaxinbotAuth.request('/api/account?action=activity')).data); window.showToast?.('Preferências atualizadas.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('account-device-list')?.addEventListener('click', async event => { const button = event.target.closest('[data-revoke-device]'); if (!button || !confirm('Revogar o acesso deste computador?')) return; button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeDevice', sessionId:button.dataset.revokeDevice } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Dispositivo revogado.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });
   document.getElementById('revoke-all-devices')?.addEventListener('click', async event => { if (!confirm('Revogar todas as sessões do aplicativo?')) return; event.currentTarget.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeAllDevices' } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Sessões do aplicativo revogadas.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled = false; } });
-  document.getElementById('mfa-configure')?.addEventListener('click', event => { event.currentTarget.disabled = true; openMfaConfiguration().catch(error => window.showToast?.(error.message)).finally(() => { event.currentTarget.disabled = false; }); });
-  document.querySelector('[data-close-mfa]')?.addEventListener('click', () => { document.getElementById('mfa-dialog').close(); document.getElementById('mfa-config-form').reset(); });
-  document.getElementById('mfa-copy-secret')?.addEventListener('click', async () => { if (!mfaEnrollment?.secret) return; try { await navigator.clipboard.writeText(mfaEnrollment.secret); window.showToast?.('Chave copiada.'); } catch { window.showToast?.('Selecione e copie a chave exibida.'); } });
-  document.getElementById('mfa-config-form')?.addEventListener('submit', async event => {
-    event.preventDefault(); const mfaForm = event.currentTarget; const button = document.getElementById('mfa-config-submit'); const status = document.getElementById('mfa-config-status'); const code = new FormData(mfaForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error');
-    try {
-      if (mfaDialogMode === 'enroll') {
-        await PaxinbotAuth.request('/api/auth/mfa-enroll-verify', { method:'POST', body:{ factorId:mfaEnrollment?.factorId, code } }); await refreshMfaStatus(); document.getElementById('mfa-dialog').close(); window.showToast?.('Verificação em duas etapas ativada.');
-      } else if (mfaDialogMode === 'disable') {
-        await PaxinbotAuth.request('/api/auth/mfa-disable', { method:'POST', body:{ factorId:currentMfa.factor?.id, code } }); await refreshMfaStatus(); document.getElementById('mfa-dialog').close(); window.showToast?.('Verificação em duas etapas desativada.');
-      } else {
-        if (!pendingMfa) throw new Error('A confirmação expirou. Tente cadastrar a passkey novamente.');
-        const result = await PaxinbotAuth.request('/api/auth/mfa-verify', { method:'POST', body:{ factorId:pendingMfa.factorId, challengeId:pendingMfa.challengeId, code } }); passkeySession = result.passkeySession; pendingMfa = null; document.getElementById('mfa-dialog').close(); await registerPasskey();
-      }
-      mfaForm.reset();
-    } catch (error) { status.textContent = error.message || 'Não foi possível concluir a verificação.'; status.classList.add('is-error'); }
-    finally { button.disabled = false; }
-  });
+  document.querySelector('[data-close-security-code]')?.addEventListener('click', () => { pendingEmailCode = null; document.getElementById('security-code-dialog').close(); document.getElementById('security-code-form').reset(); });
+  document.getElementById('security-code-resend')?.addEventListener('click', async event => { const button = event.currentTarget; const status = document.getElementById('security-code-status'); button.disabled = true; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/resend-email-code', { method:'POST' }); status.textContent = result.message; } catch (error) { status.textContent = error.message; status.classList.add('is-error'); } finally { button.disabled = false; } });
+  document.getElementById('security-code-form')?.addEventListener('submit', async event => { event.preventDefault(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('security-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { if (pendingEmailCode?.purpose !== 'passkey') throw new Error('A confirmação expirou. Tente cadastrar a passkey novamente.'); const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); passkeySession = result.passkeySession; pendingEmailCode = null; document.getElementById('security-code-dialog').close(); codeForm.reset(); await registerPasskey(); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); } finally { button.disabled = false; } });
   document.querySelector('[data-open-password]')?.addEventListener('click', () => document.getElementById('password-dialog').showModal());
   document.querySelector('[data-close-password]')?.addEventListener('click', () => document.getElementById('password-dialog').close());
-  document.getElementById('account-password-form')?.addEventListener('submit', async event => { event.preventDefault(); const data = new FormData(event.currentTarget); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password:data.get('currentPassword') } }); await PaxinbotAuth.request('/api/auth/password', { method:'POST', body:{ password:data.get('password') } }); event.currentTarget.reset(); document.getElementById('password-dialog').close(); window.showToast?.('Senha alterada.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
+  document.getElementById('account-password-form')?.addEventListener('submit', async event => { event.preventDefault(); const data = new FormData(event.currentTarget); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { await PaxinbotAuth.request('/api/auth/password', { method:'POST', body:{ currentPassword:data.get('currentPassword'), password:data.get('password') } }); event.currentTarget.reset(); document.getElementById('password-dialog').close(); window.showToast?.('Senha alterada.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('password-recovery-link')?.addEventListener('click', async () => { if (!currentAccount?.user?.email) return; try { await PaxinbotAuth.request('/api/auth/recover', { method:'POST', body:{ email:currentAccount.user.email } }); window.showToast?.('Enviamos um link para criar ou redefinir sua senha.'); } catch (error) { window.showToast?.(error.message); } });
   document.getElementById('support-ticket-form')?.addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); const data = new FormData(form); button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'createTicket', category:data.get('category'), subject:data.get('subject'), message:data.get('message') } }); form.reset(); renderTickets((await PaxinbotAuth.request('/api/account?action=tickets')).data); window.showToast?.('Chamado aberto.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('support-ticket-list')?.addEventListener('submit', async event => { const form = event.target.closest('[data-ticket-reply]'); if (!form) return; event.preventDefault(); const ticketId = form.closest('[data-ticket-id]')?.dataset.ticketId; const button = form.querySelector('[type="submit"]'); const message = new FormData(form).get('message'); button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'replyTicket', ticketId, message } }); renderTickets((await PaxinbotAuth.request('/api/account?action=tickets')).data); window.showToast?.('Resposta enviada.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });
-  document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method:'POST' }); } catch {} passkeySession = null; pendingMfa = null; renderMfaStatus({ enabled:false }); renderClientDashboard(null); await syncOwnerPanelLink(null); setAccountView('overview', false, false); history.replaceState({}, '', '/conta'); setClientStatus('Sessão encerrada.'); window.scrollTo({ top:0, behavior:'smooth' }); });
+  document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method:'POST' }); } catch {} passkeySession = null; pendingEmailCode = null; renderClientDashboard(null); await syncOwnerPanelLink(null); setAccountView('overview', false, false); history.replaceState({}, '', '/conta'); setClientStatus('Sessão encerrada.'); window.scrollTo({ top:0, behavior:'smooth' }); });
   if (currentAccount?.user) void handleCheckoutReturn();
 }
 

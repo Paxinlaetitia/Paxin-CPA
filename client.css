@@ -13,7 +13,8 @@
 .auth-step-copy span { color: var(--accent); font-size: 8px; font-weight: 800; }
 .auth-step-copy b { font-size: 14px; }
 .auth-step-copy p { margin: 0; color: var(--text-2); font-size: 10px; line-height: 1.5; text-wrap: pretty; }
-.auth-mfa-form input { font-variant-numeric: tabular-nums; letter-spacing: .18em; }
+.auth-email-code-form input,#security-code-input { font-variant-numeric: tabular-nums; letter-spacing: .18em; }
+.auth-code-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 
 .client-dashboard-preview { display: none; min-height: 100vh; padding: 112px 0 72px; background: #070707; }
 .client-authenticated .site-header,.client-authenticated .site-footer,.client-authenticated .client-access-section { display: none !important; }
@@ -171,14 +172,6 @@
 .portal-dialog h2 { margin: 0; font-size: 25px; }
 .portal-dialog p { margin: -4px 0 4px; color: var(--text-2); font-size: 11px; line-height: 1.6; }
 .dialog-close { position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
-.mfa-dialog { width: min(520px,calc(100% - 32px)); }
-.mfa-enrollment { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; gap: 16px; padding: 15px; border: 1px solid var(--line-strong); border-radius: 12px; background: #050505; }
-.mfa-enrollment[hidden] { display: none !important; }
-.mfa-enrollment > img { width: 150px; height: 150px; padding: 7px; border-radius: 8px; background: #fff; }
-.mfa-enrollment > div { min-width: 0; display: grid; gap: 7px; }
-.mfa-enrollment small { color: var(--muted); font-size: 8px; font-weight: 800; }
-.mfa-enrollment code { overflow-wrap: anywhere; color: var(--text); font-size: 11px; line-height: 1.5; user-select: all; }
-.mfa-enrollment .link-button { width: max-content; }
 .form-inline-status { min-height: 16px; margin: 0 !important; color: var(--muted); font-size: 9px !important; }
 .form-inline-status.is-error { color: #ff8b8b; }
 .checkout-dialog { width: min(520px,calc(100% - 32px)); }
@@ -239,6 +232,7 @@
 .portal-setting-card,.portal-download-card { min-width: 0; min-height: 150px; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 18px; padding: 24px; border: 1px solid var(--line-strong); border-radius: 16px; background: #0a0a0a; }
 .portal-setting-card button { min-height: 40px; padding: 0 14px; border: 1px solid rgba(240,165,0,.32); border-radius: 9px; background: var(--accent-soft); color: var(--accent-bright); font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
 .portal-setting-card button:disabled { cursor: not-allowed; opacity: .5; }
+.security-code-card > small { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 9px; font-weight: 700; }
 .portal-download-mark { width: 56px; height: 56px; display: grid; place-items: center; border: 1px solid rgba(240,165,0,.22); border-radius: 14px; background: var(--accent-soft); }
 .portal-download-mark img { width: 34px; filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%); }
 .portal-download-card .button { white-space: nowrap; }
@@ -268,8 +262,6 @@
 }
 
 @media (max-width: 680px) {
-  .mfa-enrollment { grid-template-columns: 1fr; justify-items: center; text-align: center; }
-  .mfa-enrollment > div { justify-items: center; }
   .client-access-section { padding: 104px 0 58px; }
   .client-benefits { grid-template-columns: 1fr; }
   .client-benefits > div { min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
@@ -291,7 +283,7 @@
   .access-overview-card > div + div { border-top: 1px solid var(--line); border-left: 0; }
   .portal-quick-grid { grid-template-columns: 1fr; }
   .portal-setting-card,.portal-download-card { grid-template-columns: auto 1fr; align-items: start; }
-  .portal-setting-card button,.portal-download-card .button { grid-column: 1 / -1; width: 100%; justify-content: center; }
+  .portal-setting-card button,.portal-download-card .button,.security-code-card > small { grid-column: 1 / -1; width: 100%; justify-content: center; text-align: center; }
   .portal-current-plan { align-items: flex-start; flex-direction: column; }
   .portal-current-plan .button { width: 100%; justify-content: center; }
   .portal-list-row { grid-template-columns: auto minmax(0,1fr) auto; }

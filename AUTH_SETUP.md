@@ -47,21 +47,29 @@ O suporte de passkeys do Supabase é experimental; mantenha login por e-mail/sen
 
 Se o navegador informar incompatibilidade de domínio, confirme que o site foi aberto em `https://www.paxincpa.store`. O domínio sem `www` deve redirecionar antes de iniciar a passkey. Uma conta precisa cadastrar a passkey em **Minha conta → Segurança** antes de usá-la na tela de login.
 
-## 5. Verificação em duas etapas
+## 5. Códigos de verificação por e-mail
 
-A Área do Cliente usa o MFA TOTP nativo do Supabase. O cliente ativa a proteção em **Minha conta → Segurança**, lê o QR Code em um aplicativo autenticador e confirma o primeiro código de seis dígitos.
+A Área do Cliente exige um código de seis dígitos para confirmar novos cadastros e para concluir todo login com e-mail e senha. O Supabase gera, expira e limita as tentativas; o Paxinbot só cria a sessão definitiva depois que o código é validado.
 
-- o código é exigido depois da senha, antes de a sessão definitiva ser criada;
+Em **Authentication → Email Templates**:
+
+1. Abra **Confirm sign up** e inclua `{{ .Token }}` no conteúdo. Esse é o código mostrado ao novo cliente.
+2. Abra **Magic link or OTP** e inclua `{{ .Token }}` no conteúdo. Esse é o código usado depois da senha.
+3. Mantenha os assuntos claros, por exemplo “Seu código de confirmação Paxinbot”.
+4. Configure e valide o SMTP antes de abrir o cadastro ao público.
+
+- a etapa posterior à senha usa cookies temporários `HttpOnly`, `SameSite=Strict` e expiração de dez minutos;
+- um código de login só é aceito para a mesma conta cuja senha já foi confirmada;
 - Google e passkey continuam sendo métodos independentes de autenticação;
-- segredos e códigos TOTP não são enviados para logs nem persistidos no navegador;
-- a desativação exige um código válido do autenticador.
+- códigos, senhas e tokens não são gravados em logs nem persistidos no navegador;
+- o botão de reenvio usa os limites de envio do próprio Supabase.
 
 ## Verificação antes do lançamento
 
-1. Criar uma conta e confirmar o e-mail.
-2. Fazer login e logout com senha.
+1. Criar uma conta, receber o código e confirmar o e-mail.
+2. Fazer login com senha, confirmar o segundo código e sair.
 3. Entrar com Google em uma conta nova e em uma conta existente.
 4. Recuperar senha pelo e-mail.
 5. Cadastrar e usar uma passkey em ao menos dois navegadores/dispositivos.
-6. Ativar o TOTP, sair, entrar por senha e confirmar que o painel só abre após o segundo código.
+6. Solicitar reenvio, testar código inválido e confirmar que o painel permanece bloqueado.
 7. Confirmar que `admin.html` continua bloqueado para contas de cliente.

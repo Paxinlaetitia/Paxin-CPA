@@ -5,10 +5,10 @@ Atualizada em 15/08/2026.
 ## Implementado e conectado
 
 - Site institucional multipágina e responsivo.
-- Cadastro, login por e-mail, confirmação de conta e recuperação de senha pelo Supabase.
+- Cadastro e login por senha com código de seis dígitos enviado por e-mail, além de recuperação de senha pelo Supabase.
 - Login Google com sessão gravada em cookies `HttpOnly`.
 - Base experimental de passkeys com alternativa por e-mail e Google.
-- Verificação em duas etapas TOTP para login por e-mail e senha, com sessão intermediária de curta duração.
+- Verificação obrigatória por e-mail após a senha, com sessão intermediária `HttpOnly` de curta duração e vínculo entre os dois fatores.
 - Área do Cliente autenticada com acesso, validade, segurança e download.
 - Modalidades exibidas dentro da Área do Cliente.
 - Autorização do aplicativo por código de dispositivo.
