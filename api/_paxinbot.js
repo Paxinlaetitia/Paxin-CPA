@@ -167,6 +167,16 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
   if (/ticket_unavailable/i.test(message)) return 'Este chamado não está disponível para essa operação.';
   return fallback;
 }
+function safeDeviceAuthError(payload, fallback = 'Não foi possível concluir a autorização.') {
+  const message = String(payload?.message || payload?.error || '');
+  if (/no_active_access/i.test(message)) return { code: 'access_required', error: 'Sua conta não possui acesso ativo ao aplicativo.' };
+  if (/device_expired/i.test(message)) return { code: 'request_expired', error: 'A solicitação expirou. Inicie o login novamente no aplicativo.' };
+  if (/device_consumed/i.test(message)) return { code: 'request_consumed', error: 'Esta solicitação já foi utilizada. Inicie um novo login no aplicativo.' };
+  if (/device_denied/i.test(message)) return { code: 'request_denied', error: 'A autorização deste computador foi recusada.' };
+  if (/device_poll_limit/i.test(message)) return { code: 'poll_limit', error: 'A solicitação excedeu o limite de tentativas. Inicie novamente.' };
+  if (/device_request_invalid|invalid_device_request/i.test(message)) return { code: 'request_invalid', error: 'A solicitação do aplicativo é inválida.' };
+  return { code: 'authorization_failed', error: fallback };
+}
 async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   const apiKey = String(process.env.RESEND_API_KEY || '');
   const from = String(process.env.RESEND_FROM_EMAIL || '');
@@ -179,4 +189,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   if (!response.ok) throw new Error('email_provider_error');
   return { sent:true, configured:true };
 }
-module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

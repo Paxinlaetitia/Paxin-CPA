@@ -81,3 +81,15 @@ test('desktop endpoint only accepts the opaque token format issued by the server
   assert.equal(called, false);
 });
 
+test('database authorization failures are translated without exposing internals', () => {
+  const { safeDeviceAuthError } = require('../api/_paxinbot');
+  assert.deepEqual(safeDeviceAuthError({ message: 'no_active_access' }), {
+    code: 'access_required',
+    error: 'Sua conta não possui acesso ativo ao aplicativo.'
+  });
+  assert.deepEqual(safeDeviceAuthError({ message: 'device_expired' }), {
+    code: 'request_expired',
+    error: 'A solicitação expirou. Inicie o login novamente no aplicativo.'
+  });
+  assert.equal(safeDeviceAuthError({ message: 'SQL details that must stay private' }).code, 'authorization_failed');
+});
