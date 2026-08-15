@@ -1,0 +1,10 @@
+# Segredos e configurações locais
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Saídas e metadados de ferramentas
+.vercel
+node_modules
+coverage
