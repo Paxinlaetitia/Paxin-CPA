@@ -8,6 +8,12 @@ function config() {
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !key.startsWith('sb_publishable_')) throw new Error('Configuração Supabase ausente no ambiente da Vercel.');
   return { url, key };
 }
+function serviceConfig() {
+  const { url } = config();
+  const key = String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+  if (!key || (!key.startsWith('sb_secret_') && key.split('.').length !== 3)) throw new Error('Chave secreta do Supabase ausente no ambiente da Vercel.');
+  return { url, key };
+}
 function json(res, status, body, headers = {}) {
   // Vercel executa estas funções como Node HTTP handlers, não como Express.
   // Usar a API nativa evita depender de res.set()/encadeamento específico.
@@ -25,6 +31,16 @@ function clearSession(req) { return sessionCookies(req, '', '', 0); }
 async function upstream(path, options = {}) {
   const { url, key } = config();
   const response = await fetch(`${url}${path}`, { method: options.method || 'GET', headers: { apikey: key, 'content-type': 'application/json', ...(options.headers || {}) }, body: options.body === undefined ? undefined : JSON.stringify(options.body) });
+  let payload = null; try { payload = await response.json(); } catch {}
+  return { response, payload };
+}
+async function serviceUpstream(path, options = {}) {
+  const { url, key } = serviceConfig();
+  const headers = { apikey: key, 'content-type': 'application/json', ...(options.headers || {}) };
+  // As novas chaves sb_secret_ não são JWTs. O Bearer só é necessário para a
+  // chave service_role legada; enviar sb_secret_ como Bearer causa Invalid JWT.
+  if (!key.startsWith('sb_secret_')) headers.authorization = `Bearer ${key}`;
+  const response = await fetch(`${url}${path}`, { method: options.method || 'GET', headers, body: options.body === undefined ? undefined : JSON.stringify(options.body) });
   let payload = null; try { payload = await response.json(); } catch {}
   return { response, payload };
 }
@@ -85,6 +101,11 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
   if (code === 'PGRST202' || /function.*schema cache|could not find the function/i.test(message)) return 'A atualização do banco necessária para esta função ainda não foi aplicada.';
   if (/user_not_found/i.test(message)) return 'Nenhum cliente foi encontrado com esse e-mail.';
   if (/invalid_entitlement/i.test(message)) return 'Informe uma expiração futura para o acesso por tempo.';
+  if (/product_unavailable|invalid_product/i.test(message)) return 'Esta modalidade não está mais disponível.';
+  if (/product_not_payable|zero_value_checkout/i.test(message)) return 'Esta modalidade ainda não pode ser comprada pelo checkout.';
+  if (/invalid_coupon|coupon_unavailable/i.test(message)) return 'O cupom é inválido, expirou ou atingiu o limite de usos.';
+  if (/lifetime_already_active/i.test(message)) return 'Sua conta já possui acesso vitalício.';
+  if (/checkout_rate_limited/i.test(message)) return 'Muitas tentativas de pagamento. Aguarde alguns minutos e tente novamente.';
   return fallback;
 }
-module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError };
+module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError };

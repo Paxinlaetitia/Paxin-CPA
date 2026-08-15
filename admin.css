@@ -44,6 +44,7 @@
 .admin-table-card td { color: var(--text-2); font-variant-numeric: tabular-nums; }
 .admin-table-card td:first-child { color: var(--text); font-weight: 700; }
 .admin-row-actions { display: flex; gap: 6px; }
+.admin-cell-note { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; font-weight: 500; }
 .admin-row-actions button { min-height: 30px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 7px; background: #0e0e0e; color: var(--text-2); font: inherit; font-size: 8px; cursor: pointer; }
 .admin-row-actions button.danger { border-color: rgba(235,91,91,.22); color: #f08a8a; }
 .admin-status { padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,.05); color: var(--muted); font-size: 8px; font-weight: 800; }

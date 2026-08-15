@@ -40,7 +40,8 @@ const Admin = (() => {
 
   function renderOrders(orders) {
     state.orders = orders || [];
-    rows('#admin-orders-list', state.orders.map(order => `<tr><td>${escape(order.email)}</td><td>${escape(order.productName || '—')}</td><td>${money(order.amountCents, order.currency)}</td><td><span class="admin-status ${escape(order.status)}">${escape(order.status)}</span></td><td>${date(order.createdAt)}</td></tr>`).join(''), 'Nenhum pedido registrado.', 5);
+    const labels = { pending:'Aguardando', paid:'Pago', refunded:'Reembolsado', cancelled:'Cancelado', chargeback:'Contestado' };
+    rows('#admin-orders-list', state.orders.map(order => `<tr><td>${escape(order.email)}</td><td>${escape(order.productName || '—')}</td><td><b>${money(order.amountCents, order.currency)}</b>${Number(order.discountCents) > 0 ? `<small class="admin-cell-note">Desconto ${money(order.discountCents, order.currency)}</small>` : ''}</td><td>${order.paymentProvider === 'mercado_pago' ? 'Mercado Pago' : escape(order.paymentProvider || '—')}<small class="admin-cell-note">${escape(order.providerStatus || 'Sem retorno')}</small></td><td><span class="admin-status ${escape(order.status)}">${escape(labels[order.status] || order.status)}</span></td><td>${date(order.createdAt)}</td></tr>`).join(''), 'Nenhum pedido registrado.', 6);
   }
 
   function renderAudit(events) {
