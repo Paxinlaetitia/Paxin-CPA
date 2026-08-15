@@ -2,7 +2,7 @@
 const { config, publicOrigin } = require('../_paxinbot');
 
 module.exports = async (req, res) => {
-  if (req.method !== 'GET') { res.status(405).end(); return; }
+  if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
   const { url } = config();
   const target = new URL(`${url}/auth/v1/authorize`);
   target.searchParams.set('provider', 'google');

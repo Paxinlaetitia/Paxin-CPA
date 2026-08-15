@@ -8,7 +8,13 @@ function config() {
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !key.startsWith('sb_publishable_')) throw new Error('Configuração Supabase ausente no ambiente da Vercel.');
   return { url, key };
 }
-function json(res, status, body, headers = {}) { res.status(status).set({ 'cache-control': 'no-store', ...headers }).json(body); }
+function json(res, status, body, headers = {}) {
+  // Vercel executa estas funções como Node HTTP handlers, não como Express.
+  // Usar a API nativa evita depender de res.set()/encadeamento específico.
+  res.statusCode = status;
+  for (const [name, value] of Object.entries({ 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8', ...headers })) res.setHeader(name, value);
+  res.end(JSON.stringify(body));
+}
 function cookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim().split(/=(.*)/s)).filter(([k]) => k).map(([k, v]) => [k, decodeURIComponent(v || '')])); }
 function secure(req) { return process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https'); }
 function sessionCookies(req, accessToken, refreshToken, maxAge = 60 * 60 * 24 * 30) {
