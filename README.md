@@ -25,6 +25,21 @@ Para ativar gerenciamento de perfil, dispositivos, pedidos e auditoria nos novos
 
 Para listar automaticamente na aba Assinatura os produtos ativos cadastrados pelo owner, execute também `supabase/migrations/20260816_catalog.sql`.
 
+## Login seguro do aplicativo
+
+O Paxinbot é tratado como um cliente público: o executável não contém a chave
+secreta do Supabase, credenciais administrativas ou acesso direto às tabelas.
+Ele inicia uma autorização curta, abre `https://www.paxincpa.store/activate` no
+navegador e recebe somente uma sessão opaca de dispositivo depois da aprovação.
+
+Antes de publicar a versão integrada, execute
+`supabase/migrations/20260819_desktop_auth_hardening.sql` no SQL Editor. Essa
+migração restringe os RPCs de dispositivo ao backend da Vercel, adiciona limites
+de tentativas e reduz a sessão do aplicativo para sete dias. As variáveis
+`SUPABASE_SECRET_KEY` e `PAXINBOT_SESSION_SECRET` devem existir somente na
+Vercel. O arquivo `paxinbot-auth.json` distribuído com o aplicativo contém apenas
+a URL pública do site.
+
 ## Checkout e liberação automática
 
 O fluxo comercial usa Checkout Pro do Mercado Pago. Antes de habilitar compras em produção:

@@ -99,6 +99,32 @@ async function browserSession(req, res) {
   return { user, access };
 }
 function sha256(value) { return crypto.createHash('sha256').update(String(value)).digest('hex'); }
+function serverFingerprint(purpose, value) {
+  const secret = sessionSecret();
+  if (!secret) throw new Error('Segredo interno do servidor ausente.');
+  return crypto.createHmac('sha256', secret).update(`${String(purpose)}\0${String(value)}`).digest('hex');
+}
+function clientAddress(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return forwarded || String(req.socket?.remoteAddress || 'unknown').trim().slice(0, 128);
+}
+function isUuid(value) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '')); }
+function cleanDeviceName(value) {
+  const name = String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 80);
+  return name || 'Computador Paxinbot';
+}
+async function serviceRateLimit(scope, subject, limit, windowSeconds) {
+  const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit', {
+    method: 'POST',
+    body: {
+      p_scope: String(scope || '').slice(0, 40),
+      p_subject_hash: serverFingerprint(scope, subject),
+      p_limit: Math.max(1, Math.min(1000, Number(limit) || 1)),
+      p_window_seconds: Math.max(10, Math.min(86400, Number(windowSeconds) || 60))
+    }
+  });
+  return response.ok && payload === true;
+}
 function publicOrigin(req) {
   let origin = String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, '');
   // O domínio configurado na Vercel usa www como host canônico. Retornos OAuth
@@ -153,4 +179,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   if (!response.ok) throw new Error('email_provider_error');
   return { sent:true, configured:true };
 }
-module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail };
