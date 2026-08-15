@@ -106,6 +106,24 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
   if (/invalid_coupon|coupon_unavailable/i.test(message)) return 'O cupom é inválido, expirou ou atingiu o limite de usos.';
   if (/lifetime_already_active/i.test(message)) return 'Sua conta já possui acesso vitalício.';
   if (/checkout_rate_limited/i.test(message)) return 'Muitas tentativas de pagamento. Aguarde alguns minutos e tente novamente.';
+  if (/order_not_pending/i.test(message)) return 'Este pedido não está mais aguardando pagamento.';
+  if (/order_expired/i.test(message)) return 'Este pedido expirou. Inicie uma nova compra.';
+  if (/receipt_unavailable/i.test(message)) return 'O comprovante só está disponível para pedidos pagos.';
+  if (/invalid_ticket|invalid_message/i.test(message)) return 'Revise o assunto e a mensagem do chamado.';
+  if (/ticket_rate_limited/i.test(message)) return 'Você atingiu o limite de chamados. Aguarde antes de abrir outro.';
+  if (/ticket_unavailable/i.test(message)) return 'Este chamado não está disponível para essa operação.';
   return fallback;
 }
-module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError };
+async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
+  const apiKey = String(process.env.RESEND_API_KEY || '');
+  const from = String(process.env.RESEND_FROM_EMAIL || '');
+  if (!apiKey || !from) return { sent:false, configured:false };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(to || '')) || !subject || !html) throw new Error('invalid_email_payload');
+  const response = await fetch('https://api.resend.com/emails', {
+    method:'POST', headers:{ authorization:`Bearer ${apiKey}`, 'content-type':'application/json', ...(idempotencyKey ? { 'idempotency-key':String(idempotencyKey).slice(0,256) } : {}) },
+    body:JSON.stringify({ from, to:[to], subject:String(subject).slice(0,180), html })
+  });
+  if (!response.ok) throw new Error('email_provider_error');
+  return { sent:true, configured:true };
+}
+module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail };

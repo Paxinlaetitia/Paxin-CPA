@@ -1,8 +1,8 @@
 'use strict';
 
 const Admin = (() => {
-  const routes = { overview:'/admin', customers:'/admin/clientes', access:'/admin/acessos', products:'/admin/produtos', coupons:'/admin/cupons', orders:'/admin/pedidos', audit:'/admin/auditoria' };
-  const state = { users:[], products:[], coupons:[], orders:[], audit:[] };
+  const routes = { overview:'/admin', customers:'/admin/clientes', access:'/admin/acessos', products:'/admin/produtos', coupons:'/admin/cupons', orders:'/admin/pedidos', tickets:'/admin/atendimento', audit:'/admin/auditoria' };
+  const state = { users:[], products:[], coupons:[], orders:[], tickets:[], audit:[], currentTicket:null };
   const call = async (path, options = {}) => { const response = await fetch(`/api/admin${path}`, { method:options.method || 'GET', credentials:'include', headers:{ 'content-type':'application/json' }, body:options.body ? JSON.stringify(options.body) : undefined }); const payload = await response.json().catch(() => ({})); if (!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível concluir a operação.'); return payload.data; };
   const escape = value => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]);
   const money = (cents, currency = 'BRL') => new Intl.NumberFormat('pt-BR', { style:'currency', currency }).format((Number(cents) || 0) / 100);
@@ -21,6 +21,9 @@ const Admin = (() => {
     document.getElementById('admin-accesses').textContent = data.activeAccesses ?? 0;
     document.getElementById('admin-products').textContent = data.activeProducts ?? 0;
     document.getElementById('admin-paid-orders').textContent = data.paidOrders ?? 0;
+    document.getElementById('admin-revenue').textContent = money(data.revenueCents);
+    document.getElementById('admin-pending-orders').textContent = data.pendingOrders ?? 0;
+    document.getElementById('admin-open-tickets').textContent = data.openTickets ?? 0;
   }
 
   function renderUsers(users) {
@@ -49,11 +52,34 @@ const Admin = (() => {
     rows('#admin-audit-list', state.audit.map(event => `<tr><td>${escape(event.eventType)}</td><td>${escape(event.email || 'Sistema')}</td><td>${date(event.createdAt)}</td></tr>`).join(''), 'Nenhum evento de auditoria encontrado.', 3);
   }
 
+  function renderTickets(tickets) {
+    state.tickets = tickets || []; const root = document.getElementById('admin-ticket-list');
+    const labels = { open:'Aberto', in_progress:'Em atendimento', resolved:'Resolvido', closed:'Encerrado' };
+    if (!state.tickets.length) { root.innerHTML = '<div class="admin-empty">Nenhum chamado encontrado.</div>'; return; }
+    root.innerHTML = state.tickets.map(ticket => `<article><div><span>${escape(ticket.category)}</span><h3>${escape(ticket.subject)}</h3><p>${escape(ticket.email)} · Atualizado em ${date(ticket.updatedAt)}</p></div><span class="admin-status ${escape(ticket.status)}">${escape(labels[ticket.status] || ticket.status)}</span><button type="button" data-open-ticket="${escape(ticket.id)}">Abrir conversa</button></article>`).join('');
+  }
+
+  function openTicket(ticket) {
+    if (!ticket) return; state.currentTicket = ticket;
+    document.getElementById('admin-ticket-title').textContent = ticket.subject; document.getElementById('admin-ticket-customer').textContent = ticket.email;
+    document.getElementById('admin-ticket-status').value = ticket.status;
+    document.getElementById('admin-support-thread').innerHTML = (ticket.messages || []).map(message => `<article class="${message.authorKind === 'owner' ? 'is-owner' : ''}"><b>${message.authorKind === 'owner' ? 'Você' : escape(ticket.email)}</b><p>${escape(message.body)}</p><small>${date(message.createdAt)}</small></article>`).join('');
+    const replyForm = document.getElementById('admin-ticket-reply-form'); const closed = ticket.status === 'closed'; replyForm.elements.message.disabled = closed; replyForm.querySelector('[type="submit"]').hidden = closed; const dialog = document.getElementById('admin-ticket-dialog'); if (!dialog.open) dialog.showModal();
+  }
+
+  function exportOrders() {
+    if (!state.orders.length) return window.showToast?.('Não há pedidos para exportar.');
+    const safe = value => { let text = String(value ?? '').replace(/"/g, '""'); if (/^[=+\-@]/.test(text)) text = `'${text}`; return `"${text}"`; };
+    const labels = { pending:'Aguardando', paid:'Pago', refunded:'Reembolsado', cancelled:'Cancelado', chargeback:'Contestado' };
+    const lines = [['Pedido','Cliente','Produto','Valor','Moeda','Desconto','Status','Provedor','Criado em','Pago em'], ...state.orders.map(order => [order.id,order.email,order.productName,Number(order.amountCents)/100,order.currency,Number(order.discountCents||0)/100,labels[order.status]||order.status,order.paymentProvider||'',order.createdAt,order.paidAt||''])];
+    const blob = new Blob([`\uFEFF${lines.map(line => line.map(safe).join(';')).join('\r\n')}`], { type:'text/csv;charset=utf-8' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `paxinbot-pedidos-${new Date().toISOString().slice(0,10)}.csv`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
   async function loadAll() {
     const [overview, users, products, coupons] = await Promise.all([call('?action=overview'), call('?action=users'), call('?action=products'), call('?action=coupons')]);
     renderOverview(overview); renderUsers(users); renderProducts(products); renderCoupons(coupons);
-    const [orders, audit] = await Promise.all([call('?action=orders').catch(() => []), call('?action=audit').catch(() => [])]);
-    renderOrders(orders); renderAudit(audit);
+    const [orders, tickets, audit] = await Promise.all([call('?action=orders').catch(() => []), call('?action=tickets').catch(() => []), call('?action=audit').catch(() => [])]);
+    renderOrders(orders); renderTickets(tickets); renderAudit(audit);
   }
 
   function configureProductForm(product = null) {
@@ -99,6 +125,10 @@ const Admin = (() => {
     document.getElementById('admin-products-list').addEventListener('click', async event => { const edit = event.target.closest('[data-edit-product]'); const toggle = event.target.closest('[data-toggle-product]'); if (edit) configureProductForm(state.products.find(item => item.id === edit.dataset.editProduct)); if (toggle) { const product = state.products.find(item => item.id === toggle.dataset.toggleProduct); if (!product) return; toggle.disabled = true; try { await call('', { method:'POST', body:{ action:'product', id:product.id, code:product.code, name:product.name, description:product.description, accessKind:product.access_kind, durationMinutes:product.duration_minutes, priceCents:product.price_cents, active:!product.active } }); renderProducts(await call('?action=products')); renderOverview(await call('?action=overview')); } catch (error) { toggle.disabled = false; window.showToast?.(error.message); } } });
     document.getElementById('admin-coupons-list').addEventListener('click', async event => { const edit = event.target.closest('[data-edit-coupon]'); const toggle = event.target.closest('[data-toggle-coupon]'); if (edit) configureCouponForm(state.coupons.find(item => item.id === edit.dataset.editCoupon)); if (toggle) { const coupon = state.coupons.find(item => item.id === toggle.dataset.toggleCoupon); if (!coupon) return; toggle.disabled = true; try { await call('', { method:'POST', body:{ action:'coupon', id:coupon.id, code:coupon.code, description:coupon.description, discountType:coupon.discount_type, discountValue:coupon.discount_value, maxRedemptions:coupon.max_redemptions, expiresAt:coupon.expires_at, active:!coupon.active } }); renderCoupons(await call('?action=coupons')); } catch (error) { toggle.disabled = false; window.showToast?.(error.message); } } });
     document.getElementById('admin-users-list').addEventListener('click', async event => { const grant = event.target.closest('[data-grant-email]'); const revoke = event.target.closest('[data-revoke-access]'); if (grant) { setView('access'); document.getElementById('admin-access-form').elements.email.value = grant.dataset.grantEmail; } if (revoke && confirm('Revogar o acesso e as sessões deste cliente?')) { revoke.disabled = true; try { await call('', { method:'POST', body:{ action:'revokeAccess', userId:revoke.dataset.revokeAccess } }); renderUsers(await call('?action=users')); renderOverview(await call('?action=overview')); window.showToast?.('Acesso revogado.'); } catch (error) { revoke.disabled = false; window.showToast?.(error.message); } } });
+    document.getElementById('admin-export-orders').addEventListener('click', exportOrders);
+    document.getElementById('admin-ticket-list').addEventListener('click', event => { const button = event.target.closest('[data-open-ticket]'); if (button) openTicket(state.tickets.find(ticket => ticket.id === button.dataset.openTicket)); });
+    document.getElementById('admin-ticket-status').addEventListener('change', async event => { if (!state.currentTicket) return; event.currentTarget.disabled = true; try { await call('', { method:'POST', body:{ action:'ticketStatus', ticketId:state.currentTicket.id, status:event.currentTarget.value } }); renderTickets(await call('?action=tickets')); renderOverview(await call('?action=overview')); document.getElementById('admin-ticket-dialog').close(); window.showToast?.('Status atualizado.'); } catch (error) { event.currentTarget.disabled = false; window.showToast?.(error.message); } });
+    document.getElementById('admin-ticket-reply-form').addEventListener('submit', async event => { event.preventDefault(); if (!state.currentTicket) return; const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); const message = new FormData(form).get('message'); button.disabled = true; try { await call('', { method:'POST', body:{ action:'ticketReply', ticketId:state.currentTicket.id, message } }); form.reset(); const id = state.currentTicket.id; renderTickets(await call('?action=tickets')); renderOverview(await call('?action=overview')); openTicket(state.tickets.find(ticket => ticket.id === id)); window.showToast?.('Resposta enviada.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   }
 
   async function init() {

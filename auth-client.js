@@ -12,12 +12,13 @@ const PaxinbotAuth = (() => {
 })();
 
 const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
-const accountSectionRoutes = { profile: '/conta/configuracoes', security: '/conta/configuracoes/seguranca', devices: '/conta/configuracoes/dispositivos' };
+const accountSectionRoutes = { profile: '/conta/configuracoes', security: '/conta/configuracoes/seguranca', devices: '/conta/configuracoes/dispositivos', preferences:'/conta/configuracoes/notificacoes', activity:'/conta/configuracoes/atividade' };
 let passkeySession = null;
 let passkeyClient = null;
 let currentAccount = null;
 let availableProducts = [];
 let checkoutProduct = null;
+let currentOrderId = null;
 
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
 function formatDate(value, withTime = true) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(date); }
@@ -76,9 +77,9 @@ function viewFromPath() {
 
 function accountSectionFromPath() {
   const path = location.pathname.replace(/\/$/, '') || '/conta';
-  if (path === accountSectionRoutes.security || path === '/conta/seguranca') return 'security';
-  if (path === accountSectionRoutes.devices || path === '/conta/dispositivos') return 'devices';
-  return 'profile';
+  if (path === '/conta/seguranca') return 'security';
+  if (path === '/conta/dispositivos') return 'devices';
+  return Object.entries(accountSectionRoutes).find(([, route]) => route === path)?.[0] || 'profile';
 }
 
 function setAccountView(view, moveFocus = false, updateUrl = true) {
@@ -110,7 +111,37 @@ function renderOrders(orders) {
   const root = document.getElementById('account-order-list');
   if (!orders?.length) { root.innerHTML = '<div class="portal-empty">Nenhum pedido encontrado.</div>'; return; }
   const labels = { pending:'Aguardando', paid:'Pago', refunded:'Reembolsado', cancelled:'Cancelado', chargeback:'Contestado' };
-  root.innerHTML = orders.map(order => `<article class="portal-list-row"><span class="portal-icon"><svg><use href="#i-card"></use></svg></span><div><b>${escapeHtml(order.productName || 'Pedido Paxinbot')}</b><small>${formatDate(order.createdAt)} · ${money(order.amountCents, order.currency)}${Number(order.discountCents) > 0 ? ` · Desconto ${money(order.discountCents, order.currency)}` : ''}</small></div><span class="portal-status ${escapeHtml(order.status)}">${escapeHtml(labels[order.status] || order.status)}</span></article>`).join('');
+  root.innerHTML = orders.map(order => `<article class="portal-list-row"><span class="portal-icon"><svg><use href="#i-card"></use></svg></span><div><b>${escapeHtml(order.productName || 'Pedido Paxinbot')}</b><small>${formatDate(order.createdAt)} · ${money(order.amountCents, order.currency)}${Number(order.discountCents) > 0 ? ` · Desconto ${money(order.discountCents, order.currency)}` : ''}</small></div><span class="portal-status ${escapeHtml(order.status)}">${escapeHtml(labels[order.status] || order.status)}</span><button class="portal-row-action" type="button" data-order-details="${escapeHtml(order.id)}">Detalhes</button></article>`).join('');
+}
+
+function renderPreferences(preferences) {
+  document.getElementById('preference-product-updates').checked = preferences?.productUpdates === true;
+  document.getElementById('preference-support-updates').checked = preferences?.supportUpdates !== false;
+}
+
+function renderActivity(activity) {
+  const root = document.getElementById('account-activity-list'); if (!root) return;
+  const labels = { 'account.created':'Conta criada', 'account.profile_updated':'Perfil atualizado', 'account.preferences_updated':'Preferências atualizadas', 'device.approved':'Dispositivo autorizado', 'device.signed_in':'Aplicativo conectado', 'device.revoked':'Dispositivo revogado', 'device.revoked_all':'Todas as sessões foram revogadas', 'checkout.started':'Pagamento iniciado', 'checkout.resumed':'Pagamento retomado', 'payment.approved':'Pagamento confirmado', 'payment.refunded':'Pagamento reembolsado', 'payment.charged_back':'Pagamento contestado', 'support.ticket_created':'Chamado aberto' };
+  if (!activity?.length) { root.innerHTML = '<div class="portal-empty">Sua atividade aparecerá aqui após as primeiras ações.</div>'; return; }
+  root.innerHTML = activity.map(item => `<article class="portal-list-row activity-row"><span class="portal-icon"><svg><use href="#i-file"></use></svg></span><div><b>${escapeHtml(labels[item.eventType] || 'Atividade da conta')}</b><small>${formatDate(item.createdAt)}</small></div></article>`).join('');
+}
+
+function renderTickets(tickets) {
+  const root = document.getElementById('support-ticket-list'); if (!root) return;
+  const status = { open:'Aberto', in_progress:'Em atendimento', resolved:'Resolvido', closed:'Encerrado' };
+  const category = { technical:'Técnico', payment:'Pagamento', access:'Acesso', other:'Outro' };
+  if (!tickets?.length) { root.innerHTML = '<div class="portal-empty">Você ainda não abriu chamados. Use o formulário acima quando precisar.</div>'; return; }
+  root.innerHTML = tickets.map(ticket => `<details class="support-ticket" data-ticket-id="${escapeHtml(ticket.id)}"><summary><div><span>${escapeHtml(category[ticket.category] || 'Suporte')}</span><b>${escapeHtml(ticket.subject)}</b><small>Atualizado em ${formatDate(ticket.updatedAt)}</small></div><span class="portal-status ${escapeHtml(ticket.status)}">${escapeHtml(status[ticket.status] || ticket.status)}</span></summary><div class="support-thread">${(ticket.messages || []).map(message => `<article class="${message.authorKind === 'owner' ? 'is-owner' : ''}"><b>${message.authorKind === 'owner' ? 'Suporte Paxinbot' : 'Você'}</b><p>${escapeHtml(message.body)}</p><small>${formatDate(message.createdAt)}</small></article>`).join('')}${ticket.status !== 'closed' ? `<form data-ticket-reply><label>Responder<textarea name="message" minlength="2" maxlength="3000" required></textarea></label><button class="button button-secondary" type="submit">Enviar resposta</button></form>` : ''}</div></details>`).join('');
+}
+
+async function openOrderDetails(orderId) {
+  const result = await PaxinbotAuth.request(`/api/account?action=order&orderId=${encodeURIComponent(orderId)}`); const order = result.data;
+  currentOrderId = order.id; const labels = { pending:'Aguardando pagamento', paid:'Pago', refunded:'Reembolsado', cancelled:'Cancelado', chargeback:'Contestado' };
+  document.getElementById('order-dialog-title').textContent = order.product?.name || 'Pedido Paxinbot';
+  document.getElementById('order-dialog-copy').textContent = labels[order.status] || order.status;
+  document.getElementById('order-detail-grid').innerHTML = `<div><span>VALOR</span><b>${money(order.amountCents, order.currency)}</b></div><div><span>DESCONTO</span><b>${Number(order.discountCents) > 0 ? money(order.discountCents, order.currency) : 'Sem desconto'}</b></div><div><span>CRIADO EM</span><b>${formatDate(order.createdAt)}</b></div><div><span>CONFIRMAÇÃO</span><b>${order.paidAt ? formatDate(order.paidAt) : 'Aguardando'}</b></div>`;
+  document.getElementById('order-resume').hidden = order.status !== 'pending'; document.getElementById('order-receipt').hidden = order.status !== 'paid';
+  document.getElementById('order-dialog').showModal();
 }
 
 function productDuration(product) {
@@ -180,12 +211,16 @@ async function loadPortalData(basePayload) {
   try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
   const merged = { ...basePayload, profile: account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders, products] = await Promise.all([
+  const [devices, orders, products, preferences, activity, tickets] = await Promise.all([
     PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message }))
+    PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message })),
+    PaxinbotAuth.request('/api/account?action=preferences').then(result => result.data).catch(() => ({})),
+    PaxinbotAuth.request('/api/account?action=activity').then(result => result.data).catch(() => []),
+    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => [])
   ]);
   renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error, products.checkoutReady);
+  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets);
 }
 
 async function getPasskeyClient() {
@@ -229,7 +264,9 @@ async function initClientPage() {
   document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => { const section = button.dataset.accountSectionOpen; setAccountView(button.dataset.accountOpen, true, !section); if (section) setAccountSection(section, false, true); }));
   document.getElementById('view-account-products')?.addEventListener('click', () => document.getElementById('account-products-list')?.scrollIntoView({ behavior:'smooth', block:'center' }));
   document.getElementById('account-products-list')?.addEventListener('click', event => { const button = event.target.closest('[data-buy-product]'); if (button) openCheckout(button.dataset.buyProduct); });
+  document.getElementById('account-order-list')?.addEventListener('click', event => { const button = event.target.closest('[data-order-details]'); if (button) openOrderDetails(button.dataset.orderDetails).catch(error => window.showToast?.(error.message)); });
   document.querySelector('[data-close-checkout]')?.addEventListener('click', () => document.getElementById('checkout-dialog').close());
+  document.querySelector('[data-close-order]')?.addEventListener('click', () => document.getElementById('order-dialog').close());
   document.getElementById('checkout-form')?.addEventListener('submit', async event => {
     event.preventDefault(); if (!checkoutProduct) return;
     const button = document.getElementById('checkout-submit'); button.disabled = true; button.textContent = 'Preparando pagamento…';
@@ -241,15 +278,20 @@ async function initClientPage() {
       button.disabled = false; button.innerHTML = 'Ir para o Mercado Pago <svg><use href="#i-arrow"></use></svg>'; window.showToast?.(error.message);
     }
   });
+  document.getElementById('order-resume')?.addEventListener('click', async event => { if (!currentOrderId) return; event.currentTarget.disabled = true; try { const result = await PaxinbotAuth.request('/api/checkout', { method:'POST', body:{ action:'resume', orderId:currentOrderId } }); location.assign(result.checkoutUrl); } catch (error) { event.currentTarget.disabled = false; window.showToast?.(error.message); } });
+  document.getElementById('order-receipt')?.addEventListener('click', async event => { if (!currentOrderId) return; event.currentTarget.disabled = true; try { await PaxinbotAuth.request('/api/checkout', { method:'POST', body:{ action:'receipt', orderId:currentOrderId } }); window.showToast?.('Comprovante enviado para o e-mail da conta.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled = false; } });
   document.querySelector('.portal-nav')?.addEventListener('keydown', event => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; const tabs = [...document.querySelectorAll('[data-account-view]')]; const current = tabs.indexOf(document.activeElement); if (current < 0) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; setAccountView(tabs[next].dataset.accountView, true); });
   window.addEventListener('popstate', () => { setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); });
   document.getElementById('account-profile-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('button'); button.disabled = true; try { const displayName = new FormData(event.currentTarget).get('displayName'); const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'profile', displayName } }); currentAccount.profile = result.data; renderClientDashboard(currentAccount); window.showToast?.('Dados atualizados.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
+  document.getElementById('account-preferences-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'preferences', productUpdates:document.getElementById('preference-product-updates').checked, supportUpdates:document.getElementById('preference-support-updates').checked } }); renderPreferences(result.data); renderActivity((await PaxinbotAuth.request('/api/account?action=activity')).data); window.showToast?.('Preferências atualizadas.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('account-device-list')?.addEventListener('click', async event => { const button = event.target.closest('[data-revoke-device]'); if (!button || !confirm('Revogar o acesso deste computador?')) return; button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeDevice', sessionId:button.dataset.revokeDevice } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Dispositivo revogado.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });
   document.getElementById('revoke-all-devices')?.addEventListener('click', async event => { if (!confirm('Revogar todas as sessões do aplicativo?')) return; event.currentTarget.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeAllDevices' } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Sessões do aplicativo revogadas.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled = false; } });
   document.querySelector('[data-open-password]')?.addEventListener('click', () => document.getElementById('password-dialog').showModal());
   document.querySelector('[data-close-password]')?.addEventListener('click', () => document.getElementById('password-dialog').close());
   document.getElementById('account-password-form')?.addEventListener('submit', async event => { event.preventDefault(); const data = new FormData(event.currentTarget); if (data.get('password') !== data.get('passwordConfirm')) return window.showToast?.('As senhas precisam ser iguais.'); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password:data.get('currentPassword') } }); await PaxinbotAuth.request('/api/auth/password', { method:'POST', body:{ password:data.get('password') } }); event.currentTarget.reset(); document.getElementById('password-dialog').close(); window.showToast?.('Senha alterada.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('password-recovery-link')?.addEventListener('click', async () => { if (!currentAccount?.user?.email) return; try { await PaxinbotAuth.request('/api/auth/recover', { method:'POST', body:{ email:currentAccount.user.email } }); window.showToast?.('Enviamos um link para criar ou redefinir sua senha.'); } catch (error) { window.showToast?.(error.message); } });
+  document.getElementById('support-ticket-form')?.addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); const data = new FormData(form); button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'createTicket', category:data.get('category'), subject:data.get('subject'), message:data.get('message') } }); form.reset(); renderTickets((await PaxinbotAuth.request('/api/account?action=tickets')).data); window.showToast?.('Chamado aberto.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
+  document.getElementById('support-ticket-list')?.addEventListener('submit', async event => { const form = event.target.closest('[data-ticket-reply]'); if (!form) return; event.preventDefault(); const ticketId = form.closest('[data-ticket-id]')?.dataset.ticketId; const button = form.querySelector('[type="submit"]'); const message = new FormData(form).get('message'); button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'replyTicket', ticketId, message } }); renderTickets((await PaxinbotAuth.request('/api/account?action=tickets')).data); window.showToast?.('Resposta enviada.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });
   document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method:'POST' }); } catch {} passkeySession = null; renderClientDashboard(null); await syncOwnerPanelLink(null); setAccountView('overview', false, false); history.replaceState({}, '', '/conta'); setClientStatus('Sessão encerrada.'); window.scrollTo({ top:0, behavior:'smooth' }); });
   if (currentAccount?.user) void handleCheckoutReturn();
 }

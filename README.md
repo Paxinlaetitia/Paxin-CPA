@@ -35,4 +35,16 @@ O fluxo comercial usa Checkout Pro do Mercado Pago. Antes de habilitar compras e
 4. no Mercado Pago, cadastre `https://www.paxincpa.store/api/webhooks/mercadopago` para eventos de pagamento;
 5. para e-mails de confirmação, configure `RESEND_API_KEY` e `RESEND_FROM_EMAIL` com um domínio verificado.
 
+## Pós-venda e atendimento
+
+Após a migração de checkout, execute `supabase/migrations/20260818_aftercare.sql`. Ela adiciona:
+
+- preferências de notificações da conta;
+- histórico de eventos do cliente;
+- detalhes, retomada de pedidos pendentes e recibo por e-mail;
+- chamados de suporte com conversa entre cliente e owner;
+- fila de atendimento, métricas e exportação de pedidos no painel administrativo.
+
+O e-mail de resposta do atendimento é opcional e usa as mesmas variáveis `RESEND_API_KEY` e `RESEND_FROM_EMAIL`; o chamado continua disponível no portal mesmo quando o envio de e-mail não estiver configurado.
+
 Nunca coloque chaves secretas em HTML, JavaScript do navegador ou no repositório. O retorno visual do checkout não concede acesso: somente o webhook assinado, depois de consultar o pagamento no Mercado Pago, pode criar o acesso.

@@ -16,15 +16,18 @@ Atualizada em 15/08/2026.
 - Busca funcional na Central de Ajuda.
 - URLs públicas limpas e portais com navegação própria, sem sidebar.
 - Configuração de conta, alteração de senha com reautenticação e fluxo de passkey.
-- Gestão de dispositivos, pedidos e auditoria preparada pela migração `20260815_portals.sql`.
+- Gestão de dispositivos, pedidos, auditoria, preferências e histórico de atividades.
+- Checkout Pro do Mercado Pago com pedido, retomada segura de pagamento pendente e liberação exclusiva por webhook assinado.
+- Recibo opcional por e-mail e painel de chamados para cliente e owner.
+- Painel administrativo com indicadores de receita/pedidos/atendimento, exportação de pedidos e resposta a chamados.
 
 ## Dependências externas ainda necessárias para venda
 
-- Provedor de pagamento e webhook para criar pedidos e liberar acesso automaticamente.
-- Checkout com preços reais, cupons e confirmação de pagamento.
+- Credenciais reais do Mercado Pago, webhook configurado e simulação de pagamentos em produção.
+- Catálogo, preços e cupons reais, revisados antes de abrir as vendas.
 - Arquivo final `PaxinbotSetup.exe` em armazenamento privado para download autorizado.
 - SMTP transacional validado em produção para cadastro e recuperação de senha.
-- Canal de suporte real (e-mail, formulário ou plataforma de atendimento).
+- Domínio de e-mail validado no Resend para notificações de pedido e suporte.
 - Termos de Uso e Política de Privacidade definitivos, revisados antes da venda.
 
 ## Funcionalidades administrativas ainda parciais
@@ -32,8 +35,6 @@ Atualizada em 15/08/2026.
 - Suspender completamente uma conta de cliente.
 - Processar estornos e reembolsos pelo provedor de pagamentos.
 - Publicar e assinar novas versões do instalador.
-- Abrir e responder solicitações de suporte dentro do portal.
-- Publicar o catálogo administrado no checkout e na Área do Cliente.
 
 ## Validação antes do lançamento
 
