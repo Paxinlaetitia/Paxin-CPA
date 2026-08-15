@@ -1,6 +1,6 @@
 'use strict';
 
-const { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, publicOrigin, sameOriginRequest } = require('../_paxinbot');
+const { config, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, publicOrigin, sameOriginRequest } = require('../_paxinbot');
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
@@ -91,7 +91,24 @@ module.exports = async (req, res) => {
     const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
     const { response, payload } = await upstream('/rest/v1/rpc/paxinbot_get_my_access', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
     const providers = [...new Set((session.user.identities || []).map(identity => identity.provider).filter(Boolean))];
-    return json(res, response.ok ? 200 : 503, { ok: response.ok, user: { id: session.user.id, email: session.user.email, providers }, entitlement: response.ok ? payload : { active: false } });
+    const entitlement = response.ok && payload && typeof payload === 'object' ? { ...payload } : { active: false };
+    if (response.ok && entitlement.kind === 'usage' && /^[0-9a-f-]{36}$/i.test(String(entitlement.grantId || ''))) {
+      try {
+        const filters = new URLSearchParams({
+          select: 'last_seen_at,usage_paused_at',
+          user_id: `eq.${session.user.id}`,
+          usage_grant_id: `eq.${entitlement.grantId}`,
+          revoked_at: 'is.null',
+          order: 'last_seen_at.desc',
+          limit: '1'
+        });
+        const runtime = await serviceUpstream(`/rest/v1/desktop_sessions?${filters.toString()}`);
+        const desktop = runtime.response.ok && Array.isArray(runtime.payload) ? runtime.payload[0] : null;
+        const lastSeen = Date.parse(desktop?.last_seen_at || '');
+        entitlement.usageRunning = Boolean(desktop && !desktop.usage_paused_at && Number.isFinite(lastSeen) && Date.now() - lastSeen <= 25000);
+      } catch { entitlement.usageRunning = false; }
+    }
+    return json(res, response.ok ? 200 : 503, { ok: response.ok, serverNow: new Date().toISOString(), user: { id: session.user.id, email: session.user.email, providers }, entitlement });
   }
   if (action === 'recover') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });

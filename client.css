@@ -79,6 +79,7 @@
 .access-overview-card > div { min-height: 136px; display: flex; flex-direction: column; justify-content: center; padding: 24px; }
 .access-overview-card > div + div { border-left: 1px solid var(--line); }
 .access-overview-card strong { margin: 11px 0 5px; overflow-wrap: anywhere; font-size: clamp(20px,2.4vw,29px); line-height: 1.05; font-variant-numeric: tabular-nums; }
+#dashboard-expiry,#subscription-expiry { font-variant-numeric: tabular-nums; }
 .access-overview-card small { color: var(--green); font-size: 10px; }
 .access-main { background: rgba(240,165,0,.045); }
 

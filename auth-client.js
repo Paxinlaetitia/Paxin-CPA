@@ -20,12 +20,63 @@ let availableProducts = [];
 let checkoutProduct = null;
 let currentOrderId = null;
 let pendingEmailCode = null;
+let accessClock = null;
+let accessClockTimer = null;
+let accessSyncTimer = null;
+let accessSyncInFlight = false;
 
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
 function formatDate(value, withTime = true) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(date); }
 function money(cents, currency = 'BRL') { return new Intl.NumberFormat('pt-BR', { style:'currency', currency }).format((Number(cents) || 0) / 100); }
 function formatUsageTime(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.ceil((seconds % 3600) / 60); const parts = []; if (days) parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`); if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`); if (minutes && parts.length < 2) parts.push(`${minutes} min`); return parts.join(' e ') || 'menos de 1 minuto'; }
+function formatUsageCountdown(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.floor((seconds % 3600) / 60); const rest = seconds % 60; const pad = number => String(number).padStart(2, '0'); return days ? `${days}d ${pad(hours)}h ${pad(minutes)}min ${pad(rest)}s` : hours ? `${hours}h ${pad(minutes)}min ${pad(rest)}s` : `${minutes}min ${pad(rest)}s`; }
 function remainingUntil(value) { const timestamp = value ? new Date(value).valueOf() : NaN; return Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - Date.now()) / 1000)) : 0; }
+
+function accessSeconds(entitlement = accessClock?.entitlement || {}) {
+  if (entitlement.kind !== 'usage') return remainingUntil(entitlement.expiresAt);
+  const elapsed = accessClock?.running ? Math.max(0, Math.floor((Date.now() - accessClock.syncedAt) / 1000)) : 0;
+  return Math.max(0, (Number(accessClock?.remainingSeconds) || 0) - elapsed);
+}
+
+function renderAccessSummary(payload = currentAccount) {
+  const entitlement = payload?.entitlement || {};
+  accessClock = entitlement.active && entitlement.kind !== 'lifetime' ? {
+    entitlement,
+    remainingSeconds: entitlement.kind === 'usage' ? Math.max(0, Number(entitlement.remainingSeconds) || 0) : remainingUntil(entitlement.expiresAt),
+    running: entitlement.kind === 'usage' ? entitlement.usageRunning === true : true,
+    syncedAt: Date.now()
+  } : null;
+  document.getElementById('dashboard-access').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Vitalício' : entitlement.kind === 'usage' ? 'Saldo em uso' : 'Por tempo') : entitlement.availableGrant ? 'Saldo disponível' : 'Sem acesso';
+  document.getElementById('dashboard-access-state').textContent = entitlement.active ? 'Ativo' : entitlement.availableGrant ? 'Aguardando sua ativação' : payload?.user ? 'Aguardando liberação' : 'Aguardando login';
+  updateAccessCountdown();
+  document.getElementById('subscription-plan').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : entitlement.kind === 'usage' ? 'Saldo de uso ativo' : 'Acesso por tempo') : 'Sem acesso ativo';
+}
+
+function updateAccessCountdown() {
+  const entitlement = currentAccount?.entitlement || {};
+  const remaining = accessSeconds(entitlement);
+  document.getElementById('dashboard-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Não expira' : formatUsageCountdown(remaining)) : '—';
+  document.getElementById('dashboard-expiry-state').textContent = entitlement.kind === 'usage' ? (entitlement.usageRunning ? 'Sincronizado · aplicativo em uso' : 'Pausado · aplicativo desconectado') : entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Acesso antigo: contagem contínua') : 'Sem dados';
+  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : entitlement.kind === 'usage' ? `${formatUsageCountdown(remaining)} restantes. ${entitlement.usageRunning ? 'Sincronizado com o aplicativo.' : 'O saldo está pausado.'}` : `${formatUsageCountdown(remaining)} restantes neste acesso antigo.`) : 'Escolha uma modalidade para começar.';
+}
+
+async function syncAccessSummary() {
+  if (accessSyncInFlight || document.hidden || !currentAccount?.user || !currentAccount?.entitlement?.active || currentAccount.entitlement.kind === 'lifetime') return;
+  accessSyncInFlight = true;
+  try {
+    const fresh = await PaxinbotAuth.request('/api/auth/me');
+    if (!currentAccount?.user || fresh.user?.id !== currentAccount.user.id) return;
+    currentAccount = { ...currentAccount, user:fresh.user, entitlement:fresh.entitlement, serverNow:fresh.serverNow };
+    renderAccessSummary(currentAccount);
+  } catch {}
+  finally { accessSyncInFlight = false; }
+}
+
+function startAccessClock() {
+  if (accessClockTimer === null) accessClockTimer = window.setInterval(updateAccessCountdown, 1000);
+  if (accessSyncTimer === null) accessSyncTimer = window.setInterval(syncAccessSummary, 10000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncAccessSummary(); }, { passive:true });
+}
 
 function consumePasskeySession() {
   try { const raw = sessionStorage.getItem('paxinbot_passkey_session'); sessionStorage.removeItem('paxinbot_passkey_session'); if (raw) { const value = JSON.parse(raw); if (value?.accessToken) passkeySession = value; } } catch {}
@@ -86,13 +137,7 @@ function renderClientDashboard(payload) {
   document.getElementById('dashboard-initials').textContent = displayName.slice(0, 2).toUpperCase() || 'PB';
   document.getElementById('dashboard-email').textContent = email || 'Entre para consultar';
   document.getElementById('dashboard-greeting').textContent = user ? `Olá, ${displayName}` : 'Entre na sua conta';
-  document.getElementById('dashboard-access').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Vitalício' : entitlement.kind === 'usage' ? 'Saldo em uso' : 'Por tempo') : entitlement.availableGrant ? 'Saldo disponível' : 'Sem acesso';
-  document.getElementById('dashboard-access-state').textContent = entitlement.active ? 'Ativo' : entitlement.availableGrant ? 'Aguardando sua ativação' : user ? 'Aguardando liberação' : 'Aguardando login';
-  const remaining = entitlement.kind === 'usage' ? Number(entitlement.remainingSeconds) || 0 : remainingUntil(entitlement.expiresAt);
-  document.getElementById('dashboard-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Não expira' : formatUsageTime(remaining)) : '—';
-  document.getElementById('dashboard-expiry-state').textContent = entitlement.kind === 'usage' ? 'Diminui somente com o app conectado' : entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Acesso antigo: contagem contínua') : 'Sem dados';
-  document.getElementById('subscription-plan').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : entitlement.kind === 'usage' ? 'Saldo de uso ativo' : 'Acesso por tempo') : 'Sem acesso ativo';
-  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : entitlement.kind === 'usage' ? `${formatUsageTime(remaining)} restantes. O saldo pausa quando o aplicativo é fechado.` : `${formatUsageTime(remaining)} restantes neste acesso antigo.`) : 'Escolha uma modalidade para começar.';
+  renderAccessSummary(payload);
   document.getElementById('dashboard-devices').textContent = payload?.account?.activeDevices ?? (user ? '—' : 'Protegidos');
   document.getElementById('dashboard-devices-state').textContent = user ? 'Sessões ativas do aplicativo' : 'Autorize depois do login';
   document.getElementById('client-logout').hidden = !user;
@@ -304,6 +349,7 @@ async function completeClientLogin(result, message = 'Login realizado.') {
 
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]'); consumePasskeySession();
+  startAccessClock();
   try { const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
   form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.verificationRequired) return setEmailCodeStep(result, 'login'); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
   document.getElementById('client-email-code-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingEmailCode) return cancelEmailCode(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('client-email-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); await completeClientLogin(result, pendingEmailCode?.purpose === 'signup' ? 'E-mail confirmado e conta criada.' : 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
