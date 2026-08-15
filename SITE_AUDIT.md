@@ -8,6 +8,7 @@ Atualizada em 15/08/2026.
 - Cadastro, login por e-mail, confirmação de conta e recuperação de senha pelo Supabase.
 - Login Google com sessão gravada em cookies `HttpOnly`.
 - Base experimental de passkeys com alternativa por e-mail e Google.
+- Verificação em duas etapas TOTP para login por e-mail e senha, com sessão intermediária de curta duração.
 - Área do Cliente autenticada com acesso, validade, segurança e download.
 - Modalidades exibidas dentro da Área do Cliente.
 - Autorização do aplicativo por código de dispositivo.

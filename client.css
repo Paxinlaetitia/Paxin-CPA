@@ -9,6 +9,11 @@
 .client-benefits > div { min-height: 106px; }
 .auth-card { padding: 28px; background: #090909; box-shadow: 0 24px 60px rgba(0,0,0,.36); }
 .prototype-notice { margin: 18px -28px -28px; }
+.auth-step-copy { display: grid; gap: 5px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #070707; }
+.auth-step-copy span { color: var(--accent); font-size: 8px; font-weight: 800; }
+.auth-step-copy b { font-size: 14px; }
+.auth-step-copy p { margin: 0; color: var(--text-2); font-size: 10px; line-height: 1.5; text-wrap: pretty; }
+.auth-mfa-form input { font-variant-numeric: tabular-nums; letter-spacing: .18em; }
 
 .client-dashboard-preview { display: none; min-height: 100vh; padding: 112px 0 72px; background: #070707; }
 .client-authenticated .site-header,.client-authenticated .site-footer,.client-authenticated .client-access-section { display: none !important; }
@@ -166,6 +171,16 @@
 .portal-dialog h2 { margin: 0; font-size: 25px; }
 .portal-dialog p { margin: -4px 0 4px; color: var(--text-2); font-size: 11px; line-height: 1.6; }
 .dialog-close { position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.mfa-dialog { width: min(520px,calc(100% - 32px)); }
+.mfa-enrollment { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; gap: 16px; padding: 15px; border: 1px solid var(--line-strong); border-radius: 12px; background: #050505; }
+.mfa-enrollment[hidden] { display: none !important; }
+.mfa-enrollment > img { width: 150px; height: 150px; padding: 7px; border-radius: 8px; background: #fff; }
+.mfa-enrollment > div { min-width: 0; display: grid; gap: 7px; }
+.mfa-enrollment small { color: var(--muted); font-size: 8px; font-weight: 800; }
+.mfa-enrollment code { overflow-wrap: anywhere; color: var(--text); font-size: 11px; line-height: 1.5; user-select: all; }
+.mfa-enrollment .link-button { width: max-content; }
+.form-inline-status { min-height: 16px; margin: 0 !important; color: var(--muted); font-size: 9px !important; }
+.form-inline-status.is-error { color: #ff8b8b; }
 .checkout-dialog { width: min(520px,calc(100% - 32px)); }
 .checkout-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px; border: 1px solid var(--line-strong); border-radius: 12px; background: #050505; }
 .checkout-summary > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
@@ -253,6 +268,8 @@
 }
 
 @media (max-width: 680px) {
+  .mfa-enrollment { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .mfa-enrollment > div { justify-items: center; }
   .client-access-section { padding: 104px 0 58px; }
   .client-benefits { grid-template-columns: 1fr; }
   .client-benefits > div { min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
