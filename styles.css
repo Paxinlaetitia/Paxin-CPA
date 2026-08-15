@@ -487,3 +487,14 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
   .download-card-top { grid-template-columns:auto 1fr; }.download-card-top > i { display:none; }.download-meta { grid-template-columns:1fr; }.download-meta > div { border-right:0; border-bottom:1px solid var(--line); }.download-meta > div:last-child { border-bottom:0; }.requirements-card,.release-card { min-height:0; padding:24px; }.requirements-card dl > div { grid-template-columns:1fr; gap:4px; padding:11px 0; }.download-support-card { align-items:flex-start; flex-direction:column; }.download-support-card .button { width:100%; }
   .footer-links { grid-template-columns:1fr 1fr; }
 }
+
+/* Account authentication additions */
+.auth-session-note { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.auth-switch { display: block; width: 100%; margin-top: 14px; text-align: center; }
+.google-button { position: relative; }
+.google-g { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; background: #fff; color: #3c74e6; font: 800 12px/1 Arial, sans-serif; }
+.passkey-button { margin-top: 9px; }
+.passkey-button[hidden], .google-button[hidden], .auth-divider[hidden] { display: none; }
+.auth-callback { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 15%, rgba(240,165,0,.11), transparent 35%), var(--bg); }
+.auth-callback .auth-card { width: min(440px, 100%); }
+.auth-callback h1 { margin: 3px 0 0; font-size: 24px; letter-spacing: -.035em; }

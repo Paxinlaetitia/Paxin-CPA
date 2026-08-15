@@ -44,4 +44,4 @@ async function browserSession(req, res) {
 }
 function sha256(value) { return crypto.createHash('sha256').update(String(value)).digest('hex'); }
 function publicOrigin(req) { return String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, ''); }
-module.exports = { json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin };
+module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin };
