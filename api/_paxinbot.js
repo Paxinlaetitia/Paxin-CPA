@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 function config() {
   const url = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
@@ -23,9 +24,26 @@ function json(res, status, body, headers = {}) {
 }
 function cookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim().split(/=(.*)/s)).filter(([k]) => k).map(([k, v]) => [k, decodeURIComponent(v || '')])); }
 function secure(req) { return process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https'); }
-function sessionCookies(req, accessToken, refreshToken, maxAge = 60 * 60 * 24 * 30) {
-  const suffix = `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure(req) ? '; Secure' : ''}`;
-  return [`paxinbot_access=${encodeURIComponent(accessToken || '')}; ${suffix}`, `paxinbot_refresh=${encodeURIComponent(refreshToken || '')}; ${suffix}`];
+function sessionSecret() { return String(process.env.PAXINBOT_SESSION_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''); }
+function signSessionDeadline(deadline) {
+  const secret = sessionSecret(); if (!secret) return '';
+  const value = String(deadline); const signature = crypto.createHmac('sha256', secret).update(value).digest('base64url'); return `${value}.${signature}`;
+}
+function sessionDeadline(req) {
+  const raw = String(cookies(req).paxinbot_session_deadline || ''); if (!raw) return null;
+  const split = raw.lastIndexOf('.'); const value = raw.slice(0, split); const signature = raw.slice(split + 1); const expected = signSessionDeadline(value); if (!expected || split < 1) return 0;
+  const expectedSignature = expected.slice(expected.lastIndexOf('.') + 1); const left = Buffer.from(signature); const right = Buffer.from(expectedSignature);
+  if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return 0;
+  const deadline = Number(value); return Number.isSafeInteger(deadline) && deadline > 0 ? deadline : 0;
+}
+function sessionCookies(req, accessToken, refreshToken, maxAge = SESSION_MAX_AGE) {
+  const isClearing = maxAge <= 0; const now = Math.floor(Date.now() / 1000); const existing = isClearing ? 0 : sessionDeadline(req);
+  const deadline = isClearing ? 0 : existing && existing > now ? existing : now + maxAge;
+  const remaining = isClearing ? 0 : Math.max(1, Math.min(maxAge, deadline - now));
+  const suffix = `Path=/; HttpOnly; SameSite=Lax; Max-Age=${remaining}${secure(req) ? '; Secure' : ''}`;
+  const result = [`paxinbot_access=${encodeURIComponent(accessToken || '')}; ${suffix}`, `paxinbot_refresh=${encodeURIComponent(refreshToken || '')}; ${suffix}`];
+  const signedDeadline = isClearing ? '' : signSessionDeadline(deadline);
+  result.push(`paxinbot_session_deadline=${encodeURIComponent(signedDeadline)}; ${suffix}`); return result;
 }
 function clearSession(req) { return sessionCookies(req, '', '', 0); }
 async function upstream(path, options = {}) {
@@ -71,6 +89,7 @@ async function refreshSession(refresh) {
   return response.ok ? payload : null;
 }
 async function browserSession(req, res) {
+  const deadline = sessionDeadline(req); if (deadline === 0 || (deadline && deadline <= Math.floor(Date.now() / 1000))) { res.setHeader('Set-Cookie', clearSession(req)); return null; }
   const jar = cookies(req); let access = jar.paxinbot_access; let user = await userFromAccess(access);
   if (user) return { user, access };
   const refreshed = await refreshSession(jar.paxinbot_refresh);

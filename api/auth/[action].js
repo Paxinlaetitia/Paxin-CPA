@@ -117,7 +117,7 @@ module.exports = async (req, res) => {
     const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${accessToken}` } });
     if (!response.ok || !payload?.id) return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
     const refreshToken = receivedRefreshToken.length >= 20 ? receivedRefreshToken : '';
-    res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 30 : 60 * 60));
+    res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
     return json(res, 200, { ok: true, renewable: Boolean(refreshToken) });
   }
   if (action === 'password') {

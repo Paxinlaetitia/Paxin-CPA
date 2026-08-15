@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Área do Cliente Paxinbot: acesso, segurança e downloads." /><meta name="theme-color" content="#050505" />
-  <title>Área do Cliente — Paxinbot</title><link rel="icon" href="/assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/client.css" />
+  <title>Área do Cliente — Paxinbot</title><link rel="icon" href="/assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/controls.css" /><link rel="stylesheet" href="/client.css" />
 </head>
 <body data-page="cliente">
-  <div data-site-header></div>
   <main class="client-main">
     <section class="client-access-section" id="account-auth">
       <div class="client-aura"></div>
+      <div class="container client-access-topbar"><a class="client-access-brand" href="/" aria-label="Paxinbot, página inicial"><span><img src="/assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b></a><a class="client-access-back" href="/">Voltar ao site</a></div>
       <div class="container client-access-grid">
         <div class="client-intro reveal">
           <div class="eyebrow"><span></span> Área do Cliente</div>
@@ -28,7 +28,7 @@
           <form id="client-login-form" class="auth-form">
             <label for="client-email">E-mail<span class="auth-input"><svg><use href="#i-mail"></use></svg><input id="client-email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required /></span></label>
             <label for="client-password">Senha<span class="auth-input"><svg><use href="#i-lock"></use></svg><input id="client-password" name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required /><button class="auth-eye" type="button" aria-label="Mostrar senha">Mostrar</button></span></label>
-            <div class="auth-options"><span class="auth-session-note">Sessão protegida neste navegador</span><button class="link-button js-forgot" type="button">Esqueci minha senha</button></div>
+            <div class="auth-options"><span class="auth-session-note">Sessão protegida por até 7 dias</span><button class="link-button js-forgot" type="button">Esqueci minha senha</button></div>
             <button class="button button-primary button-full auth-submit" type="submit">Entrar na conta <svg><use href="#i-arrow"></use></svg></button>
           </form>
           <form id="client-email-code-form" class="auth-form auth-email-code-form" hidden>
@@ -77,13 +77,11 @@
 
         <div class="portal-pages">
           <section class="portal-page is-active" id="account-panel-overview" role="tabpanel" aria-labelledby="account-tab-overview" data-account-panel="overview">
-            <div class="portal-page-head"><div><span>VISÃO GERAL</span><h2>Seu acesso, sem complicação.</h2><p>Consulte a validade e continue de onde parou.</p></div><button class="portal-text-action" type="button" data-account-open="subscription">Ver assinatura <svg><use href="#i-arrow"></use></svg></button></div>
             <article class="access-overview-card"><div class="access-main"><span>ACESSO ATUAL</span><strong id="dashboard-access">—</strong><small id="dashboard-access-state">Aguardando login</small></div><div><span>EXPIRAÇÃO</span><strong id="dashboard-expiry">—</strong><small id="dashboard-expiry-state">Sem dados</small></div><div><span>DISPOSITIVOS</span><strong id="dashboard-devices">Protegidos</strong><small id="dashboard-devices-state">Autorize pelo navegador</small></div></article>
             <div class="portal-quick-grid"><article><span class="portal-icon"><svg><use href="#i-device"></use></svg></span><div><h3>Gerencie seus computadores</h3><p>Consulte e revogue sessões do aplicativo vinculadas à sua conta.</p></div><button class="portal-inline-link" type="button" data-account-open="account" data-account-section-open="devices">Ver dispositivos <svg><use href="#i-arrow"></use></svg></button></article><article><span class="portal-icon"><svg><use href="#i-shield"></use></svg></span><div><h3>Revise a segurança</h3><p>Configure uma passkey e mantenha sua senha atualizada.</p></div><button class="portal-inline-link" type="button" data-account-open="account" data-account-section-open="security">Abrir segurança <svg><use href="#i-arrow"></use></svg></button></article></div>
           </section>
 
           <section class="portal-page" id="account-panel-subscription" role="tabpanel" aria-labelledby="account-tab-subscription" data-account-panel="subscription" hidden>
-            <div class="portal-page-head"><div><span>ASSINATURA</span><h2>Plano, validade e histórico.</h2><p>As modalidades disponíveis e suas compras ficam reunidas aqui.</p></div></div>
             <div class="checkout-return" id="checkout-return" role="status" aria-live="polite" hidden><span class="portal-icon"><svg><use href="#i-card"></use></svg></span><div><b id="checkout-return-title">Consultando pagamento</b><p id="checkout-return-copy">Aguarde enquanto confirmamos seu pedido.</p></div></div>
             <article class="portal-current-plan"><div><span>PLANO ATUAL</span><h3 id="subscription-plan">Sem acesso ativo</h3><p id="subscription-expiry">Escolha uma modalidade para começar.</p></div><button class="button button-secondary" id="view-account-products" type="button">Ver modalidades</button></article>
             <div class="portal-plan-grid" id="account-products-list" aria-live="polite"><div class="portal-empty portal-plan-loading">Carregando modalidades disponíveis…</div></div>
@@ -91,12 +89,10 @@
           </section>
 
           <section class="portal-page" id="account-panel-downloads" role="tabpanel" aria-labelledby="account-tab-downloads" data-account-panel="downloads" hidden>
-            <div class="portal-page-head"><div><span>DOWNLOADS</span><h2>Aplicativo oficial para Windows.</h2><p>Versão, requisitos e instalador em um único lugar.</p></div></div>
             <article class="portal-download-card"><div class="portal-download-mark"><img src="/assets/paxinbot-mark.svg" alt="" /></div><div><span>VERSÃO ESTÁVEL</span><h3>Paxinbot 1.0</h3><p>Windows 10 ou superior. O instalador definitivo será disponibilizado por link protegido.</p></div><a class="button button-primary" href="/download">Central de download <svg><use href="#i-arrow"></use></svg></a></article>
           </section>
 
           <section class="portal-page" id="account-panel-account" role="tabpanel" aria-labelledby="account-tab-account" data-account-panel="account" hidden>
-            <div class="portal-page-head account-page-head"><div><span>MINHA CONTA</span><h2>Conta, segurança e dispositivos.</h2><p>Gerencie seus dados e métodos de acesso em uma única área.</p></div></div>
             <div class="account-settings-shell">
               <aside class="account-settings-nav" aria-label="Configurações da conta"><span>CONFIGURAÇÕES</span><button class="is-active" type="button" data-account-section="profile" aria-selected="true"><svg><use href="#i-user"></use></svg><div><b>Perfil</b><small>Dados da sua conta</small></div></button><button type="button" data-account-section="security" aria-selected="false"><svg><use href="#i-shield"></use></svg><div><b>Segurança</b><small>Senha e passkey</small></div></button><button type="button" data-account-section="devices" aria-selected="false"><svg><use href="#i-device"></use></svg><div><b>Dispositivos</b><small>Sessões autorizadas</small></div></button><button type="button" data-account-section="preferences" aria-selected="false"><svg><use href="#i-mail"></use></svg><div><b>Notificações</b><small>Preferências de contato</small></div></button><button type="button" data-account-section="activity" aria-selected="false"><svg><use href="#i-file"></use></svg><div><b>Atividade</b><small>Histórico da conta</small></div></button></aside>
               <div class="account-settings-content">
@@ -110,7 +106,6 @@
           </section>
 
           <section class="portal-page" id="account-panel-support" role="tabpanel" aria-labelledby="account-tab-support" data-account-panel="support" hidden>
-            <div class="portal-page-head"><div><span>SUPORTE</span><h2>Ajuda quando você precisar.</h2><p>Consulte os guias disponíveis e acompanhe os canais oficiais.</p></div></div>
             <div class="support-layout"><form class="support-form" id="support-ticket-form"><div><span>NOVO CHAMADO</span><h3>Fale com o suporte</h3><p>Descreva o problema com contexto suficiente para conseguirmos ajudar.</p></div><label>Categoria<select name="category" required><option value="technical">Problema técnico</option><option value="payment">Pagamento</option><option value="access">Acesso à conta</option><option value="other">Outro assunto</option></select></label><label>Assunto<input name="subject" minlength="5" maxlength="120" required placeholder="Resumo do problema" /></label><label>Mensagem<textarea name="message" minlength="10" maxlength="3000" required placeholder="Explique o que aconteceu e o que você esperava que ocorresse."></textarea></label><button class="button button-primary" type="submit">Abrir chamado</button></form><aside class="support-help-card"><span class="portal-icon"><svg><use href="#i-help"></use></svg></span><h3>Antes de abrir</h3><p>Consulte instruções de instalação, dispositivos e acesso na Central de Ajuda.</p><a class="portal-inline-link" href="/ajuda">Consultar artigos <svg><use href="#i-arrow"></use></svg></a></aside></div>
             <div class="portal-section-title"><div><span>ATENDIMENTO</span><h3>Seus chamados</h3></div></div><div class="support-ticket-list" id="support-ticket-list"><div class="portal-empty">Nenhum chamado encontrado.</div></div>
           </section>
@@ -123,6 +118,6 @@
   <dialog class="portal-dialog" id="security-code-dialog"><form id="security-code-form"><button class="dialog-close" type="button" data-close-security-code aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><span>CONFIRMAÇÃO DE SEGURANÇA</span><h2>Confira seu e-mail</h2><p id="security-code-copy">Enviamos um código de seis dígitos para confirmar o cadastro da passkey.</p><label>Código de verificação<input id="security-code-input" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="000000" required /></label><button class="button button-primary" type="submit">Confirmar e continuar</button><button class="link-button" id="security-code-resend" type="button">Reenviar código</button><p class="form-inline-status" id="security-code-status" role="status" aria-live="polite"></p></form></dialog>
   <dialog class="portal-dialog checkout-dialog" id="checkout-dialog"><form id="checkout-form"><button class="dialog-close" type="button" data-close-checkout aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><span>COMPRA SEGURA</span><h2>Confirmar modalidade</h2><p>Revise os dados antes de continuar para o ambiente protegido do Mercado Pago.</p><div class="checkout-summary"><div><small>MODALIDADE</small><b id="checkout-product-name">—</b><span id="checkout-product-duration">—</span></div><strong id="checkout-product-price">—</strong></div><label>Cupom de desconto <span class="optional-field">Opcional</span><input id="checkout-coupon" name="couponCode" maxlength="32" pattern="[A-Za-z0-9_-]{3,32}" autocomplete="off" placeholder="Digite o código" /></label><div class="checkout-security"><svg><use href="#i-shield"></use></svg><p>Preço e cupom serão validados no servidor. O acesso só será liberado após a confirmação do pagamento.</p></div><button class="button button-primary" id="checkout-submit" type="submit">Ir para o Mercado Pago <svg><use href="#i-arrow"></use></svg></button><small class="checkout-terms">Ao continuar, você confirma a modalidade e o período selecionados.</small></form></dialog>
   <dialog class="portal-dialog order-dialog" id="order-dialog"><div class="order-dialog-content"><button class="dialog-close" type="button" data-close-order aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><span>PEDIDO</span><h2 id="order-dialog-title">Detalhes do pedido</h2><p id="order-dialog-copy">Consulte o pagamento e a modalidade escolhida.</p><div class="order-detail-grid" id="order-detail-grid"></div><div class="order-dialog-actions"><button class="button button-primary" id="order-resume" type="button" hidden>Retomar pagamento</button><button class="button button-secondary" id="order-receipt" type="button" hidden>Enviar comprovante</button></div></div></dialog>
-  <div data-site-footer></div><div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="/site-shell.js"></script><script src="/script.js"></script><script src="/auth-client.js"></script>
+  <div data-site-footer></div><div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="/site-shell.js"></script><script src="/controls.js"></script><script src="/script.js"></script><script src="/auth-client.js"></script>
 </body>
 </html>

@@ -63,6 +63,7 @@ const Admin = (() => {
     if (!ticket) return; state.currentTicket = ticket;
     document.getElementById('admin-ticket-title').textContent = ticket.subject; document.getElementById('admin-ticket-customer').textContent = ticket.email;
     document.getElementById('admin-ticket-status').value = ticket.status;
+    window.PaxinbotControls?.refresh(document.getElementById('admin-ticket-reply-form'));
     document.getElementById('admin-support-thread').innerHTML = (ticket.messages || []).map(message => `<article class="${message.authorKind === 'owner' ? 'is-owner' : ''}"><b>${message.authorKind === 'owner' ? 'Você' : escape(ticket.email)}</b><p>${escape(message.body)}</p><small>${date(message.createdAt)}</small></article>`).join('');
     const replyForm = document.getElementById('admin-ticket-reply-form'); const closed = ticket.status === 'closed'; replyForm.elements.message.disabled = closed; replyForm.querySelector('[type="submit"]').hidden = closed; const dialog = document.getElementById('admin-ticket-dialog'); if (!dialog.open) dialog.showModal();
   }
@@ -85,13 +86,13 @@ const Admin = (() => {
   function configureProductForm(product = null) {
     const form = document.getElementById('admin-product-form'); form.reset();
     form.elements.id.value = product?.id || ''; form.elements.name.value = product?.name || ''; form.elements.code.value = product?.code || ''; form.elements.accessKind.value = product?.access_kind || 'duration'; form.elements.durationMinutes.value = product?.duration_minutes || ''; form.elements.price.value = product ? (Number(product.price_cents) / 100).toFixed(2) : ''; form.elements.description.value = product?.description || ''; form.elements.active.checked = product ? Boolean(product.active) : true;
-    document.getElementById('product-dialog-title').textContent = product ? 'Editar produto' : 'Novo produto'; updateDurationField(); document.getElementById('product-dialog').showModal();
+    document.getElementById('product-dialog-title').textContent = product ? 'Editar produto' : 'Novo produto'; updateDurationField(); window.PaxinbotControls?.refresh(form); document.getElementById('product-dialog').showModal();
   }
 
   function configureCouponForm(coupon = null) {
     const form = document.getElementById('admin-coupon-form'); form.reset();
     form.elements.id.value = coupon?.id || ''; form.elements.code.value = coupon?.code || ''; form.elements.description.value = coupon?.description || ''; form.elements.discountType.value = coupon?.discount_type || 'percent'; form.elements.discountValue.value = coupon ? (coupon.discount_type === 'fixed' ? Number(coupon.discount_value) / 100 : coupon.discount_value) : ''; form.elements.maxRedemptions.value = coupon?.max_redemptions || ''; form.elements.expiresAt.value = coupon?.expires_at ? coupon.expires_at.slice(0,10) : ''; form.elements.active.checked = coupon ? Boolean(coupon.active) : true;
-    document.getElementById('coupon-dialog-title').textContent = coupon ? 'Editar cupom' : 'Novo cupom'; document.getElementById('coupon-dialog').showModal();
+    document.getElementById('coupon-dialog-title').textContent = coupon ? 'Editar cupom' : 'Novo cupom'; window.PaxinbotControls?.refresh(form); document.getElementById('coupon-dialog').showModal();
   }
 
   function updateDurationField() {
@@ -99,7 +100,7 @@ const Admin = (() => {
   }
 
   function updateAccessExpiry() {
-    const form = document.getElementById('admin-access-form'); const lifetime = form.elements.kind.value === 'lifetime'; form.querySelector('[data-access-expiry]').hidden = lifetime; form.elements.expiresAt.required = !lifetime; if (lifetime) form.elements.expiresAt.value = '';
+    const form = document.getElementById('admin-access-form'); const lifetime = form.elements.kind.value === 'lifetime'; form.querySelector('[data-access-expiry]').hidden = lifetime; form.elements.expiresAt.required = !lifetime; if (lifetime) form.elements.expiresAt.value = ''; window.PaxinbotControls?.refresh(form);
   }
 
   async function submitAction(form, body, after) {

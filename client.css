@@ -1,6 +1,13 @@
 /* Portal do cliente: estrutura compacta, responsiva e independente da interface do app. */
 .client-main { overflow: clip; }
-.client-access-section { min-height: auto; padding: 126px 0 76px; }
+.client-access-section { min-height: 100dvh; display: block; padding: 24px 0 76px; }
+.client-access-topbar { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 42px; }
+.client-access-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); }
+.client-access-brand > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgba(240,165,0,.28); border-radius: 10px; background: var(--accent-soft); }
+.client-access-brand img { width: 24px; filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%); }
+.client-access-brand b { font-size: 16px; }
+.client-access-back { min-height: 36px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-2); font-size: 10px; font-weight: 700; }
+.client-access-back:hover { border-color: rgba(240,165,0,.34); color: var(--text); }
 .client-access-grid { grid-template-columns: minmax(0, 1fr) 440px; gap: 64px; }
 .client-access-grid > *,.client-intro { min-width: 0; max-width: 100%; }
 .client-intro h1 { max-width: 100%; text-wrap: balance; }
@@ -262,7 +269,8 @@
 }
 
 @media (max-width: 680px) {
-  .client-access-section { padding: 104px 0 58px; }
+  .client-access-section { padding: 18px 0 58px; }
+  .client-access-topbar { margin-bottom: 30px; }
   .client-benefits { grid-template-columns: 1fr; }
   .client-benefits > div { min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px; }
   .client-benefits > div > span { margin-bottom: 0; }

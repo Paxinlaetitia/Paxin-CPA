@@ -8,9 +8,11 @@ Em **Settings → Environment Variables**, adicione para Production, Preview e D
 
 - `SUPABASE_URL` — URL base do projeto Supabase, sem `/rest/v1`.
 - `SUPABASE_PUBLISHABLE_KEY` — chave `sb_publishable_...`.
+- `SUPABASE_SECRET_KEY` — chave secreta usada exclusivamente pelas funções do backend.
+- `PAXINBOT_SESSION_SECRET` — segredo aleatório com pelo menos 32 bytes para assinar a expiração das sessões.
 - `PUBLIC_SITE_URL` — `https://www.paxincpa.store`.
 
-Não coloque `service_role`, senha SMTP, segredo do Google ou qualquer token administrativo na Vercel nem no navegador.
+Segredos podem existir nas variáveis protegidas do backend da Vercel, mas nunca no HTML, JavaScript do navegador, repositório ou logs.
 
 ## 2. URLs no Supabase
 
@@ -63,6 +65,12 @@ Em **Authentication → Email Templates**:
 - Google e passkey continuam sendo métodos independentes de autenticação;
 - códigos, senhas e tokens não são gravados em logs nem persistidos no navegador;
 - o botão de reenvio usa os limites de envio do próprio Supabase.
+
+## Sessão do navegador
+
+- A sessão da Área do Cliente expira no máximo sete dias após a autenticação.
+- O prazo absoluto é assinado no servidor e não é renovado durante a atualização do token.
+- Ações sensíveis continuam exigindo confirmação da senha, Google ou código por e-mail.
 
 ## Verificação antes do lançamento
 
