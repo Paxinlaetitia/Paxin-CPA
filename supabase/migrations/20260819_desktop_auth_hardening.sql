@@ -185,12 +185,12 @@ begin
   from public.paxinbot_active_entitlement(v_device.approved_user_id);
   if not found then raise exception 'no_active_access'; end if;
 
-  v_token := encode(gen_random_bytes(32), 'hex');
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
   v_expires := now() + interval '7 days';
   insert into public.desktop_sessions
     (token_hash, user_id, device_name, app_version, expires_at)
   values
-    (encode(digest(v_token, 'sha256'), 'hex'), v_device.approved_user_id,
+    (encode(extensions.digest(v_token, 'sha256'), 'hex'), v_device.approved_user_id,
      v_device.device_name, v_device.app_version, v_expires);
 
   update public.device_authorizations set consumed_at = now() where id = v_device.id;
@@ -275,4 +275,3 @@ grant execute on function public.paxinbot_device_start_v2(uuid,text,text,text,te
 grant execute on function public.paxinbot_device_approve_v2(uuid,text,uuid) to service_role;
 grant execute on function public.paxinbot_device_poll_v2(uuid,text) to service_role;
 grant execute on function public.paxinbot_desktop_session_v2(text) to service_role;
-

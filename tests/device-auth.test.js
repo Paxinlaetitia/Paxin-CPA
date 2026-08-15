@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 process.env.NODE_ENV = 'test';
 process.env.SUPABASE_URL = 'https://example.supabase.co';
@@ -97,4 +99,15 @@ test('database authorization failures are translated without exposing internals'
     diagnosticCode: '42702',
     error: 'A função de acesso instalada no banco está incompatível. Código 42702.'
   });
+});
+
+test('desktop session migration resolves pgcrypto from the Supabase extensions schema', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'migrations', '20260821_desktop_crypto_schema.sql'),
+    'utf8'
+  );
+  assert.match(migration, /extensions\.gen_random_bytes\(32\)/);
+  assert.match(migration, /extensions\.digest\(v_token, 'sha256'\)/);
+  assert.doesNotMatch(migration, /(?<!\.)\bgen_random_bytes\(/);
+  assert.doesNotMatch(migration, /(?<!\.)\bdigest\(/);
 });
