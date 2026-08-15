@@ -72,4 +72,9 @@ function publicOrigin(req) {
   if (origin === 'https://paxincpa.store') origin = 'https://www.paxincpa.store';
   return origin;
 }
-module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin };
+function sameOriginRequest(req) {
+  const origin = String(req.headers.origin || '');
+  if (!origin) return true;
+  try { return new URL(origin).origin === publicOrigin(req); } catch { return false; }
+}
+module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest };

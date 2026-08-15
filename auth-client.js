@@ -48,6 +48,31 @@ function renderClientDashboard(payload) {
   document.getElementById('passkey-copy').textContent = passkeySession ? 'Cadastre uma passkey neste dispositivo agora.' : user ? 'Para adicionar uma passkey, entre novamente com e-mail e senha.' : 'Entre para cadastrar uma passkey neste dispositivo.';
 }
 
+function setAccountView(view, moveFocus = false) {
+  const target = document.querySelector(`[data-account-panel="${view}"]`);
+  if (!target) return;
+  document.querySelectorAll('[data-account-panel]').forEach(panel => {
+    const active = panel === target;
+    panel.hidden = !active;
+    panel.classList.toggle('is-active', active);
+  });
+  document.querySelectorAll('[data-account-view]').forEach(button => {
+    const active = button.dataset.accountView === view;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+    if (active && moveFocus) button.focus();
+  });
+}
+
+async function syncOwnerPanelLink(user) {
+  const link = document.getElementById('owner-panel-link');
+  if (!link) return;
+  link.hidden = true;
+  if (!user) return;
+  try { await PaxinbotAuth.request('/api/admin?action=overview'); link.hidden = false; } catch {}
+}
+
 async function getPasskeyClient() {
   if (passkeyClient) return passkeyClient;
   const config = await PaxinbotAuth.request('/api/auth/config');
@@ -75,16 +100,24 @@ async function registerPasskey() {
 
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]');
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); renderClientDashboard(current); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
-  form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method: 'POST', body: { email: data.get('email'), password: data.get('password') } }); passkeySession = result.passkeySession || null; const current = await PaxinbotAuth.request('/api/auth/me'); renderClientDashboard(current); setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.('Login realizado.'); document.getElementById('client-password').value = ''; document.getElementById('client-dashboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
+  try { const current = await PaxinbotAuth.request('/api/auth/me'); renderClientDashboard(current); await syncOwnerPanelLink(current.user); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
+  form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method: 'POST', body: { email: data.get('email'), password: data.get('password') } }); passkeySession = result.passkeySession || null; const current = await PaxinbotAuth.request('/api/auth/me'); renderClientDashboard(current); await syncOwnerPanelLink(current.user); setAccountView('overview'); setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.('Login realizado.'); document.getElementById('client-password').value = ''; document.getElementById('client-dashboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
   document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); if (data.get('password') !== data.get('passwordConfirm')) { window.showToast?.('As senhas precisam ser iguais.'); return; } submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method: 'POST', body: { email: data.get('email'), password: data.get('password') } }); setClientStatus(result.message, true); signup.reset(); setAuthMode('login'); window.showToast?.('Conta criada. Confira seu e-mail.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
   document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
   document.getElementById('passkey-login')?.addEventListener('click', () => loginWithPasskey().catch(error => { setClientStatus(error.message || 'Não foi possível usar a passkey.'); window.showToast?.(error.message || 'Não foi possível usar a passkey.'); }));
   document.getElementById('passkey-register')?.addEventListener('click', () => registerPasskey().catch(error => window.showToast?.(error.message || 'Não foi possível cadastrar a passkey.')));
-  const modalities = document.getElementById('account-modalities');
-  document.getElementById('open-modalities')?.addEventListener('click', () => { modalities.hidden = false; modalities.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-  document.getElementById('close-modalities')?.addEventListener('click', () => { modalities.hidden = true; });
-  document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method: 'POST' }); } catch {} passkeySession = null; renderClientDashboard(null); setClientStatus('Sessão encerrada.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountView)));
+  document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountOpen, true)));
+  document.querySelector('.portal-nav')?.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...document.querySelectorAll('[data-account-view]')];
+    const current = tabs.indexOf(document.activeElement);
+    if (current < 0) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    setAccountView(tabs[next].dataset.accountView, true);
+  });
+  document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method: 'POST' }); } catch {} passkeySession = null; renderClientDashboard(null); await syncOwnerPanelLink(null); setAccountView('overview'); setClientStatus('Sessão encerrada.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }
 
 async function initActivationPage() {

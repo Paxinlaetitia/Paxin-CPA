@@ -69,7 +69,23 @@ document.querySelector('.js-download')?.addEventListener('click', () => {
 
 document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = 'ajuda.html'; });
 
-document.querySelector('.js-help-search')?.addEventListener('click', () => { document.querySelector('.faq-list details')?.setAttribute('open', ''); });
+function searchHelp() {
+  const input = document.getElementById('help-search-input');
+  const status = document.getElementById('help-search-status');
+  if (!input || !status) return;
+  const query = input.value.trim().toLocaleLowerCase('pt-BR');
+  const articles = [...document.querySelectorAll('.faq-list details')];
+  let matches = 0;
+  articles.forEach(article => {
+    const found = !query || article.textContent.toLocaleLowerCase('pt-BR').includes(query);
+    article.hidden = !found;
+    if (found) { matches += 1; article.open = Boolean(query); }
+  });
+  status.textContent = query ? (matches ? `${matches} resultado${matches === 1 ? '' : 's'} encontrado${matches === 1 ? '' : 's'}.` : 'Nenhuma resposta encontrada. Tente outro termo.') : 'Digite um termo para pesquisar.';
+  if (matches && query) document.querySelector('.faq-list details:not([hidden])')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+document.querySelector('.js-help-search')?.addEventListener('click', searchHelp);
+document.getElementById('help-search-input')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchHelp(); } });
 
 document.querySelector('.js-forgot')?.addEventListener('click', async () => {
   const email = document.getElementById('client-email')?.value?.trim();

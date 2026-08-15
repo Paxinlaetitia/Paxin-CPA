@@ -1,6 +1,6 @@
 'use strict';
 
-const { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, publicOrigin } = require('../_paxinbot');
+const { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, publicOrigin, sameOriginRequest } = require('../_paxinbot');
 
 function actionOf(req) {
   if (req.query?.action) return String(req.query.action);
@@ -9,6 +9,7 @@ function actionOf(req) {
 
 module.exports = async (req, res) => {
   const action = actionOf(req);
+  if (req.method === 'POST' && ['login', 'logout', 'recover', 'signup', 'session', 'password'].includes(action) && !sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
   if (action === 'login') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const body = await readBody(req); const email = String(body.email || '').trim(); const password = String(body.password || '');

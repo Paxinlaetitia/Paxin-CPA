@@ -19,4 +19,4 @@ Abra `index.html` em um navegador moderno ou use o atalho `Visualizar Paxinbot S
 - Rotas de login, sessão, recuperação de senha e autorização de computador.
 - Estrutura para banco Supabase e acesso por duração/vitalício.
 
-Para produção, execute a migração do Supabase, configure SMTP, defina os produtos e conecte o provedor de pagamentos antes de apontar o domínio público.
+O backend de produção usa Vercel Functions e Supabase. Antes da venda, configure SMTP, conecte o provedor de pagamentos, publique o instalador e conclua os itens listados em `SITE_AUDIT.md`.
