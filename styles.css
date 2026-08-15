@@ -500,4 +500,5 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .auth-callback .auth-card { width: min(440px, 100%); }
 .auth-callback h1 { margin: 3px 0 0; font-size: 24px; letter-spacing: -.035em; }
 .client-authenticated .client-access-section { display: none; }
-.client-authenticated .client-dashboard-preview { padding-top: 130px; min-height: 100vh; }
+.client-authenticated .client-dashboard-preview { min-height: 100vh; padding: 112px 0 76px; }
+.client-authenticated .client-dashboard-intro { display: none; }
