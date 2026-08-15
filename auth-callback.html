@@ -15,7 +15,9 @@
     const response = await fetch('/api/auth/session', { method:'POST', credentials:'include', headers:{'content-type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({accessToken,refreshToken: refreshToken || ''}) });
     if (!response.ok) throw new Error();
     if (params.get('flow') === 'passkey') sessionStorage.setItem('paxinbot_passkey_session', JSON.stringify({ accessToken, refreshToken: refreshToken || '' }));
-    location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : params.get('flow') === 'passkey' ? '/conta/seguranca' : '/conta');
+    let safeReturn='/conta';
+    try { const candidate=sessionStorage.getItem('paxinbot_auth_return') || ''; sessionStorage.removeItem('paxinbot_auth_return'); const parsed=new URL(candidate,location.origin); const productId=parsed.searchParams.get('product') || ''; if (parsed.origin===location.origin && parsed.pathname==='/conta/checkout' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId) && parsed.searchParams.size===1) safeReturn=`/conta/checkout?product=${encodeURIComponent(productId)}`; } catch {}
+    location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : params.get('flow') === 'passkey' ? '/conta/seguranca' : safeReturn);
   } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }
 })();
 </script></body></html>

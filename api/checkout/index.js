@@ -3,6 +3,7 @@ const { json, readBody, browserSession, upstream, publicOrigin, sameOriginReques
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COUPON = /^[A-Z0-9_-]{3,32}$/;
+const PAYER_NAME = /^[\p{L}\p{M}][\p{L}\p{M}' .-]{1,99}$/u;
 
 function mercadoPagoToken() {
   const token = String(process.env.MERCADOPAGO_ACCESS_TOKEN || '');
@@ -39,6 +40,31 @@ async function createPreference(req, access, order) {
   return checkoutUrl;
 }
 
+async function createPixOrder(access, order) {
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  const providerResponse = await fetch('https://api.mercadopago.com/v1/orders', {
+    method:'POST',
+    headers:{ authorization:`Bearer ${mercadoPagoToken()}`, 'content-type':'application/json', 'x-idempotency-key':String(order.orderId) },
+    body:JSON.stringify({
+      type:'online', total_amount:(Number(order.amountCents) / 100).toFixed(2),
+      external_reference:String(order.externalReference), processing_mode:'automatic',
+      transactions:{ payments:[{ amount:(Number(order.amountCents) / 100).toFixed(2), payment_method:{ id:'pix', type:'bank_transfer' }, expiration_time:'PT30M' }] },
+      payer:{ email:String(order.payerEmail || '') }
+    })
+  });
+  const providerOrder = await providerResponse.json().catch(() => null);
+  const payment = providerOrder?.transactions?.payments?.[0];
+  const qrCode = String(payment?.payment_method?.qr_code || '');
+  const qrCodeBase64 = String(payment?.payment_method?.qr_code_base64 || '');
+  if (!providerResponse.ok || !providerOrder?.id || !payment?.id || qrCode.length < 20 || qrCode.length > 2048 || qrCodeBase64.length < 40 || qrCodeBase64.length > 1_500_000 || !/^[A-Za-z0-9+/=]+$/.test(qrCodeBase64)) throw new Error('provider_error');
+  const attached = await rpc(access, 'paxinbot_attach_pix_order', {
+    p_order_id:order.orderId, p_provider_order_id:String(providerOrder.id),
+    p_provider_payment_id:String(payment.id), p_expires_at:expiresAt.toISOString()
+  });
+  if (!attached.response.ok) throw new Error('attach_error');
+  return { qrCode, qrCodeBase64, expiresAt:expiresAt.toISOString() };
+}
+
 module.exports = async (req, res) => {
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para continuar.' });
@@ -54,6 +80,13 @@ module.exports = async (req, res) => {
 
   const body = await readBody(req);
   const action = String(body.action || 'create');
+  if (action === 'quote') {
+    const productId = String(body.productId || '');
+    const couponCode = String(body.couponCode || '').trim().toUpperCase();
+    if (!UUID.test(productId) || (couponCode && !COUPON.test(couponCode))) return json(res, 400, { ok:false, error:'Produto ou cupom inválido.' });
+    const quoted = await rpc(session.access, 'paxinbot_quote_checkout', { p_product_id:productId, p_coupon_code:couponCode || null });
+    return json(res, quoted.response.ok ? 200 : 400, quoted.response.ok ? { ok:true, quote:quoted.payload } : { ok:false, error:safeUpstreamError(quoted.payload, 'Não foi possível validar esta modalidade.') });
+  }
   if (action === 'receipt') {
     const orderId = String(body.orderId || ''); if (!UUID.test(orderId)) return json(res, 400, { ok:false, error:'Pedido inválido.' });
     const receipt = await rpc(session.access, 'paxinbot_get_my_receipt', { p_order_id:orderId });
@@ -75,14 +108,22 @@ module.exports = async (req, res) => {
   if (action !== 'create') return json(res, 400, { ok:false, error:'Ação inválida.' });
   const productId = String(body.productId || '');
   const couponCode = String(body.couponCode || '').trim().toUpperCase();
-  if (!UUID.test(productId) || (couponCode && !COUPON.test(couponCode))) return json(res, 400, { ok:false, error:'Produto ou cupom inválido.' });
+  const paymentMethod = String(body.paymentMethod || 'pix');
+  const payerName = String(body.payerName || '').trim().replace(/\s+/g, ' ');
+  const clientRequestId = String(body.clientRequestId || '');
+  if (!UUID.test(productId) || !UUID.test(clientRequestId) || !['pix','checkout_pro'].includes(paymentMethod) || !PAYER_NAME.test(payerName) || (couponCode && !COUPON.test(couponCode))) return json(res, 400, { ok:false, error:'Confira os dados da compra e tente novamente.' });
 
-  const prepared = await rpc(session.access, 'paxinbot_prepare_checkout', { p_product_id:productId, p_coupon_code:couponCode || null });
+  const prepared = await rpc(session.access, 'paxinbot_prepare_checkout_v2', {
+    p_product_id:productId, p_coupon_code:couponCode || null, p_client_request_id:clientRequestId,
+    p_payment_method:paymentMethod, p_payer_name:payerName
+  });
   if (!prepared.response.ok) return json(res, 400, { ok:false, error:safeUpstreamError(prepared.payload, 'Não foi possível preparar esta compra.') });
   const order = prepared.payload;
 
-  try { return json(res, 201, { ok:true, orderId:order.orderId, checkoutUrl:await createPreference(req, session.access, order) }); } catch {
-    await rpc(session.access, 'paxinbot_cancel_checkout', { p_order_id:order.orderId, p_reason:'provider_error' }).catch(() => null);
+  try {
+    if (paymentMethod === 'pix') return json(res, 201, { ok:true, orderId:order.orderId, paymentMethod, pix:await createPixOrder(session.access, order) });
+    return json(res, 201, { ok:true, orderId:order.orderId, paymentMethod, checkoutUrl:await createPreference(req, session.access, order) });
+  } catch {
     return json(res, 503, { ok:false, error:'O Mercado Pago não respondeu. Aguarde um momento e tente novamente.' });
   }
 };

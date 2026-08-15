@@ -42,13 +42,14 @@ a URL pública do site.
 
 ## Checkout e liberação automática
 
-O fluxo comercial usa Checkout Pro do Mercado Pago. Antes de habilitar compras em produção:
+O fluxo comercial usa PIX interno pela Orders API e Checkout Pro para cartão e outros meios. Antes de habilitar compras em produção:
 
 1. execute `supabase/migrations/20260817_checkout.sql` no SQL Editor do Supabase;
 2. crie uma chave secreta exclusiva para o backend e salve-a na Vercel como `SUPABASE_SECRET_KEY`;
 3. configure `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` somente na Vercel;
-4. no Mercado Pago, cadastre `https://www.paxincpa.store/api/webhooks/mercadopago` para eventos de pagamento;
-5. para e-mails de confirmação, configure `RESEND_API_KEY` e `RESEND_FROM_EMAIL` com um domínio verificado.
+4. depois das demais migrações, execute `supabase/migrations/20260824_checkout_v1.sql`;
+5. no Mercado Pago, cadastre `https://www.paxincpa.store/api/webhooks/mercadopago` e habilite os eventos **Pagamentos** e **Order (Mercado Pago)**;
+6. para e-mails de confirmação, configure `RESEND_API_KEY` e `RESEND_FROM_EMAIL` com um domínio verificado.
 
 ## Pós-venda e atendimento
 

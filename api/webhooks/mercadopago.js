@@ -30,6 +30,13 @@ function publicPaymentSnapshot(payment) {
     dateApproved:payment?.date_approved || null
   };
 }
+function publicOrderSnapshot(order, payment) {
+  return {
+    orderStatus:String(order?.status || '').slice(0,60),
+    statusDetail:String(order?.status_detail || payment?.status_detail || '').slice(0,100),
+    paymentMethod:String(payment?.payment_method?.type || payment?.payment_method?.id || '').slice(0,60)
+  };
+}
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
 async function sendConfirmation(result) {
   const apiKey = String(process.env.RESEND_API_KEY || '');
@@ -52,9 +59,31 @@ module.exports = async (req, res) => {
   const dataId = String(req.query?.['data.id'] || req.query?.id || body?.data?.id || '');
   if (!verifySignature(req, dataId)) return json(res, 401, { ok:false });
   const type = String(req.query?.type || body?.type || body?.action || '').toLowerCase();
-  if (type && type !== 'payment' && !type.startsWith('payment.')) return json(res, 200, { ok:true, ignored:true });
+  const isOrder = type === 'order' || type.startsWith('order.');
+  const isPayment = !type || type === 'payment' || type.startsWith('payment.');
+  if (!isOrder && !isPayment) return json(res, 200, { ok:true, ignored:true });
 
   try {
+    if (isOrder) {
+      const orderResponse = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
+      const order = await orderResponse.json().catch(() => null);
+      const payment = order?.transactions?.payments?.[0];
+      if (!orderResponse.ok || !order?.id || !payment?.id) return json(res, 503, { ok:false });
+      const amountCents = Math.round(Number(payment.paid_amount || payment.amount || order.total_amount) * 100);
+      if (!Number.isSafeInteger(amountCents) || amountCents < 0) return json(res, 400, { ok:false });
+      const providerStatus = String(payment.status || order.status || '').toLowerCase();
+      const finalStatus = providerStatus === 'processed' ? 'approved' : providerStatus === 'refunded' ? 'refunded' : ['failed','canceled','cancelled','expired'].includes(providerStatus) ? 'cancelled' : providerStatus;
+      const finalized = await serviceUpstream('/rest/v1/rpc/paxinbot_finalize_mercadopago_payment', {
+        method:'POST', body:{
+          p_payment_id:String(payment.id), p_external_reference:String(order.external_reference || ''),
+          p_status:finalStatus, p_amount_cents:amountCents,
+          p_currency:String(order.currency || payment.currency_id || 'BRL'), p_provider_payload:publicOrderSnapshot(order,payment)
+        }
+      });
+      if (!finalized.response.ok) return json(res, 503, { ok:false });
+      await sendConfirmation(finalized.payload).catch(() => null);
+      return json(res, 200, { ok:true });
+    }
     const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
     const payment = await paymentResponse.json().catch(() => null);
     if (!paymentResponse.ok || !payment?.id) return json(res, 503, { ok:false });
