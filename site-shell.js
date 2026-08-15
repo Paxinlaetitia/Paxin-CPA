@@ -63,14 +63,14 @@
     footer.outerHTML = `
       <footer class="site-footer">
         <div class="container footer-main">
-          <div><a class="brand" href="index.html"><span class="brand-mark"><img src="assets/paxinbot-mark.svg" alt="" /></span><span class="brand-name">Paxinbot</span></a><p>Operações CPA organizadas com clareza, controle e consistência.</p></div>
+          <div><a class="brand" href="index.html"><span class="brand-mark"><img src="assets/paxinbot-mark.svg" alt="" /></span><span class="brand-name">Paxinbot</span></a><p>Ambiente de trabalho para organizar sessões, rotinas e acompanhamento operacional.</p></div>
           <div class="footer-links">
             <div><b>PRODUTO</b><a href="produto.html">Visão geral</a><a href="recursos.html">Recursos</a><a href="planos.html">Planos</a></div>
             <div><b>CLIENTE</b><a href="cliente.html">Área do cliente</a><a href="download.html">Download</a><a href="ajuda.html">Central de ajuda</a></div>
             <div><b>LEGAL</b><a href="seguranca.html">Segurança</a><a href="ajuda.html#termos">Termos de uso</a><a href="ajuda.html#privacidade">Privacidade</a></div>
           </div>
         </div>
-        <div class="container footer-bottom"><span>© <span id="year"></span> Paxinbot. Todos os direitos reservados.</span><span class="prototype-badge">PROTÓTIPO VISUAL</span></div>
+        <div class="container footer-bottom"><span>© <span id="year"></span> Paxinbot. Todos os direitos reservados.</span><span class="prototype-badge">CANAL OFICIAL</span></div>
       </footer>`;
   }
 })();

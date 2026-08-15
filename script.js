@@ -59,32 +59,17 @@ document.addEventListener('keydown', event => {
   }
 });
 
-document.querySelector('.js-demo-login')?.addEventListener('click', () => {
-  closeModal();
-  showToast('Fluxo visual aprovado para receber a autenticação na próxima etapa.');
-});
-
-document.querySelectorAll('.js-plan').forEach(button => {
-  button.addEventListener('click', () => {
-    showToast(`Plano ${button.dataset.plan}: estrutura visual selecionada.`);
-  });
-});
-
 document.querySelector('.js-preview')?.addEventListener('click', () => {
-  showToast('O download real será conectado depois da aprovação do site.');
+  window.location.href = 'cliente.html';
 });
 
 document.querySelector('.js-download')?.addEventListener('click', () => {
-  showToast('Página pronta. O instalador oficial ainda será conectado a este botão.');
+  window.location.href = 'cliente.html';
 });
 
-document.querySelector('.js-support')?.addEventListener('click', () => {
-  showToast('O canal de atendimento será conectado antes do lançamento.');
-});
+document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = 'ajuda.html'; });
 
-document.querySelector('.js-help-search')?.addEventListener('click', () => {
-  showToast('A busca será ativada quando a base de artigos estiver pronta.');
-});
+document.querySelector('.js-help-search')?.addEventListener('click', () => { document.querySelector('.faq-list details')?.setAttribute('open', ''); });
 
 document.querySelector('.js-forgot')?.addEventListener('click', async () => {
   const email = document.getElementById('client-email')?.value?.trim();
@@ -95,9 +80,7 @@ document.querySelector('.js-forgot')?.addEventListener('click', async () => {
   } catch { showToast('Não foi possível iniciar a recuperação agora.'); }
 });
 
-document.querySelector('.js-create-account')?.addEventListener('click', () => {
-  showToast('O cadastro será liberado junto com a integração de pagamentos.');
-});
+document.querySelector('.js-create-account')?.addEventListener('click', () => { window.location.href = 'planos.html'; });
 
 const passwordField = document.getElementById('client-password');
 document.querySelector('.auth-eye')?.addEventListener('click', event => {
@@ -108,19 +91,9 @@ document.querySelector('.auth-eye')?.addEventListener('click', event => {
 });
 
 
-document.querySelectorAll('.billing-switch button').forEach(button => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('.billing-switch button').forEach(item => item.classList.toggle('active', item === button));
-    showToast('Alternância visual selecionada. Os preços ainda serão definidos.');
-  });
-});
+document.querySelectorAll('.billing-switch button').forEach(button => button.addEventListener('click', () => document.querySelectorAll('.billing-switch button').forEach(item => item.classList.toggle('active', item === button))));
 
-document.querySelectorAll('a[href="#"]').forEach(link => {
-  link.addEventListener('click', event => {
-    event.preventDefault();
-    showToast('Esta área será construída após a aprovação do esqueleto.');
-  });
-});
+document.querySelectorAll('a[href="#"]').forEach(link => link.addEventListener('click', event => event.preventDefault()));
 
 const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(entry => {
