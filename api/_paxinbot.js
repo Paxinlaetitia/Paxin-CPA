@@ -28,7 +28,13 @@ async function upstream(path, options = {}) {
   let payload = null; try { payload = await response.json(); } catch {}
   return { response, payload };
 }
-async function readBody(req) { if (req.body && typeof req.body === 'object') return req.body; const chunks = []; for await (const chunk of req) chunks.push(chunk); try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; } }
+async function readBody(req) {
+  // O adaptador da Vercel pode entregar JSON já analisado ou como texto.
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') { try { return JSON.parse(req.body || '{}'); } catch { return {}; } }
+  const chunks = []; for await (const chunk of req) chunks.push(chunk);
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; }
+}
 async function userFromAccess(access) {
   if (!access) return null;
   const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${access}` } });
