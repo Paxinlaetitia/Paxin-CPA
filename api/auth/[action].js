@@ -4,7 +4,7 @@ const { config, json, cookies, sessionCookies, clearSession, upstream, readBody,
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
-  const suffix = `Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${isSecure ? '; Secure' : ''}`;
+  const suffix = `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${isSecure ? '; Secure' : ''}`;
   const entries = { paxinbot_verify_access: values.accessToken || '', paxinbot_verify_email: values.email || '', paxinbot_verify_purpose: values.purpose || '' };
   return Object.entries(entries).map(([name, value]) => `${name}=${encodeURIComponent(value)}; ${suffix}`);
 }
@@ -53,7 +53,8 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const body = await readBody(req); const jar = cookies(req); const code = String(body.code || '').replace(/\s/g, '');
     const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || ''); const temporaryAccess = String(jar.paxinbot_verify_access || '');
-    if (!/^[0-9]{6}$/.test(code) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup', 'passkey'].includes(purpose)) return json(res, 400, { ok: false, error: 'Informe o código de seis dígitos enviado ao seu e-mail.' });
+    if (!/^[0-9]{6}$/.test(code)) return json(res, 400, { ok: false, error: 'Informe o código de seis dígitos enviado ao seu e-mail.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup', 'passkey'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
     let passwordUser = null;
     if (purpose !== 'signup') {
       if (!temporaryAccess) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
@@ -61,7 +62,7 @@ module.exports = async (req, res) => {
       if (!temporaryUser.response.ok || !temporaryUser.payload?.id) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
       passwordUser = temporaryUser.payload;
     }
-    const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { email, token: code, type: 'email' } });
+    const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { email, token: code, type: purpose === 'signup' ? 'signup' : 'email' } });
     if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'Não foi possível confirmar o código.') });
     if (passwordUser && passwordUser.id !== verified.payload.user.id) return json(res, 401, { ok: false, error: 'O código não corresponde à conta confirmada pela senha.' });
     res.setHeader('Set-Cookie', [...sessionCookies(req, verified.payload.access_token, verified.payload.refresh_token), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]);

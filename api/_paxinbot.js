@@ -110,7 +110,15 @@ function publicOrigin(req) {
 function sameOriginRequest(req) {
   const origin = String(req.headers.origin || '');
   if (!origin) return true;
-  try { return new URL(origin).origin === publicOrigin(req); } catch { return false; }
+  try {
+    const received = new URL(origin).origin;
+    const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+    const host = forwardedHost || String(req.headers.host || '').trim();
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    const protocol = forwardedProto || (secure(req) ? 'https' : 'http');
+    const requestOrigin = host ? new URL(`${protocol}://${host}`).origin : '';
+    return received === requestOrigin || received === new URL(publicOrigin(req)).origin;
+  } catch { return false; }
 }
 function safeUpstreamError(payload, fallback = 'Não foi possível concluir a operação.') {
   const code = String(payload?.code || '');
