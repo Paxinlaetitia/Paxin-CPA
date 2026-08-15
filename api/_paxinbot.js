@@ -168,6 +168,7 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
   return fallback;
 }
 function safeDeviceAuthError(payload, fallback = 'Não foi possível concluir a autorização.') {
+  const upstreamCode = String(payload?.code || '').toUpperCase();
   const message = String(payload?.message || payload?.error || '');
   if (/no_active_access/i.test(message)) return { code: 'access_required', error: 'Sua conta não possui acesso ativo ao aplicativo.' };
   if (/device_expired/i.test(message)) return { code: 'request_expired', error: 'A solicitação expirou. Inicie o login novamente no aplicativo.' };
@@ -175,7 +176,20 @@ function safeDeviceAuthError(payload, fallback = 'Não foi possível concluir a 
   if (/device_denied/i.test(message)) return { code: 'request_denied', error: 'A autorização deste computador foi recusada.' };
   if (/device_poll_limit/i.test(message)) return { code: 'poll_limit', error: 'A solicitação excedeu o limite de tentativas. Inicie novamente.' };
   if (/device_request_invalid|invalid_device_request/i.test(message)) return { code: 'request_invalid', error: 'A solicitação do aplicativo é inválida.' };
-  return { code: 'authorization_failed', error: fallback };
+  const databaseErrors = {
+    '23502': 'A estrutura da sessão está incompleta no banco.',
+    '23503': 'A conta vinculada à sessão não está mais disponível.',
+    '23505': 'A sessão já foi criada. Inicie uma nova autorização.',
+    '23514': 'A sessão não atende às regras atuais do banco.',
+    '42501': 'O serviço não possui permissão para concluir a sessão.',
+    '42702': 'A função de acesso instalada no banco está incompatível.',
+    '42703': 'A migração do banco está incompleta.',
+    '42883': 'Uma função necessária ainda não foi instalada no banco.',
+    'PGRST202': 'A atualização do banco ainda não foi reconhecida pelo servidor.'
+  };
+  if (databaseErrors[upstreamCode]) return { code: 'database_incompatible', diagnosticCode: upstreamCode, error: `${databaseErrors[upstreamCode]} Código ${upstreamCode}.` };
+  const diagnosticCode = /^[A-Z0-9]{3,12}$/.test(upstreamCode) ? upstreamCode : 'AUTH-SESSION';
+  return { code: 'authorization_failed', diagnosticCode, error: `${fallback} Código ${diagnosticCode}.` };
 }
 async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   const apiKey = String(process.env.RESEND_API_KEY || '');

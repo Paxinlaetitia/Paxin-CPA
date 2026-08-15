@@ -92,4 +92,9 @@ test('database authorization failures are translated without exposing internals'
     error: 'A solicitação expirou. Inicie o login novamente no aplicativo.'
   });
   assert.equal(safeDeviceAuthError({ message: 'SQL details that must stay private' }).code, 'authorization_failed');
+  assert.deepEqual(safeDeviceAuthError({ code: '42702', message: 'internal database detail' }), {
+    code: 'database_incompatible',
+    diagnosticCode: '42702',
+    error: 'A função de acesso instalada no banco está incompatível. Código 42702.'
+  });
 });
