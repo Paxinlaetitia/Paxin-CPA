@@ -77,4 +77,14 @@ function sameOriginRequest(req) {
   if (!origin) return true;
   try { return new URL(origin).origin === publicOrigin(req); } catch { return false; }
 }
-module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest };
+function safeUpstreamError(payload, fallback = 'Não foi possível concluir a operação.') {
+  const code = String(payload?.code || '');
+  const message = String(payload?.message || payload?.msg || payload?.error_description || '');
+  if (code === '23505' || /duplicate key|already exists/i.test(message)) return 'Já existe um registro com esse código.';
+  if (code === '23514' || /check constraint|violates constraint/i.test(message)) return 'Um ou mais dados não atendem às regras do cadastro.';
+  if (code === 'PGRST202' || /function.*schema cache|could not find the function/i.test(message)) return 'A atualização do banco necessária para esta função ainda não foi aplicada.';
+  if (/user_not_found/i.test(message)) return 'Nenhum cliente foi encontrado com esse e-mail.';
+  if (/invalid_entitlement/i.test(message)) return 'Informe uma expiração futura para o acesso por tempo.';
+  return fallback;
+}
+module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin, sameOriginRequest, safeUpstreamError };

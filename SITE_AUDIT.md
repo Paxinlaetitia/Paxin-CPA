@@ -14,6 +14,9 @@ Atualizada em 15/08/2026.
 - Painel do proprietário protegido por validação no servidor.
 - Cadastro de produtos, cupons e liberação manual de acesso.
 - Busca funcional na Central de Ajuda.
+- URLs públicas limpas e portais com navegação própria, sem sidebar.
+- Configuração de conta, alteração de senha com reautenticação e fluxo de passkey.
+- Gestão de dispositivos, pedidos e auditoria preparada pela migração `20260815_portals.sql`.
 
 ## Dependências externas ainda necessárias para venda
 
@@ -26,10 +29,10 @@ Atualizada em 15/08/2026.
 
 ## Funcionalidades administrativas ainda parciais
 
-- Editar, pausar e reativar produtos existentes.
-- Editar, pausar e acompanhar cupons individualmente.
-- Suspender clientes, revogar acessos e encerrar sessões de dispositivos.
-- Consultar pedidos, pagamentos e eventos de auditoria.
+- Suspender completamente uma conta de cliente.
+- Processar estornos e reembolsos pelo provedor de pagamentos.
+- Publicar e assinar novas versões do instalador.
+- Abrir e responder solicitações de suporte dentro do portal.
 - Publicar o catálogo administrado no checkout e na Área do Cliente.
 
 ## Validação antes do lançamento
@@ -40,4 +43,3 @@ Atualizada em 15/08/2026.
 - Testar reflow em 320 px, navegação por teclado e foco visível.
 - Validar o instalador e o fluxo completo de autorização do aplicativo.
 - Simular pagamento aprovado, recusado, estornado e webhook repetido.
-

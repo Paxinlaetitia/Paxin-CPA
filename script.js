@@ -60,14 +60,14 @@ document.addEventListener('keydown', event => {
 });
 
 document.querySelector('.js-preview')?.addEventListener('click', () => {
-  window.location.href = 'cliente.html';
+  window.location.href = '/conta';
 });
 
 document.querySelector('.js-download')?.addEventListener('click', () => {
-  window.location.href = 'cliente.html';
+  window.location.href = '/conta';
 });
 
-document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = 'ajuda.html'; });
+document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = '/ajuda'; });
 
 function searchHelp() {
   const input = document.getElementById('help-search-input');
@@ -96,7 +96,7 @@ document.querySelector('.js-forgot')?.addEventListener('click', async () => {
   } catch { showToast('Não foi possível iniciar a recuperação agora.'); }
 });
 
-document.querySelector('.js-create-account')?.addEventListener('click', () => { window.location.href = 'planos.html'; });
+document.querySelector('.js-create-account')?.addEventListener('click', () => { window.location.href = '/planos'; });
 
 const passwordField = document.getElementById('client-password');
 document.querySelector('.auth-eye')?.addEventListener('click', event => {

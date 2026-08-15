@@ -27,7 +27,8 @@ module.exports = async (req, res) => {
     if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
     const { response, payload } = await upstream('/rest/v1/rpc/paxinbot_get_my_access', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
-    return json(res, response.ok ? 200 : 503, { ok: response.ok, user: { id: session.user.id, email: session.user.email }, entitlement: response.ok ? payload : { active: false } });
+    const providers = [...new Set((session.user.identities || []).map(identity => identity.provider).filter(Boolean))];
+    return json(res, response.ok ? 200 : 503, { ok: response.ok, user: { id: session.user.id, email: session.user.email, providers }, entitlement: response.ok ? payload : { active: false } });
   }
   if (action === 'recover') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
@@ -57,7 +58,7 @@ module.exports = async (req, res) => {
   }
   if (action === 'password') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'A sessão de recuperação expirou. Solicite um novo link.' });
+    const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Sua sessão expirou. Entre novamente para alterar a senha.' });
     const { password } = await readBody(req); const value = String(password || '');
     if (value.length < 10 || value.length > 128) return json(res, 400, { ok: false, error: 'Use uma senha entre 10 e 128 caracteres.' });
     const { response, payload } = await upstream('/auth/v1/user', { method: 'PUT', headers: { authorization: `Bearer ${session.access}` }, body: { password: value } });
@@ -70,8 +71,8 @@ module.exports = async (req, res) => {
   }
   if (action === 'google') {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
-    const { url } = config(); const target = new URL(`${url}/auth/v1/authorize`);
-    target.searchParams.set('provider', 'google'); target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=google`);
+    const { url } = config(); const target = new URL(`${url}/auth/v1/authorize`); const intent = String(req.query?.intent || '') === 'passkey' ? 'passkey' : 'google';
+    target.searchParams.set('provider', 'google'); target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=${intent}`);
     res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' }); res.end(); return;
   }
   return json(res, 404, { ok: false, error: 'Rota não encontrada.' });

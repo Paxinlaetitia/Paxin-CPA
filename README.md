@@ -20,3 +20,5 @@ Abra `index.html` em um navegador moderno ou use o atalho `Visualizar Paxinbot S
 - Estrutura para banco Supabase e acesso por duração/vitalício.
 
 O backend de produção usa Vercel Functions e Supabase. Antes da venda, configure SMTP, conecte o provedor de pagamentos, publique o instalador e conclua os itens listados em `SITE_AUDIT.md`.
+
+Para ativar gerenciamento de perfil, dispositivos, pedidos e auditoria nos novos portais, execute no SQL Editor do Supabase a migração `supabase/migrations/20260815_portals.sql` após a migração principal de acesso.

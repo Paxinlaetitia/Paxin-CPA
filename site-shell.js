@@ -3,11 +3,11 @@
 (function buildSiteShell() {
   const page = document.body.dataset.page || 'inicio';
   const nav = [
-    ['produto', 'Produto', 'produto.html'],
-    ['recursos', 'Recursos', 'recursos.html'],
-    ['planos', 'Planos', 'planos.html'],
-    ['seguranca', 'Segurança', 'seguranca.html'],
-    ['ajuda', 'Ajuda', 'ajuda.html']
+    ['produto', 'Produto', '/produto'],
+    ['recursos', 'Recursos', '/recursos'],
+    ['planos', 'Planos', '/planos'],
+    ['seguranca', 'Segurança', '/seguranca'],
+    ['ajuda', 'Ajuda', '/ajuda']
   ];
 
   const icons = `
@@ -42,8 +42,8 @@
     header.outerHTML = `
       <header class="site-header" id="top">
         <div class="container header-inner">
-          <a class="brand" href="index.html" aria-label="Paxinbot, início">
-            <span class="brand-mark"><img src="assets/paxinbot-mark.svg" alt="" /></span>
+          <a class="brand" href="/" aria-label="Paxinbot, início">
+            <span class="brand-mark"><img src="/assets/paxinbot-mark.svg" alt="" /></span>
             <span class="brand-name">Paxinbot</span>
           </a>
           <button class="menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="main-nav"><svg><use href="#i-menu"></use></svg></button>
@@ -51,8 +51,8 @@
             ${nav.map(([key, label, href]) => `<a class="${page === key ? 'active' : ''}" href="${href}">${label}</a>`).join('')}
           </nav>
           <div class="header-actions">
-            <a class="button button-ghost ${page === 'cliente' ? 'is-current' : ''}" href="cliente.html">Área do cliente</a>
-            <a class="button button-primary ${page === 'download' ? 'is-current' : ''}" href="download.html">Baixar aplicativo</a>
+            <a class="button button-ghost ${page === 'cliente' ? 'is-current' : ''}" href="/conta">Área do cliente</a>
+            <a class="button button-primary ${page === 'download' ? 'is-current' : ''}" href="/download">Baixar aplicativo</a>
           </div>
         </div>
       </header>`;
@@ -63,11 +63,11 @@
     footer.outerHTML = `
       <footer class="site-footer">
         <div class="container footer-main">
-          <div><a class="brand" href="index.html"><span class="brand-mark"><img src="assets/paxinbot-mark.svg" alt="" /></span><span class="brand-name">Paxinbot</span></a><p>Ambiente de trabalho para organizar sessões, rotinas e acompanhamento operacional.</p></div>
+          <div><a class="brand" href="/"><span class="brand-mark"><img src="/assets/paxinbot-mark.svg" alt="" /></span><span class="brand-name">Paxinbot</span></a><p>Ambiente de trabalho para organizar sessões, rotinas e acompanhamento operacional.</p></div>
           <div class="footer-links">
-            <div><b>PRODUTO</b><a href="produto.html">Visão geral</a><a href="recursos.html">Recursos</a><a href="planos.html">Planos</a></div>
-            <div><b>CLIENTE</b><a href="cliente.html">Área do cliente</a><a href="download.html">Download</a><a href="ajuda.html">Central de ajuda</a></div>
-            <div><b>LEGAL</b><a href="seguranca.html">Segurança</a><a href="ajuda.html#termos">Termos de uso</a><a href="ajuda.html#privacidade">Privacidade</a></div>
+            <div><b>PRODUTO</b><a href="/produto">Visão geral</a><a href="/recursos">Recursos</a><a href="/planos">Planos</a></div>
+            <div><b>CLIENTE</b><a href="/conta">Área do cliente</a><a href="/download">Download</a><a href="/ajuda">Central de ajuda</a></div>
+            <div><b>LEGAL</b><a href="/seguranca">Segurança</a><a href="/ajuda#termos">Termos de uso</a><a href="/ajuda#privacidade">Privacidade</a></div>
           </div>
         </div>
         <div class="container footer-bottom"><span>© <span id="year"></span> Paxinbot. Todos os direitos reservados.</span><span class="prototype-badge">CANAL OFICIAL</span></div>

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "redirects": [
+    { "source": "/cliente", "destination": "/conta", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/conta", "destination": "/cliente" },
+    { "source": "/conta/:path*", "destination": "/cliente" },
+    { "source": "/admin/:path*", "destination": "/admin" }
+  ]
+}

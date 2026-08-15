@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Área do Cliente Paxinbot: acesso, segurança e downloads." /><meta name="theme-color" content="#050505" />
-  <title>Área do Cliente — Paxinbot</title><link rel="icon" href="assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="styles.css" /><link rel="stylesheet" href="client.css" />
+  <title>Área do Cliente — Paxinbot</title><link rel="icon" href="/assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/client.css" />
 </head>
 <body data-page="cliente">
   <div data-site-header></div>
@@ -51,59 +51,70 @@
     <section class="client-dashboard-preview" id="client-dashboard" aria-label="Área da conta">
       <div class="container client-portal">
         <header class="portal-account-bar">
-          <div class="portal-identity">
-            <span class="portal-avatar" id="dashboard-initials">PB</span>
-            <div><span class="portal-kicker">CONTA PAXINBOT</span><h1 id="dashboard-greeting">Entre na sua conta</h1><p id="dashboard-email">Entre para consultar</p></div>
-          </div>
-          <button class="portal-logout" id="client-logout" type="button" hidden>Sair da conta</button>
+          <a class="portal-brand" href="/conta" aria-label="Paxinbot, visão geral"><span><img src="/assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b><small>Área do Cliente</small></a>
+          <div class="portal-identity"><span class="portal-avatar" id="dashboard-initials">PB</span><div><span class="portal-kicker">CONTA PAXINBOT</span><h1 id="dashboard-greeting">Entre na sua conta</h1><p id="dashboard-email">Entre para consultar</p></div></div>
+          <button class="portal-logout" id="client-logout" type="button" hidden>Sair</button>
         </header>
 
         <nav class="portal-nav" aria-label="Seções da conta">
           <div class="portal-tabs" role="tablist" aria-label="Conteúdo da conta">
             <button class="is-active" id="account-tab-overview" type="button" role="tab" data-account-view="overview" aria-selected="true" aria-controls="account-panel-overview"><svg><use href="#i-grid"></use></svg>Visão geral</button>
-            <button id="account-tab-modalities" type="button" role="tab" data-account-view="modalities" aria-selected="false" aria-controls="account-panel-modalities"><svg><use href="#i-card"></use></svg>Modalidades</button>
+            <button id="account-tab-subscription" type="button" role="tab" data-account-view="subscription" aria-selected="false" aria-controls="account-panel-subscription"><svg><use href="#i-card"></use></svg>Assinatura</button>
+            <button id="account-tab-devices" type="button" role="tab" data-account-view="devices" aria-selected="false" aria-controls="account-panel-devices"><svg><use href="#i-device"></use></svg>Dispositivos</button>
             <button id="account-tab-security" type="button" role="tab" data-account-view="security" aria-selected="false" aria-controls="account-panel-security"><svg><use href="#i-shield"></use></svg>Segurança</button>
             <button id="account-tab-downloads" type="button" role="tab" data-account-view="downloads" aria-selected="false" aria-controls="account-panel-downloads"><svg><use href="#i-download"></use></svg>Downloads</button>
+            <button id="account-tab-account" type="button" role="tab" data-account-view="account" aria-selected="false" aria-controls="account-panel-account"><svg><use href="#i-user"></use></svg>Minha conta</button>
+            <button id="account-tab-support" type="button" role="tab" data-account-view="support" aria-selected="false" aria-controls="account-panel-support"><svg><use href="#i-help"></use></svg>Suporte</button>
           </div>
-          <a class="portal-admin-link" id="owner-panel-link" href="admin.html" hidden><svg><use href="#i-sliders"></use></svg>Administração</a>
+          <a class="portal-admin-link" id="owner-panel-link" href="/admin" hidden><svg><use href="#i-sliders"></use></svg>Administração</a>
         </nav>
+        <div class="portal-system-notice" id="portal-system-notice" role="status" hidden></div>
 
         <div class="portal-pages">
           <section class="portal-page is-active" id="account-panel-overview" role="tabpanel" aria-labelledby="account-tab-overview" data-account-panel="overview">
-            <div class="portal-page-head"><div><span>VISÃO GERAL</span><h2>Seu acesso, sem complicação.</h2><p>Consulte a validade e continue de onde parou.</p></div><button class="portal-text-action" type="button" data-account-open="modalities">Conhecer modalidades <svg><use href="#i-arrow"></use></svg></button></div>
-            <article class="access-overview-card">
-              <div class="access-main"><span>ACESSO ATUAL</span><strong id="dashboard-access">—</strong><small id="dashboard-access-state">Aguardando login</small></div>
-              <div class="access-detail"><span>EXPIRAÇÃO</span><strong id="dashboard-expiry">—</strong><small id="dashboard-expiry-state">Sem dados</small></div>
-              <div class="access-detail"><span>DISPOSITIVOS</span><strong id="dashboard-devices">Protegidos</strong><small id="dashboard-devices-state">Autorize pelo navegador</small></div>
-            </article>
-            <div class="portal-quick-grid">
-              <article><span class="portal-icon"><svg><use href="#i-device"></use></svg></span><div><h3>Autorizar aplicativo</h3><p>Confirme este computador pelo navegador quando o Paxinbot solicitar.</p></div><a href="ajuda.html#primeiros-passos">Ver instruções <svg><use href="#i-arrow"></use></svg></a></article>
-              <article><span class="portal-icon"><svg><use href="#i-help"></use></svg></span><div><h3>Precisa de ajuda?</h3><p>Encontre respostas rápidas e os canais oficiais de atendimento.</p></div><a href="ajuda.html">Central de ajuda <svg><use href="#i-arrow"></use></svg></a></article>
-            </div>
+            <div class="portal-page-head"><div><span>VISÃO GERAL</span><h2>Seu acesso, sem complicação.</h2><p>Consulte a validade e continue de onde parou.</p></div><button class="portal-text-action" type="button" data-account-open="subscription">Ver assinatura <svg><use href="#i-arrow"></use></svg></button></div>
+            <article class="access-overview-card"><div class="access-main"><span>ACESSO ATUAL</span><strong id="dashboard-access">—</strong><small id="dashboard-access-state">Aguardando login</small></div><div><span>EXPIRAÇÃO</span><strong id="dashboard-expiry">—</strong><small id="dashboard-expiry-state">Sem dados</small></div><div><span>DISPOSITIVOS</span><strong id="dashboard-devices">Protegidos</strong><small id="dashboard-devices-state">Autorize pelo navegador</small></div></article>
+            <div class="portal-quick-grid"><article><span class="portal-icon"><svg><use href="#i-device"></use></svg></span><div><h3>Gerencie seus computadores</h3><p>Consulte e revogue sessões do aplicativo vinculadas à sua conta.</p></div><button class="portal-inline-link" type="button" data-account-open="devices">Ver dispositivos <svg><use href="#i-arrow"></use></svg></button></article><article><span class="portal-icon"><svg><use href="#i-shield"></use></svg></span><div><h3>Revise a segurança</h3><p>Configure uma passkey e mantenha sua senha atualizada.</p></div><button class="portal-inline-link" type="button" data-account-open="security">Abrir segurança <svg><use href="#i-arrow"></use></svg></button></article></div>
           </section>
 
-          <section class="portal-page" id="account-panel-modalities" role="tabpanel" aria-labelledby="account-tab-modalities" data-account-panel="modalities" hidden>
-            <div class="portal-page-head"><div><span>MODALIDADES</span><h2>Escolha o tempo que combina com sua rotina.</h2><p>As opções ficam dentro da sua conta. Valores e disponibilidade serão exibidos no checkout.</p></div></div>
-            <div class="portal-plan-grid">
-              <article><span>USO PONTUAL</span><h3>Por horas</h3><p>Para operações específicas, com início e validade definidos na contratação.</p><ul><li>Acesso vinculado à conta</li><li>Validade visível no painel</li><li>Autorização de dispositivo</li></ul><a href="ajuda.html">Consultar disponibilidade</a></article>
-              <article class="is-featured"><span>ACESSO RECORRENTE</span><h3>Quinzenal, mensal ou trimestral</h3><p>Para manter sua rotina ativa por períodos maiores.</p><ul><li>Período definido</li><li>Gestão pela Área do Cliente</li><li>Atualizações oficiais</li></ul><a href="ajuda.html">Consultar disponibilidade</a></article>
-              <article><span>SEM EXPIRAÇÃO</span><h3>Vitalício</h3><p>Acesso sem data de vencimento, vinculado à sua conta.</p><ul><li>Sem renovação periódica</li><li>Conta protegida</li><li>Download oficial</li></ul><a href="ajuda.html">Consultar disponibilidade</a></article>
-            </div>
+          <section class="portal-page" id="account-panel-subscription" role="tabpanel" aria-labelledby="account-tab-subscription" data-account-panel="subscription" hidden>
+            <div class="portal-page-head"><div><span>ASSINATURA</span><h2>Plano, validade e histórico.</h2><p>As modalidades disponíveis e suas compras ficam reunidas aqui.</p></div></div>
+            <article class="portal-current-plan"><div><span>PLANO ATUAL</span><h3 id="subscription-plan">Sem acesso ativo</h3><p id="subscription-expiry">Escolha uma modalidade para começar.</p></div><a class="button button-secondary" href="/planos">Ver opções públicas</a></article>
+            <div class="portal-plan-grid"><article><span>USO PONTUAL</span><h3>Por horas</h3><p>Para operações específicas, com validade definida.</p><ul><li>Acesso vinculado à conta</li><li>Validade visível no painel</li></ul><a href="/ajuda">Consultar disponibilidade</a></article><article class="is-featured"><span>RECORRENTE</span><h3>Quinzenal, mensal ou trimestral</h3><p>Períodos maiores para manter sua rotina.</p><ul><li>Gestão pela Área do Cliente</li><li>Atualizações oficiais</li></ul><a href="/ajuda">Consultar disponibilidade</a></article><article><span>SEM EXPIRAÇÃO</span><h3>Vitalício</h3><p>Acesso sem vencimento vinculado à conta.</p><ul><li>Sem renovação periódica</li><li>Download oficial</li></ul><a href="/ajuda">Consultar disponibilidade</a></article></div>
+            <div class="portal-section-title"><div><span>HISTÓRICO</span><h3>Pedidos</h3></div></div><div class="portal-list" id="account-order-list"><div class="portal-empty">Nenhum pedido encontrado.</div></div>
+          </section>
+
+          <section class="portal-page" id="account-panel-devices" role="tabpanel" aria-labelledby="account-tab-devices" data-account-panel="devices" hidden>
+            <div class="portal-page-head"><div><span>DISPOSITIVOS</span><h2>Computadores autorizados.</h2><p>Revogue qualquer sessão que você não reconheça.</p></div><button class="portal-text-action danger" id="revoke-all-devices" type="button">Revogar todos</button></div>
+            <div class="portal-list" id="account-device-list"><div class="portal-empty">Carregando dispositivos…</div></div>
           </section>
 
           <section class="portal-page" id="account-panel-security" role="tabpanel" aria-labelledby="account-tab-security" data-account-panel="security" hidden>
-            <div class="portal-page-head"><div><span>SEGURANÇA</span><h2>Proteja sua conta e seus dispositivos.</h2><p>Use uma passkey para entrar com biometria ou PIN deste dispositivo.</p></div></div>
-            <article class="portal-setting-card"><span class="portal-icon"><svg><use href="#i-shield"></use></svg></span><div><span id="passkey-state">OPCIONAL</span><h3>Passkey</h3><p id="passkey-copy">Entre para cadastrar uma passkey neste dispositivo.</p></div><button id="passkey-register" type="button" disabled>Configurar passkey</button></article>
+            <div class="portal-page-head"><div><span>SEGURANÇA</span><h2>Proteja sua conta.</h2><p>Gerencie seus métodos de entrada sem sair do portal.</p></div></div>
+            <div class="portal-settings-grid"><article class="portal-setting-card"><span class="portal-icon"><svg><use href="#i-shield"></use></svg></span><div><span id="passkey-state">OPCIONAL</span><h3>Passkey</h3><p id="passkey-copy">Use biometria ou PIN para entrar com segurança.</p></div><button id="passkey-register" type="button">Configurar passkey</button></article><article class="portal-setting-card"><span class="portal-icon"><svg><use href="#i-lock"></use></svg></span><div><span>SENHA</span><h3>Alterar senha</h3><p>Defina uma nova senha com no mínimo 10 caracteres.</p></div><button type="button" data-open-password>Alterar senha</button></article></div>
+            <article class="portal-security-note"><svg><use href="#i-check"></use></svg><div><b>Métodos vinculados</b><p id="account-providers">Verificando os métodos de entrada…</p></div></article>
           </section>
 
           <section class="portal-page" id="account-panel-downloads" role="tabpanel" aria-labelledby="account-tab-downloads" data-account-panel="downloads" hidden>
-            <div class="portal-page-head"><div><span>DOWNLOADS</span><h2>Aplicativo oficial para Windows.</h2><p>Baixe sempre pelo domínio oficial para manter a versão correta.</p></div></div>
-            <article class="portal-download-card"><div class="portal-download-mark"><img src="assets/paxinbot-mark.svg" alt="" /></div><div><span>VERSÃO ESTÁVEL</span><h3>Paxinbot 1.0</h3><p>Windows 10 ou superior. Atualizações distribuídas pelo canal oficial.</p></div><a class="button button-primary" href="download.html">Ir para download <svg><use href="#i-arrow"></use></svg></a></article>
+            <div class="portal-page-head"><div><span>DOWNLOADS</span><h2>Aplicativo oficial para Windows.</h2><p>Versão, requisitos e instalador em um único lugar.</p></div></div>
+            <article class="portal-download-card"><div class="portal-download-mark"><img src="/assets/paxinbot-mark.svg" alt="" /></div><div><span>VERSÃO ESTÁVEL</span><h3>Paxinbot 1.0</h3><p>Windows 10 ou superior. O instalador definitivo será disponibilizado por link protegido.</p></div><a class="button button-primary" href="/download">Central de download <svg><use href="#i-arrow"></use></svg></a></article>
+          </section>
+
+          <section class="portal-page" id="account-panel-account" role="tabpanel" aria-labelledby="account-tab-account" data-account-panel="account" hidden>
+            <div class="portal-page-head"><div><span>MINHA CONTA</span><h2>Dados da conta.</h2><p>Mantenha seus dados de identificação atualizados.</p></div></div>
+            <form class="portal-form-card" id="account-profile-form"><label>Nome de exibição<input id="account-display-name" name="displayName" minlength="2" maxlength="80" required /></label><label>E-mail<input id="account-email" type="email" readonly /></label><div><button class="button button-primary" type="submit">Salvar alterações</button></div></form>
+          </section>
+
+          <section class="portal-page" id="account-panel-support" role="tabpanel" aria-labelledby="account-tab-support" data-account-panel="support" hidden>
+            <div class="portal-page-head"><div><span>SUPORTE</span><h2>Ajuda quando você precisar.</h2><p>Consulte os guias disponíveis e acompanhe os canais oficiais.</p></div></div>
+            <div class="portal-quick-grid"><article><span class="portal-icon"><svg><use href="#i-help"></use></svg></span><div><h3>Central de ajuda</h3><p>Instalação, acesso, dispositivos e uso do painel.</p></div><a href="/ajuda">Consultar artigos <svg><use href="#i-arrow"></use></svg></a></article><article><span class="portal-icon"><svg><use href="#i-mail"></use></svg></span><div><h3>Atendimento</h3><p>O canal de atendimento será exibido aqui após a configuração oficial.</p></div><a href="/ajuda">Ver atendimento <svg><use href="#i-arrow"></use></svg></a></article></div>
           </section>
         </div>
       </div>
     </section>
   </main>
-  <div data-site-footer></div><div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="site-shell.js"></script><script src="script.js"></script><script src="auth-client.js"></script>
+  <dialog class="portal-dialog" id="passkey-dialog"><form method="dialog"><button class="dialog-close" value="cancel" aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><span>CONFIRMAÇÃO DE SEGURANÇA</span><h2>Confirme sua identidade</h2><p>Para cadastrar uma passkey, entre novamente com sua senha ou confirme pelo Google.</p><label>Senha<input id="passkey-password" type="password" autocomplete="current-password" /></label><button class="button button-primary" id="passkey-password-confirm" type="button">Confirmar com senha</button><a class="button button-secondary" href="/api/auth/google?intent=passkey">Confirmar com Google</a></form></dialog>
+  <dialog class="portal-dialog" id="password-dialog"><form id="account-password-form"><button class="dialog-close" type="button" data-close-password aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><span>SEGURANÇA</span><h2>Alterar senha</h2><p>Confirme sua senha atual e escolha uma nova senha exclusiva.</p><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required /></label><label>Nova senha<input name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required /></label><label>Confirmar senha<input name="passwordConfirm" type="password" minlength="10" maxlength="128" autocomplete="new-password" required /></label><button class="button button-primary" type="submit">Salvar nova senha</button><button class="link-button" id="password-recovery-link" type="button">Minha conta não possui senha</button></form></dialog>
+  <div data-site-footer></div><div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="/site-shell.js"></script><script src="/script.js"></script><script src="/auth-client.js"></script>
 </body>
 </html>
