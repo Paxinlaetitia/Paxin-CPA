@@ -10,7 +10,9 @@
   const accessToken = hash.get('access_token'); const refreshToken = hash.get('refresh_token');
   if (!accessToken || !refreshToken) { status.textContent = 'A confirmação foi concluída. Entre na sua conta para continuar.'; return; }
   try {
-    const response = await fetch('/api/auth/session', { method:'POST', credentials:'include', headers:{'content-type':'application/json'}, body:JSON.stringify({accessToken,refreshToken}) });
+    // Form encoding usa o parser nativo da Vercel para callbacks OAuth. Os
+    // valores continuam no corpo HTTPS e não são anexados à URL da API.
+    const response = await fetch('/api/auth/session', { method:'POST', credentials:'include', headers:{'content-type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({accessToken,refreshToken}) });
     if (!response.ok) throw new Error();
     location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? 'redefinir-senha.html' : 'cliente.html');
   } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }

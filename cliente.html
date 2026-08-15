@@ -2,30 +2,29 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Área do Cliente Paxinbot: acesso, assinatura, dispositivos e downloads." /><meta name="theme-color" content="#050505" />
+  <meta name="description" content="Área do Cliente Paxinbot: acesso, segurança e downloads." /><meta name="theme-color" content="#050505" />
   <title>Área do Cliente — Paxinbot</title><link rel="icon" href="assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="styles.css" />
 </head>
 <body data-page="cliente">
   <div data-site-header></div>
   <main class="client-main">
-    <section class="client-access-section">
+    <section class="client-access-section" id="account-auth">
       <div class="client-aura"></div>
       <div class="container client-access-grid">
         <div class="client-intro reveal">
           <div class="eyebrow"><span></span> Área do Cliente</div>
-          <h1>Sua conta Paxinbot em um só lugar.</h1>
-          <p>Gerencie assinatura, dispositivos autorizados, downloads e atendimento em um ambiente separado do aplicativo.</p>
+          <h1>Sua conta Paxinbot, do seu jeito.</h1>
+          <p>Entre para acompanhar o acesso, obter a versão oficial do aplicativo e manter a segurança da sua conta em dia.</p>
           <div class="client-benefits">
-            <div><span><svg><use href="#i-card"></use></svg></span><div><b>Assinatura</b><small>Plano, cobrança e histórico.</small></div></div>
-            <div><span><svg><use href="#i-device"></use></svg></span><div><b>Dispositivos</b><small>Consulte e encerre sessões.</small></div></div>
-            <div><span><svg><use href="#i-download"></use></svg></span><div><b>Downloads</b><small>Versão atual e atualizações.</small></div></div>
+            <div><span><svg><use href="#i-card"></use></svg></span><div><b>Seu acesso</b><small>Validade e modalidade contratada.</small></div></div>
+            <div><span><svg><use href="#i-download"></use></svg></span><div><b>Aplicativo</b><small>Download e atualizações oficiais.</small></div></div>
+            <div><span><svg><use href="#i-shield"></use></svg></span><div><b>Segurança</b><small>Senha, Google e passkeys.</small></div></div>
           </div>
-          <div class="client-trust"><svg><use href="#i-shield"></use></svg><span><b>Entrada protegida pelo domínio oficial</b><small>Confirme sempre o endereço antes de informar seus dados.</small></span></div>
+          <div class="client-trust"><svg><use href="#i-shield"></use></svg><span><b>Conta e aplicativo são separados</b><small>O programa pede apenas uma autorização de dispositivo — nunca sua senha.</small></span></div>
         </div>
-
         <div class="auth-card reveal reveal-delay">
           <div class="auth-head"><div class="auth-logo"><img src="assets/paxinbot-mark.svg" alt="" /></div><div><span>ACESSO SEGURO</span><h2>Entre na sua conta</h2></div></div>
-          <p class="auth-copy" id="auth-mode-copy">Use os dados cadastrados durante a compra ou criação da conta.</p>
+          <p class="auth-copy" id="auth-mode-copy">Use seu e-mail, Google ou uma passkey cadastrada.</p>
           <form id="client-login-form" class="auth-form">
             <label for="client-email">E-mail<span class="auth-input"><svg><use href="#i-mail"></use></svg><input id="client-email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required /></span></label>
             <label for="client-password">Senha<span class="auth-input"><svg><use href="#i-lock"></use></svg><input id="client-password" name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required /><button class="auth-eye" type="button" aria-label="Mostrar senha">Mostrar</button></span></label>
@@ -49,12 +48,23 @@
       </div>
     </section>
 
-    <section class="section client-dashboard-preview">
+    <section class="client-dashboard-preview" id="client-dashboard">
       <div class="container">
-        <div class="section-heading reveal client-dashboard-intro"><div class="eyebrow"><span></span> Área do Cliente</div><h2>Conta, acesso e segurança no mesmo painel.</h2><p>Depois de entrar, o cliente acompanha validade, autoriza o aplicativo e configura meios de acesso mais seguros.</p></div>
-        <div class="dashboard-shell reveal" id="client-dashboard">
-          <aside class="dashboard-nav"><div class="dashboard-user"><span id="dashboard-initials">PB</span><div><b id="dashboard-account-name">Conta Paxinbot</b><small id="dashboard-email">Entre para consultar</small></div></div><nav><a class="active" href="#overview"><svg><use href="#i-grid"></use></svg>Visão geral</a><a href="#access"><svg><use href="#i-card"></use></svg>Acesso</a><a href="#security"><svg><use href="#i-shield"></use></svg>Segurança</a><a href="download.html"><svg><use href="#i-download"></use></svg>Downloads</a><a href="ajuda.html"><svg><use href="#i-help"></use></svg>Suporte</a></nav></aside>
-          <div class="dashboard-content"><header><div><span>PAINEL DO CLIENTE</span><h3 id="dashboard-greeting">Entre na sua conta</h3></div><button id="client-logout" type="button" hidden>Sair / trocar conta</button></header><div class="dashboard-stats" id="overview"><article><span>ACESSO ATUAL</span><b id="dashboard-access">—</b><small id="dashboard-access-state">Aguardando login</small></article><article id="access"><span>EXPIRAÇÃO</span><b id="dashboard-expiry">—</b><small id="dashboard-expiry-state">Sem dados</small></article><article><span>DISPOSITIVOS</span><b id="dashboard-devices">Protegidos</b><small id="dashboard-devices-state">Autorize pelo navegador</small></article></div><div class="dashboard-panels"><article><header><b>Autorizar aplicativo</b><span>SEGURO</span></header><div class="device-line"><svg><use href="#i-device"></use></svg><div><b>Entrar pelo navegador</b><small>O Paxinbot pede autorização sem receber sua senha.</small></div><a href="ajuda.html#primeiros-passos">Como funciona</a></div></article><article id="security"><header><b>Passkeys</b><span id="passkey-state">OPCIONAL</span></header><div class="device-line"><svg><use href="#i-shield"></use></svg><div><b>Proteja com biometria ou PIN</b><small id="passkey-copy">Entre para cadastrar uma passkey neste dispositivo.</small></div><button id="passkey-register" type="button" disabled>Configurar</button></div></article><article><header><b>Aplicativo</b><span>ESTÁVEL</span></header><div class="device-line"><svg><use href="#i-download"></use></svg><div><b>Paxinbot v1.0</b><small>Windows 10 ou superior</small></div><a href="download.html">Download</a></div></article></div></div>
+        <div class="client-dashboard-intro reveal"><div class="eyebrow"><span></span> Minha conta</div><h1>Seu acesso Paxinbot.</h1><p>Tudo que é importante para sua conta, sem transformar o site em uma cópia do aplicativo.</p></div>
+        <section class="account-hero-card reveal">
+          <div class="account-profile"><span id="dashboard-initials">PB</span><div><small>CONTA PAXINBOT</small><h2 id="dashboard-greeting">Entre na sua conta</h2><p id="dashboard-email">Entre para consultar</p></div></div>
+          <div class="account-hero-actions"><a class="button button-secondary" href="planos.html">Ver modalidades</a><button id="client-logout" type="button" hidden>Sair / trocar conta</button></div>
+        </section>
+        <div class="account-summary reveal">
+          <article><span>ACESSO ATUAL</span><b id="dashboard-access">—</b><small id="dashboard-access-state">Aguardando login</small></article>
+          <article><span>EXPIRAÇÃO</span><b id="dashboard-expiry">—</b><small id="dashboard-expiry-state">Sem dados</small></article>
+          <article><span>DISPOSITIVOS</span><b id="dashboard-devices">Protegidos</b><small id="dashboard-devices-state">Autorize pelo navegador</small></article>
+        </div>
+        <div class="account-content-grid reveal">
+          <article class="account-feature account-feature-wide"><div class="account-feature-icon"><svg><use href="#i-device"></use></svg></div><div><span>APLICATIVO</span><h3>Autorize seu computador pelo navegador</h3><p>Quando o Paxinbot for aberto, ele exibirá uma solicitação de autorização. Confirme-a neste domínio, sem informar sua senha no aplicativo.</p></div><a class="button button-secondary" href="ajuda.html#primeiros-passos">Como funciona</a></article>
+          <article class="account-feature"><div class="account-feature-icon"><svg><use href="#i-shield"></use></svg></div><div><span>SEGURANÇA</span><h3>Passkey</h3><p id="passkey-copy">Entre para cadastrar uma passkey neste dispositivo.</p></div><div class="account-feature-action"><small id="passkey-state">OPCIONAL</small><button id="passkey-register" type="button" disabled>Configurar</button></div></article>
+          <article class="account-feature"><div class="account-feature-icon"><svg><use href="#i-download"></use></svg></div><div><span>DOWNLOAD</span><h3>Paxinbot para Windows</h3><p>Obtenha o aplicativo pelo canal oficial e mantenha sua versão atualizada.</p></div><a class="button button-primary" href="download.html">Download</a></article>
+          <article class="account-feature"><div class="account-feature-icon"><svg><use href="#i-help"></use></svg></div><div><span>AJUDA</span><h3>Precisa de orientação?</h3><p>Consulte o guia inicial, perguntas frequentes e os canais de suporte.</p></div><a class="button button-secondary" href="ajuda.html">Central de ajuda</a></article>
         </div>
       </div>
     </section>
