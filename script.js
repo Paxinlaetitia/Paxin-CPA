@@ -5,7 +5,7 @@ const menuButton = document.querySelector('.menu-button');
 const navigation = document.querySelector('.main-nav');
 const modal = document.getElementById('login-modal');
 const toast = document.querySelector('.toast');
-const CHECKOUT_INTENT_KEY = 'paxinbot_checkout_intent';
+const PUBLIC_CHECKOUT_INTENT_KEY = 'paxinbot_checkout_intent';
 let toastTimer = null;
 
 function setHeaderState() {
@@ -129,14 +129,14 @@ async function loadPublicCatalog() {
     const featured = products.length === 1 ? 0 : Math.min(1, products.length - 1);
     root.innerHTML = products.map((product, index) => `<article class="plan-card ${index === featured ? 'featured' : ''}">${index === featured ? '<div class="plan-label">DESTAQUE</div>' : ''}<div class="plan-head"><span>${catalogEscape(catalogDuration(product))}</span><h3>${catalogEscape(product.name)}</h3><p>${catalogEscape(product.description || 'Acesso completo ao Paxinbot durante o período contratado.')}</p></div><div class="price"><b>${catalogMoney(product.priceCents)}</b><small>valor da modalidade</small></div><ul><li><svg><use href="#i-check"></use></svg> Todos os recursos disponíveis</li><li><svg><use href="#i-check"></use></svg> Acesso vinculado à sua conta</li><li><svg><use href="#i-check"></use></svg> ${product.accessKind === 'lifetime' ? 'Acesso sem expiração' : 'Saldo consumido somente com o app conectado'}</li><li><svg><use href="#i-check"></use></svg> Gestão pela Área do Cliente</li></ul><a class="button ${index === featured ? 'button-primary' : 'button-secondary'} button-full" data-select-product="${catalogEscape(product.id)}" href="/conta/checkout?product=${encodeURIComponent(product.id)}">Escolher modalidade</a></article>`).join('');
     root.querySelectorAll('[data-select-product]').forEach(link => link.addEventListener('click', () => {
-      try { sessionStorage.setItem(CHECKOUT_INTENT_KEY, JSON.stringify({ productId:link.dataset.selectProduct, selectedAt:Date.now() })); } catch {}
+      try { sessionStorage.setItem(PUBLIC_CHECKOUT_INTENT_KEY, JSON.stringify({ productId:link.dataset.selectProduct, selectedAt:Date.now() })); } catch {}
     }));
   } catch (error) { root.innerHTML = `<div class="catalog-message is-error">${catalogEscape(error.message)}</div>`; }
 }
 loadPublicCatalog();
 
 document.querySelectorAll('a[href="/conta"]').forEach(link => link.addEventListener('click', () => {
-  try { sessionStorage.removeItem(CHECKOUT_INTENT_KEY); } catch {}
+  try { sessionStorage.removeItem(PUBLIC_CHECKOUT_INTENT_KEY); } catch {}
 }));
 
 document.querySelectorAll('a[href="#"]').forEach(link => link.addEventListener('click', event => event.preventDefault()));

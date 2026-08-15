@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -32,4 +33,8 @@ test('every account route uses the gated client document and admin remains serve
   assert.ok(rewrites.some(rule => rule.source === '/conta/:path*' && rule.destination === '/cliente'));
   assert.ok(rewrites.some(rule => rule.source === '/admin' && rule.destination === '/api/admin?view=hidden'));
   assert.ok(rewrites.some(rule => /^\/gestao\//.test(rule.source) && rule.destination === '/api/admin?view=page'));
+});
+
+test('public and account scripts can share one browser page without lexical collisions', () => {
+  assert.doesNotThrow(() => new vm.Script(`${read('script.js')}\n${read('auth-client.js')}`));
 });

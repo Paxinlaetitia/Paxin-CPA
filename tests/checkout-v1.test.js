@@ -20,7 +20,7 @@ test('public catalog preserves the selected existing product through authenticat
   assert.match(accountClient, /root\.hidden=true/);
   assert.match(accountClient, /selectedCheckoutIntentMatches\(productId\)/);
   assert.match(publicClient, /data-select-product/);
-  assert.match(publicClient, /sessionStorage\.setItem\(CHECKOUT_INTENT_KEY/);
+  assert.match(publicClient, /sessionStorage\.setItem\(PUBLIC_CHECKOUT_INTENT_KEY/);
 });
 
 test('checkout collects only the approved customer fields and supports PIX plus card', () => {
