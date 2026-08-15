@@ -136,7 +136,7 @@ function setAccountSection(section, moveFocus = false, updateUrl = true) {
 
 async function syncOwnerPanelLink(user) {
   const link = document.getElementById('owner-panel-link'); if (!link) return; link.hidden = true; if (!user) return;
-  try { await PaxinbotAuth.request('/api/admin?action=overview'); link.hidden = false; } catch {}
+  try { const result=await PaxinbotAuth.request('/api/admin?action=overview'); if (!result.adminPath) return; link.href=result.adminPath; link.hidden = false; } catch {}
 }
 
 function renderDevices(devices) {

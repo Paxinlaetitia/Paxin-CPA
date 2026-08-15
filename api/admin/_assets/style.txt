@@ -1,3 +1,4 @@
+/* Recurso privado: entregue somente após autorização owner. */
 .admin-gate[hidden],.admin-main[hidden],.admin-page-panel[hidden],.admin-form [hidden] { display: none !important; }
 .admin-main { min-height: 100vh; padding-bottom: 72px; background: #070707; }
 .admin-topbar { min-height: 76px; display: flex; align-items: center; border-bottom: 1px solid var(--line); background: #070707; }

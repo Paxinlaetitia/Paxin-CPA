@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "functions": {
+    "api/admin/index.js": { "includeFiles": "api/admin/_assets/**" }
+  },
   "redirects": [
     { "source": "/cliente", "destination": "/conta", "permanent": true },
     { "source": "/conta/seguranca", "destination": "/conta/configuracoes/seguranca", "permanent": true },
@@ -9,6 +12,9 @@
   "rewrites": [
     { "source": "/conta", "destination": "/cliente" },
     { "source": "/conta/:path*", "destination": "/cliente" },
-    { "source": "/admin/:path*", "destination": "/admin" }
+    { "source": "/admin", "destination": "/api/admin?view=hidden" },
+    { "source": "/admin/:path*", "destination": "/api/admin?view=hidden" },
+    { "source": "/gestao/e7fc8a8f64e6e0aed8e92b6a", "destination": "/api/admin?view=page" },
+    { "source": "/gestao/e7fc8a8f64e6e0aed8e92b6a/:path*", "destination": "/api/admin?view=page" }
   ]
 }

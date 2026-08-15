@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex,nofollow" /><meta name="theme-color" content="#050505" /><title>Administração — Paxinbot</title><link rel="icon" href="/assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/controls.css" /><link rel="stylesheet" href="/admin.css" /></head>
+<!-- Entregue exclusivamente pela função administrativa após autorização owner. -->
+<html lang="pt-BR"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex,nofollow" /><meta name="theme-color" content="#050505" /><title>Administração — Paxinbot</title><link rel="icon" href="/assets/paxinbot-mark.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/controls.css" /><link rel="stylesheet" href="/api/admin?view=asset&amp;name=style" /></head>
 <body class="admin-page" data-page="admin">
   <section class="admin-gate" id="admin-gate" hidden><div><span>ACESSO RESTRITO</span><h1>Painel do proprietário</h1><p id="admin-gate-message">Validando sua conta…</p><a class="button button-secondary" href="/conta">Voltar para Área do Cliente</a></div></section>
   <main class="admin-main" id="admin-content" aria-live="polite">
-    <header class="admin-topbar"><div class="container"><a class="admin-brand" href="/admin"><span><img src="/assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b><small>Administração</small></a><div><span>ACESSO DO PROPRIETÁRIO</span><a class="button button-secondary" href="/conta">Área do Cliente</a></div></div></header>
+    <header class="admin-topbar"><div class="container"><a class="admin-brand" href="/gestao/e7fc8a8f64e6e0aed8e92b6a"><span><img src="/assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b><small>Administração</small></a><div><span>ACESSO DO PROPRIETÁRIO</span><a class="button button-secondary" href="/conta">Área do Cliente</a></div></div></header>
     <div class="container admin-shell">
       <section class="admin-head"><div><span>GESTÃO PAXINBOT</span><h1>Operação em um só lugar.</h1><p>Clientes, acessos, catálogo e atividade administrativa com validação no servidor.</p></div></section>
       <nav class="admin-tabs" aria-label="Seções administrativas" role="tablist">
@@ -43,5 +44,5 @@
 
   <dialog class="admin-dialog admin-ticket-dialog" id="admin-ticket-dialog"><div class="admin-ticket-dialog-content"><button class="dialog-close" type="button" data-close-dialog="admin-ticket-dialog" aria-label="Fechar"><svg><use href="#i-close"></use></svg></button><header><span>ATENDIMENTO</span><h2 id="admin-ticket-title">Chamado</h2><p id="admin-ticket-customer">Cliente</p></header><div class="admin-support-thread" id="admin-support-thread"></div><form id="admin-ticket-reply-form"><label>Responder<textarea name="message" minlength="2" maxlength="3000" required></textarea></label><div><select id="admin-ticket-status" aria-label="Status do chamado"><option value="open">Aberto</option><option value="in_progress">Em atendimento</option><option value="resolved">Resolvido</option><option value="closed">Encerrado</option></select><button class="button button-primary" type="submit">Enviar resposta</button></div></form></div></dialog>
 
-  <div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="/site-shell.js"></script><script src="/controls.js"></script><script src="/script.js"></script><script src="/admin-client.js"></script>
+  <div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div><script src="/site-shell.js"></script><script src="/controls.js"></script><script src="/script.js"></script><script src="/api/admin?view=asset&amp;name=client"></script>
 </body></html>

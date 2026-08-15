@@ -1,5 +1,25 @@
 'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
 const { json, readBody, browserSession, upstream, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
+function hiddenAdminResponse(res) {
+  res.statusCode = 404;
+  res.setHeader('content-type', 'text/html; charset=utf-8');
+  res.setHeader('cache-control', 'private, no-store, max-age=0');
+  res.setHeader('x-robots-tag', 'noindex, nofollow, noarchive');
+  res.setHeader('content-security-policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+  return res.end('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title></head><body><main><h1>Página não encontrada</h1><p>Verifique o endereço informado.</p><a href="/">Voltar ao início</a></main></body></html>');
+}
+function protectedAdminFile(res, name, contentType) {
+  const file = path.join(__dirname, '_assets', name);
+  res.statusCode = 200;
+  res.setHeader('content-type', contentType);
+  res.setHeader('cache-control', 'private, no-store, max-age=0');
+  res.setHeader('x-robots-tag', 'noindex, nofollow, noarchive');
+  res.setHeader('x-content-type-options', 'nosniff');
+  if (name === 'page.txt') res.setHeader('content-security-policy', "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+  return res.end(fs.readFileSync(file));
+}
 const queries = {
   overview: ['paxinbot_owner_overview', () => ({})],
   users: ['paxinbot_owner_list_users', q => ({ p_query: String(q.q || '') })],
@@ -10,14 +30,22 @@ const queries = {
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
 };
 module.exports = async (req, res) => {
+  const view = String(req.query?.view || '');
+  if (view === 'hidden') return hiddenAdminResponse(res);
   const session = await browserSession(req, res);
-  if (!session) return json(res, 401, { ok: false, error: 'Entre com a conta do proprietário.' });
+  if (!session) return view ? hiddenAdminResponse(res) : json(res, 401, { ok: false, error: 'Entre com a conta do proprietário.' });
   const ownerCheck = await upstream('/rest/v1/rpc/paxinbot_is_owner', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
-  if (!ownerCheck.response.ok || ownerCheck.payload !== true) return json(res, 403, { ok: false, error: 'Esta conta está autenticada, mas ainda não foi registrada como proprietária no Supabase.' });
+  if (!ownerCheck.response.ok || ownerCheck.payload !== true) return view ? hiddenAdminResponse(res) : json(res, 403, { ok: false, error: 'Esta conta está autenticada, mas ainda não foi registrada como proprietária no Supabase.' });
+  if (req.method === 'GET' && view === 'page') return protectedAdminFile(res, 'page.txt', 'text/html; charset=utf-8');
+  if (req.method === 'GET' && view === 'asset') {
+    if (req.query?.name === 'style') return protectedAdminFile(res, 'style.txt', 'text/css; charset=utf-8');
+    if (req.query?.name === 'client') return protectedAdminFile(res, 'client.txt', 'text/javascript; charset=utf-8');
+    return hiddenAdminResponse(res);
+  }
   if (req.method === 'GET') {
     const item = queries[String(req.query?.action || 'overview')]; if (!item) return json(res, 404, { ok: false, error: 'Consulta não encontrada.' });
     const { response, payload } = await upstream(`/rest/v1/rpc/${item[0]}`, { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: item[1](req.query || {}) });
-    return json(res, response.ok ? 200 : 403, response.ok ? { ok: true, data: payload } : { ok: false, error: 'O painel não encontrou as funções de proprietário no banco. Execute a migração principal novamente.' });
+    return json(res, response.ok ? 200 : 403, response.ok ? { ok: true, data: payload, adminPath: '/gestao/e7fc8a8f64e6e0aed8e92b6a' } : { ok: false, error: 'O painel não encontrou as funções de proprietário no banco. Execute a migração principal novamente.' });
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });

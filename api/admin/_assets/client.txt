@@ -1,7 +1,9 @@
 'use strict';
+// Recurso privado: entregue somente após autorização owner.
 
 const Admin = (() => {
-  const routes = { overview:'/admin', customers:'/admin/clientes', access:'/admin/acessos', products:'/admin/produtos', coupons:'/admin/cupons', orders:'/admin/pedidos', tickets:'/admin/atendimento', audit:'/admin/auditoria' };
+  const adminRoot = '/gestao/e7fc8a8f64e6e0aed8e92b6a';
+  const routes = { overview:adminRoot, customers:`${adminRoot}/clientes`, access:`${adminRoot}/acessos`, products:`${adminRoot}/produtos`, coupons:`${adminRoot}/cupons`, orders:`${adminRoot}/pedidos`, tickets:`${adminRoot}/atendimento`, audit:`${adminRoot}/auditoria` };
   const state = { users:[], products:[], coupons:[], orders:[], tickets:[], audit:[], currentTicket:null };
   const call = async (path, options = {}) => { const response = await fetch(`/api/admin${path}`, { method:options.method || 'GET', credentials:'include', headers:{ 'content-type':'application/json' }, body:options.body ? JSON.stringify(options.body) : undefined }); const payload = await response.json().catch(() => ({})); if (!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível concluir a operação.'); return payload.data; };
   const escape = value => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]);
