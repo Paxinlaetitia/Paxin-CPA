@@ -154,6 +154,10 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
   if (code === 'PGRST202' || /function.*schema cache|could not find the function/i.test(message)) return 'A atualização do banco necessária para esta função ainda não foi aplicada.';
   if (/user_not_found/i.test(message)) return 'Nenhum cliente foi encontrado com esse e-mail.';
   if (/invalid_entitlement/i.test(message)) return 'Informe uma expiração futura para o acesso por tempo.';
+  if (/invalid_usage_duration/i.test(message)) return 'Informe um saldo de uso válido.';
+  if (/usage_grant_not_found|usage_grant_unavailable/i.test(message)) return 'Este saldo não está mais disponível para ativação.';
+  if (/usage_grant_already_active/i.test(message)) return 'Já existe um saldo ativo nesta conta.';
+  if (/existing_access_must_finish/i.test(message)) return 'O acesso atual precisa terminar antes de ativar outro saldo.';
   if (/product_unavailable|invalid_product/i.test(message)) return 'Esta modalidade não está mais disponível.';
   if (/product_not_payable|zero_value_checkout/i.test(message)) return 'Esta modalidade ainda não pode ser comprada pelo checkout.';
   if (/invalid_coupon|coupon_unavailable/i.test(message)) return 'O cupom é inválido, expirou ou atingiu o limite de usos.';

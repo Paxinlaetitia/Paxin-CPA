@@ -104,6 +104,15 @@
 .portal-current-plan span,.portal-section-title span { color: var(--accent); font-size: 9px; font-weight: 800; }
 .portal-current-plan h3 { margin: 5px 0 3px; font-size: 20px; }
 .portal-current-plan p { margin: 0; color: var(--text-2); font-size: 11px; }
+.portal-usage-credit { min-height:106px; display:flex; align-items:center; justify-content:space-between; gap:22px; margin:0 0 18px; padding:20px 22px; border:1px solid rgba(46,204,113,.28); border-radius:15px; background:rgba(46,204,113,.045); }
+.portal-usage-credit[hidden] { display:none; }
+.portal-usage-credit span,.activation-credit > span { color:var(--green); font-size:9px; font-weight:800; letter-spacing:.06em; }
+.portal-usage-credit h3 { margin:5px 0 3px; font-size:20px; }
+.portal-usage-credit p { margin:0; color:var(--text-2); font-size:11px; }
+.activation-credit { display:grid; gap:9px; margin:18px 0; padding:16px; border:1px solid rgba(46,204,113,.25); border-radius:12px; background:rgba(46,204,113,.04); }
+.activation-credit[hidden] { display:none; }
+.activation-credit strong { font-size:22px; }
+.activation-credit p { margin:0 0 3px; color:var(--text-2); font-size:10px; line-height:1.55; }
 .checkout-return { min-height: 76px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 14px; margin-bottom: 12px; padding: 14px 18px; border: 1px solid rgba(240,165,0,.25); border-radius: 14px; background: rgba(240,165,0,.05); }
 .checkout-return[hidden] { display: none !important; }
 .checkout-return b { display: block; margin-bottom: 3px; font-size: 12px; }
@@ -294,6 +303,8 @@
   .portal-setting-card button,.portal-download-card .button,.security-code-card > small { grid-column: 1 / -1; width: 100%; justify-content: center; text-align: center; }
   .portal-current-plan { align-items: flex-start; flex-direction: column; }
   .portal-current-plan .button { width: 100%; justify-content: center; }
+  .portal-usage-credit { align-items:flex-start; flex-direction:column; }
+  .portal-usage-credit .button { width:100%; justify-content:center; }
   .portal-list-row { grid-template-columns: auto minmax(0,1fr) auto; }
   .portal-list-row > button { grid-column: 2 / -1; width: 100%; }
   .portal-status { grid-column: 3; grid-row: 1; }

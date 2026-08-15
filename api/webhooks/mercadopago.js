@@ -41,7 +41,7 @@ async function sendConfirmation(result) {
     headers:{ authorization:`Bearer ${apiKey}`, 'content-type':'application/json', 'idempotency-key':`payment-confirmed/${result.orderId}` },
     body:JSON.stringify({
       from, to:[result.email], subject:'Pagamento confirmado — Paxinbot',
-      html:`<div style="background:#080808;color:#f4f4f4;padding:32px;font-family:Arial,sans-serif"><h1 style="font-size:24px">Acesso liberado</h1><p>O pagamento de <strong>${escapeHtml(result.productName)}</strong> foi confirmado.</p><p>Valor: ${escapeHtml(amount)}</p><p>Entre na Área do Cliente para consultar a validade e autorizar o aplicativo.</p><p style="color:#999;font-size:12px">Pedido ${escapeHtml(result.orderId)}</p></div>`
+      html:`<div style="background:#080808;color:#f4f4f4;padding:32px;font-family:Arial,sans-serif"><h1 style="font-size:24px">Acesso liberado</h1><p>O pagamento de <strong>${escapeHtml(result.productName)}</strong> foi confirmado.</p><p>Valor: ${escapeHtml(amount)}</p><p>Entre na Área do Cliente para consultar e, nas modalidades por tempo, ativar seu saldo quando estiver pronto para usar.</p><p style="color:#999;font-size:12px">Pedido ${escapeHtml(result.orderId)}</p></div>`
     })
   });
 }

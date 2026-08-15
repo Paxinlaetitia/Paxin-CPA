@@ -24,6 +24,7 @@ let pendingEmailCode = null;
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
 function formatDate(value, withTime = true) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('pt-BR', withTime ? { dateStyle:'medium', timeStyle:'short' } : { dateStyle:'medium' }).format(date); }
 function money(cents, currency = 'BRL') { return new Intl.NumberFormat('pt-BR', { style:'currency', currency }).format((Number(cents) || 0) / 100); }
+function formatUsageTime(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.ceil((seconds % 3600) / 60); const parts = []; if (days) parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`); if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`); if (minutes && parts.length < 2) parts.push(`${minutes} min`); return parts.join(' e ') || 'menos de 1 minuto'; }
 
 function consumePasskeySession() {
   try { const raw = sessionStorage.getItem('paxinbot_passkey_session'); sessionStorage.removeItem('paxinbot_passkey_session'); if (raw) { const value = JSON.parse(raw); if (value?.accessToken) passkeySession = value; } } catch {}
@@ -81,13 +82,13 @@ function renderClientDashboard(payload) {
   document.getElementById('dashboard-initials').textContent = displayName.slice(0, 2).toUpperCase() || 'PB';
   document.getElementById('dashboard-email').textContent = email || 'Entre para consultar';
   document.getElementById('dashboard-greeting').textContent = user ? `Olá, ${displayName}` : 'Entre na sua conta';
-  document.getElementById('dashboard-access').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Vitalício' : 'Por tempo') : 'Sem acesso';
-  document.getElementById('dashboard-access-state').textContent = entitlement.active ? 'Ativo' : user ? 'Aguardando liberação' : 'Aguardando login';
+  document.getElementById('dashboard-access').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Vitalício' : entitlement.kind === 'usage' ? 'Saldo em uso' : 'Por tempo') : entitlement.availableGrant ? 'Saldo disponível' : 'Sem acesso';
+  document.getElementById('dashboard-access-state').textContent = entitlement.active ? 'Ativo' : entitlement.availableGrant ? 'Aguardando sua ativação' : user ? 'Aguardando liberação' : 'Aguardando login';
   const expires = entitlement.expiresAt ? formatDate(entitlement.expiresAt) : 'Não expira';
-  document.getElementById('dashboard-expiry').textContent = entitlement.active ? expires : '—';
-  document.getElementById('dashboard-expiry-state').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Definido pelo acesso contratado') : 'Sem dados';
-  document.getElementById('subscription-plan').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Acesso por tempo') : 'Sem acesso ativo';
-  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : `Válido até ${expires}.`) : 'Escolha uma modalidade para começar.';
+  document.getElementById('dashboard-expiry').textContent = entitlement.kind === 'usage' ? formatUsageTime(entitlement.remainingSeconds) : entitlement.active ? expires : '—';
+  document.getElementById('dashboard-expiry-state').textContent = entitlement.kind === 'usage' ? 'Diminui somente com o app conectado' : entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : 'Definido pelo acesso contratado') : 'Sem dados';
+  document.getElementById('subscription-plan').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Acesso vitalício' : entitlement.kind === 'usage' ? 'Saldo de uso ativo' : 'Acesso por tempo') : 'Sem acesso ativo';
+  document.getElementById('subscription-expiry').textContent = entitlement.active ? (entitlement.kind === 'lifetime' ? 'Este acesso não expira.' : entitlement.kind === 'usage' ? `${formatUsageTime(entitlement.remainingSeconds)} restantes. O saldo pausa quando o aplicativo é fechado.` : `Válido até ${expires}.`) : 'Escolha uma modalidade para começar.';
   document.getElementById('dashboard-devices').textContent = payload?.account?.activeDevices ?? (user ? '—' : 'Protegidos');
   document.getElementById('dashboard-devices-state').textContent = user ? 'Sessões ativas do aplicativo' : 'Autorize depois do login';
   document.getElementById('client-logout').hidden = !user;
@@ -97,6 +98,13 @@ function renderClientDashboard(payload) {
   document.getElementById('account-providers').textContent = providers.length ? providers.map(item => item === 'google' ? 'Google' : item === 'email' ? 'E-mail e senha' : item).join(' e ') : 'E-mail e senha';
   document.getElementById('passkey-state').textContent = passkeySession ? 'PRONTA PARA CADASTRO' : 'OPCIONAL';
   document.getElementById('passkey-copy').textContent = passkeySession ? 'Sua identidade foi confirmada. Cadastre a passkey neste dispositivo.' : 'Use biometria ou PIN para entrar com segurança.';
+}
+
+function renderUsageGrants(grants) {
+  const card = document.getElementById('usage-credit-card'); if (!card) return;
+  const available = (grants || []).find(grant => grant.status === 'available');
+  card.hidden = !available; card.dataset.grantId = available?.id || '';
+  if (available) { const active=Boolean(currentAccount?.entitlement?.active); document.getElementById('usage-credit-title').textContent = `${formatUsageTime(available.remainingSeconds)}${active ? ' na fila' : ''}`; document.getElementById('usage-credit-copy').textContent=active ? 'Este saldo fica guardado e poderá ser ativado quando o acesso atual terminar.' : 'O tempo só começa a diminuir depois da ativação e enquanto o aplicativo estiver conectado.'; document.getElementById('activate-usage-credit').hidden=active; }
 }
 
 function viewFromPath() {
@@ -188,7 +196,7 @@ function renderProducts(products, error = '', checkoutReady = false) {
   if (error) { root.innerHTML = `<div class="portal-empty portal-plan-loading">${escapeHtml(error)}</div>`; return; }
   if (!products?.length) { root.innerHTML = '<div class="portal-empty portal-plan-loading">Nenhuma modalidade ativa foi publicada.</div>'; return; }
   const featured = products.length === 1 ? 0 : Math.min(1, products.length - 1);
-  root.innerHTML = products.map((product, index) => `<article class="${index === featured ? 'is-featured' : ''}"><span>${escapeHtml(productDuration(product))}</span><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.description || 'Acesso completo ao Paxinbot durante a validade contratada.')}</p><div class="portal-plan-price"><strong>${money(product.priceCents)}</strong><small>valor da modalidade</small></div><ul><li>Todos os recursos do aplicativo</li><li>${product.accessKind === 'lifetime' ? 'Acesso sem data de expiração' : `Validade de ${escapeHtml(productDuration(product).toLocaleLowerCase('pt-BR'))}`}</li></ul><button class="portal-plan-buy" type="button" data-buy-product="${escapeHtml(product.id)}" ${checkoutReady ? '' : 'disabled'}>${checkoutReady ? 'Comprar agora <svg><use href="#i-arrow"></use></svg>' : 'Checkout em configuração'}</button></article>`).join('');
+  root.innerHTML = products.map((product, index) => `<article class="${index === featured ? 'is-featured' : ''}"><span>${escapeHtml(productDuration(product))}</span><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.description || 'Acesso completo ao Paxinbot durante o período contratado.')}</p><div class="portal-plan-price"><strong>${money(product.priceCents)}</strong><small>valor da modalidade</small></div><ul><li>Todos os recursos do aplicativo</li><li>${product.accessKind === 'lifetime' ? 'Acesso sem data de expiração' : `Saldo de ${escapeHtml(productDuration(product).toLocaleLowerCase('pt-BR'))}`}</li>${product.accessKind === 'lifetime' ? '' : '<li>O tempo pausa quando o aplicativo é fechado</li>'}</ul><button class="portal-plan-buy" type="button" data-buy-product="${escapeHtml(product.id)}" ${checkoutReady ? '' : 'disabled'}>${checkoutReady ? 'Comprar agora <svg><use href="#i-arrow"></use></svg>' : 'Checkout em configuração'}</button></article>`).join('');
 }
 
 function openCheckout(productId) {
@@ -224,7 +232,7 @@ async function handleCheckoutReturn() {
     try {
       const result = await PaxinbotAuth.request(`/api/checkout?orderId=${encodeURIComponent(orderId)}`); const order = result.order;
       if (order.status === 'paid') {
-        setCheckoutReturn('success', 'Pagamento confirmado', 'Seu acesso foi liberado e já está disponível para o aplicativo.');
+        setCheckoutReturn('success', 'Pagamento confirmado', 'Seu saldo foi liberado. Ative-o quando estiver pronto para usar o aplicativo.');
         await refreshOrderData(); history.replaceState({ accountView:'subscription' }, '', '/conta/assinatura'); return;
       }
       if (['cancelled','refunded','chargeback'].includes(order.status)) {
@@ -241,16 +249,17 @@ async function loadPortalData(basePayload) {
   try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
   const merged = { ...basePayload, profile: account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders, products, preferences, activity, tickets] = await Promise.all([
+  const [devices, orders, products, preferences, activity, tickets, usageGrants] = await Promise.all([
     PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message })),
     PaxinbotAuth.request('/api/account?action=preferences').then(result => result.data).catch(() => ({})),
     PaxinbotAuth.request('/api/account?action=activity').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => [])
+    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => []),
+    PaxinbotAuth.request('/api/account?action=usageGrants').then(result => result.data).catch(() => [])
   ]);
   renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error, products.checkoutReady);
-  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets);
+  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderUsageGrants(usageGrants);
 }
 
 async function getPasskeyClient() {
@@ -305,6 +314,7 @@ async function initClientPage() {
   document.querySelectorAll('[data-account-section]').forEach(button => button.addEventListener('click', () => setAccountSection(button.dataset.accountSection)));
   document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => { const section = button.dataset.accountSectionOpen; setAccountView(button.dataset.accountOpen, true, !section); if (section) setAccountSection(section, false, true); }));
   document.getElementById('view-account-products')?.addEventListener('click', () => document.getElementById('account-products-list')?.scrollIntoView({ behavior:'smooth', block:'center' }));
+  document.getElementById('activate-usage-credit')?.addEventListener('click', async event => { const card=document.getElementById('usage-credit-card'); const grantId=card?.dataset.grantId; if (!grantId || !confirm('Ativar este saldo agora? Depois da ativação, ele será consumido enquanto o aplicativo estiver conectado.')) return; event.currentTarget.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId } }); const current=await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); window.showToast?.('Saldo ativado. Agora você pode autorizar o aplicativo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; } });
   document.getElementById('account-products-list')?.addEventListener('click', event => { const button = event.target.closest('[data-buy-product]'); if (button) openCheckout(button.dataset.buyProduct); });
   document.getElementById('account-order-list')?.addEventListener('click', event => { const button = event.target.closest('[data-order-details]'); if (button) openOrderDetails(button.dataset.orderDetails).catch(error => window.showToast?.(error.message)); });
   document.querySelector('[data-close-checkout]')?.addEventListener('click', () => document.getElementById('checkout-dialog').close());
@@ -342,9 +352,10 @@ async function initClientPage() {
 }
 
 async function initActivationPage() {
-  const approve = document.getElementById('activate-approve'); if (!approve) return; const openApp = document.getElementById('activate-open-app'); const copy = document.getElementById('activate-copy'); const status = document.getElementById('activate-status'); const note = document.getElementById('activate-login-note'); const query = new URLSearchParams(location.search); const requestId = query.get('request'); const userCode = query.get('code');
+  const approve = document.getElementById('activate-approve'); if (!approve) return; const openApp = document.getElementById('activate-open-app'); const copy = document.getElementById('activate-copy'); const status = document.getElementById('activate-status'); const note = document.getElementById('activate-login-note'); const usagePanel=document.getElementById('activate-usage-panel'); const usageButton=document.getElementById('activate-usage'); const query = new URLSearchParams(location.search); const requestId = query.get('request'); const userCode = query.get('code'); let availableGrant=null;
   if (!requestId || !userCode) { copy.textContent = 'A solicitação de dispositivo é inválida ou está incompleta.'; return; }
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); copy.textContent = `Você está conectado como ${current.user.email}. Confirme para autorizar este computador.`; note.hidden = true; approve.disabled = !current.entitlement.active; if (!current.entitlement.active) status.textContent = 'Esta conta ainda não possui um acesso ativo.'; } catch { copy.textContent = 'Entre na Área do Cliente nesta mesma janela e volte para confirmar o computador.'; status.textContent = 'A solicitação continuará válida apenas por alguns minutos.'; }
+  try { const current = await PaxinbotAuth.request('/api/auth/me'); copy.textContent = `Você está conectado como ${current.user.email}. Confirme para autorizar este computador.`; note.hidden = true; approve.disabled = !current.entitlement.active; availableGrant=current.entitlement.availableGrant || null; if (!current.entitlement.active && availableGrant) { usagePanel.hidden=false; document.getElementById('activate-usage-duration').textContent=formatUsageTime(availableGrant.remainingSeconds); status.textContent='Ative o saldo antes de autorizar este computador.'; } else if (!current.entitlement.active) status.textContent = 'Esta conta ainda não possui um acesso ativo.'; } catch { copy.textContent = 'Entre na Área do Cliente nesta mesma janela e volte para confirmar o computador.'; status.textContent = 'A solicitação continuará válida apenas por alguns minutos.'; }
+  usageButton?.addEventListener('click', async () => { if (!availableGrant) return; usageButton.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId:availableGrant.id } }); usagePanel.hidden=true; approve.disabled=false; status.textContent='Saldo ativado. Agora autorize este computador.'; window.showToast?.('Saldo ativado.'); } catch (error) { status.textContent=error.message || 'Não foi possível ativar o saldo.'; usageButton.disabled=false; } });
   approve.addEventListener('click', async () => { approve.disabled = true; try { const result = await PaxinbotAuth.request('/api/v1/devices/approve', { method:'POST', body:{ requestId, userCode } }); copy.textContent = `Computador “${result.deviceName}” autorizado.`; status.textContent = 'Confirme no navegador para retornar ao Paxinbot.'; approve.hidden = true; openApp.hidden = false; window.showToast?.('Computador autorizado.'); window.location.assign('paxinbot://auth-complete'); } catch (error) { approve.disabled = false; status.textContent = error.message || 'Não foi possível autorizar este computador.'; } });
 }
 

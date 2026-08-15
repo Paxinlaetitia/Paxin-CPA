@@ -39,8 +39,10 @@ module.exports = async (req, res) => {
   if (action === 'access') {
     const email = String(body.email || '').trim().toLowerCase(); const kind = String(body.kind || '');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { ok: false, error: 'Informe o e-mail válido de um cliente cadastrado.' });
-    if (!['duration','lifetime'].includes(kind) || (kind === 'duration' && (!body.expiresAt || new Date(body.expiresAt) <= new Date()))) return json(res, 400, { ok: false, error: 'Informe uma expiração futura para o acesso por tempo.' });
+    const durationSeconds = Number(body.durationSeconds);
+    if (!['usage','lifetime'].includes(kind) || (kind === 'usage' && (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 315360000))) return json(res, 400, { ok: false, error: 'Informe um saldo de uso entre 1 minuto e 10 anos.' });
     body.email = email;
+    body.durationSeconds = durationSeconds;
   }
   if (action === 'revokeAccess' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) {
     return json(res, 400, { ok: false, error: 'Identificador de cliente inválido.' });
@@ -51,7 +53,9 @@ module.exports = async (req, res) => {
   const actions = {
     product: ['paxinbot_owner_save_product', () => ({ p_id: body.id || null, p_code: body.code, p_name: body.name, p_description: body.description || '', p_access_kind: body.accessKind, p_duration_minutes: body.accessKind === 'lifetime' ? null : Number(body.durationMinutes), p_price_cents: Number(body.priceCents), p_active: body.active !== false })],
     coupon: ['paxinbot_owner_save_coupon', () => ({ p_id: body.id || null, p_code: body.code, p_description: body.description || '', p_discount_type: body.discountType, p_discount_value: Number(body.discountValue), p_max_redemptions: body.maxRedemptions ? Number(body.maxRedemptions) : null, p_expires_at: body.expiresAt || null, p_active: body.active !== false })],
-    access: ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: body.kind, p_expires_at: body.kind === 'lifetime' ? null : body.expiresAt, p_source: 'owner-panel' })],
+    access: body.kind === 'lifetime'
+      ? ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: 'lifetime', p_expires_at: null, p_source: 'owner-panel' })]
+      : ['paxinbot_owner_grant_usage', () => ({ p_email: body.email, p_total_seconds: body.durationSeconds, p_source: 'owner-panel' })],
     revokeAccess: ['paxinbot_owner_revoke_access', () => ({ p_user_id: body.userId })],
     ticketReply: ['paxinbot_owner_reply_support_ticket', () => ({ p_ticket_id:body.ticketId, p_message:String(body.message || '').trim() })],
     ticketStatus: ['paxinbot_owner_update_support_status', () => ({ p_ticket_id:body.ticketId, p_status:body.status })]
