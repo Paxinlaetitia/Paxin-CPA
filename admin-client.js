@@ -1,0 +1,21 @@
+'use strict';
+const adminStyle = document.createElement('link'); adminStyle.rel = 'stylesheet'; adminStyle.href = 'admin.css'; document.head.append(adminStyle);
+const Admin = (() => {
+  const call = async (path, options = {}) => { const r = await fetch(`/api/admin${path}`, { method: options.method || 'GET', credentials: 'include', headers: { 'content-type': 'application/json' }, body: options.body ? JSON.stringify(options.body) : undefined }); const p = await r.json().catch(() => ({})); if (!r.ok || !p.ok) throw new Error(p.error || 'Não foi possível concluir a operação.'); return p.data; };
+  const money = cents => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((Number(cents) || 0) / 100);
+  const escape = value => String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
+  const rows = (selector, html, empty, colspan) => { document.querySelector(selector).innerHTML = html || `<tr><td colspan="${colspan}">${empty}</td></tr>`; };
+  const render = async () => {
+    const [overview, users, products, coupons] = await Promise.all([call('?action=overview'), call('?action=users'), call('?action=products'), call('?action=coupons')]);
+    [['#admin-customers', overview.customers], ['#admin-accesses', overview.activeAccesses], ['#admin-products', overview.activeProducts], ['#admin-coupons', overview.activeCoupons]].forEach(([id, value]) => document.querySelector(id).textContent = value);
+    rows('#admin-users-list', users.map(u => `<tr><td>${escape(u.email)}</td><td>${u.access ? escape(u.access.kind === 'lifetime' ? 'Vitalício' : 'Por tempo') : 'Sem acesso'}</td><td>${u.access?.expiresAt ? new Date(u.access.expiresAt).toLocaleDateString('pt-BR') : u.access ? 'Não expira' : '—'}</td></tr>`).join(''), 'Nenhum cliente encontrado.', 3);
+    rows('#admin-products-list', products.map(x => `<tr><td>${escape(x.name)}</td><td>${escape(x.code)}</td><td>${x.access_kind === 'lifetime' ? 'Vitalício' : `${x.duration_minutes} min.`}</td><td>${money(x.price_cents)}</td><td>${x.active ? 'Ativo' : 'Pausado'}</td></tr>`).join(''), 'Nenhum produto cadastrado.', 5);
+    rows('#admin-coupons-list', coupons.map(x => `<tr><td>${escape(x.code)}</td><td>${x.discount_type === 'percent' ? `${x.discount_value}%` : money(x.discount_value)}</td><td>${x.redemptions}${x.max_redemptions ? ` / ${x.max_redemptions}` : ''}</td><td>${x.active ? 'Ativo' : 'Pausado'}</td></tr>`).join(''), 'Nenhum cupom cadastrado.', 4);
+  };
+  const bind = (selector, action, values) => document.querySelector(selector)?.addEventListener('submit', async e => { e.preventDefault(); const f = new FormData(e.currentTarget); const b = e.currentTarget.querySelector('[type="submit"]'); b.disabled = true; try { await call('', { method: 'POST', body: { action, ...values(f) } }); e.currentTarget.reset(); window.showToast?.('Alterações salvas.'); await render(); } catch (err) { window.showToast?.(err.message); } finally { b.disabled = false; } });
+  const init = async () => { try { await render(); } catch { location.replace('cliente.html'); return; }
+    bind('#admin-product-form', 'product', f => ({ code:f.get('code'), name:f.get('name'), description:f.get('description'), accessKind:f.get('accessKind'), durationMinutes:f.get('durationMinutes'), priceCents:Math.round(Number(String(f.get('price') || '0').replace(',','.')) * 100), active:f.get('active') === 'on' }));
+    bind('#admin-coupon-form', 'coupon', f => ({ code:f.get('code'), description:f.get('description'), discountType:f.get('discountType'), discountValue:f.get('discountType') === 'percent' ? Number(f.get('discountValue')) : Math.round(Number(String(f.get('discountValue') || '0').replace(',','.')) * 100), maxRedemptions:f.get('maxRedemptions'), expiresAt:f.get('expiresAt') ? new Date(`${f.get('expiresAt')}T23:59:59`).toISOString() : null, active:f.get('active') === 'on' }));
+    bind('#admin-access-form', 'access', f => ({ email:f.get('email'), kind:f.get('kind'), expiresAt:f.get('kind') === 'lifetime' ? null : (f.get('expiresAt') ? new Date(f.get('expiresAt')).toISOString() : null) }));
+  }; return { init };
+})(); void Admin.init();
