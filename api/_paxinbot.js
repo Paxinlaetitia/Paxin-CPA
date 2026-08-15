@@ -49,5 +49,12 @@ async function browserSession(req, res) {
   return { user, access };
 }
 function sha256(value) { return crypto.createHash('sha256').update(String(value)).digest('hex'); }
-function publicOrigin(req) { return String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, ''); }
+function publicOrigin(req) {
+  let origin = String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, '');
+  // O domínio configurado na Vercel usa www como host canônico. Retornos OAuth
+  // no host secundário causariam redirecionamento de origem e impediriam o
+  // navegador de gravar a sessão HttpOnly.
+  if (origin === 'https://paxincpa.store') origin = 'https://www.paxincpa.store';
+  return origin;
+}
 module.exports = { config, json, cookies, sessionCookies, clearSession, upstream, readBody, browserSession, sha256, publicOrigin };

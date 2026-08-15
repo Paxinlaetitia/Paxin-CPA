@@ -490,6 +490,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 
 /* Account authentication additions */
 .auth-session-note { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.auth-form[hidden] { display: none !important; }
 .auth-switch { display: block; width: 100%; margin-top: 14px; text-align: center; }
 .google-button { position: relative; }
 .google-g { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; background: #fff; color: #3c74e6; font: 800 12px/1 Arial, sans-serif; }

@@ -8,7 +8,7 @@ Em **Settings → Environment Variables**, adicione para Production, Preview e D
 
 - `SUPABASE_URL` — URL base do projeto Supabase, sem `/rest/v1`.
 - `SUPABASE_PUBLISHABLE_KEY` — chave `sb_publishable_...`.
-- `PUBLIC_SITE_URL` — `https://paxincpa.store`.
+- `PUBLIC_SITE_URL` — `https://www.paxincpa.store`.
 
 Não coloque `service_role`, senha SMTP, segredo do Google ou qualquer token administrativo na Vercel nem no navegador.
 
@@ -16,19 +16,19 @@ Não coloque `service_role`, senha SMTP, segredo do Google ou qualquer token adm
 
 Em **Authentication → URL Configuration**:
 
-- Site URL: `https://paxincpa.store`
+- Site URL: `https://www.paxincpa.store`
 - Redirect URLs:
-  - `https://paxincpa.store/auth-callback.html`
-  - `https://paxincpa.store/auth-callback.html?flow=google`
-  - `https://paxincpa.store/auth-callback.html?flow=signup`
-  - `https://paxincpa.store/auth-callback.html?flow=recovery`
+  - `https://www.paxincpa.store/auth-callback.html`
+  - `https://www.paxincpa.store/auth-callback.html?flow=google`
+  - `https://www.paxincpa.store/auth-callback.html?flow=signup`
+  - `https://www.paxincpa.store/auth-callback.html?flow=recovery`
 
 Mantenha a confirmação de e-mail habilitada e configure SMTP antes de abrir o cadastro ao público.
 
 ## 3. Google
 
 1. No Google Cloud Console, crie um OAuth Client do tipo **Web application**.
-2. Em Authorized JavaScript origins, adicione `https://paxincpa.store`.
+2. Em Authorized JavaScript origins, adicione `https://www.paxincpa.store`.
 3. Em Authorized redirect URIs, use exatamente o callback mostrado em **Supabase → Authentication → Providers → Google** (normalmente `https://<project-ref>.supabase.co/auth/v1/callback`).
 4. Copie o Client ID e o Client Secret para o provedor **Google** no Supabase e habilite-o.
 
@@ -41,7 +41,7 @@ Em **Authentication → Passkeys** no Supabase:
 - habilite Passkey authentication;
 - Relying party ID: `paxincpa.store`;
 - Relying party name: `Paxinbot`;
-- Origins permitidas: `https://paxincpa.store`.
+- Origins permitidas: `https://www.paxincpa.store`.
 
 O suporte de passkeys do Supabase é experimental; mantenha login por e-mail/senha e Google como alternativas até validar o fluxo em Chrome, Edge e celular.
 
