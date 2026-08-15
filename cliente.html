@@ -53,13 +53,17 @@
         <div class="client-dashboard-intro reveal"><div class="eyebrow"><span></span> Minha conta</div><h1>Seu acesso Paxinbot.</h1><p>Tudo que é importante para sua conta, sem transformar o site em uma cópia do aplicativo.</p></div>
         <section class="account-hero-card reveal">
           <div class="account-profile"><span id="dashboard-initials">PB</span><div><small>CONTA PAXINBOT</small><h2 id="dashboard-greeting">Entre na sua conta</h2><p id="dashboard-email">Entre para consultar</p></div></div>
-          <div class="account-hero-actions"><a class="button button-secondary" href="planos.html">Ver modalidades</a><button id="client-logout" type="button" hidden>Sair / trocar conta</button></div>
+          <div class="account-hero-actions"><button class="button button-secondary" id="open-modalities" type="button">Ver modalidades</button><button id="client-logout" type="button" hidden>Sair / trocar conta</button></div>
         </section>
         <div class="account-summary reveal">
           <article><span>ACESSO ATUAL</span><b id="dashboard-access">—</b><small id="dashboard-access-state">Aguardando login</small></article>
           <article><span>EXPIRAÇÃO</span><b id="dashboard-expiry">—</b><small id="dashboard-expiry-state">Sem dados</small></article>
           <article><span>DISPOSITIVOS</span><b id="dashboard-devices">Protegidos</b><small id="dashboard-devices-state">Autorize pelo navegador</small></article>
         </div>
+        <section class="account-modalities" id="account-modalities" hidden>
+          <div class="account-section-head"><div><div class="eyebrow"><span></span> Modalidades</div><h2>Escolha o tempo de acesso ideal.</h2><p>As modalidades ficam aqui na sua área; pagamento e liberação serão vinculados à conta após a confirmação.</p></div><button id="close-modalities" type="button" aria-label="Fechar modalidades">Fechar</button></div>
+          <div class="account-modality-grid"><article><span>USO PONTUAL</span><h3>Por horas</h3><p>Para uma demanda específica, com início e validade definidos na contratação.</p><a href="ajuda.html">Tirar dúvidas</a></article><article class="is-featured"><span>ACESSO RECORRENTE</span><h3>Quinzenal, mensal ou trimestral</h3><p>Para manter a rotina ativa com renovação e validade visíveis na sua conta.</p><a href="ajuda.html">Tirar dúvidas</a></article><article><span>SEM EXPIRAÇÃO</span><h3>Vitalício</h3><p>Acesso vinculado à sua conta sem data de vencimento.</p><a href="ajuda.html">Tirar dúvidas</a></article></div>
+        </section>
         <div class="account-content-grid reveal">
           <article class="account-feature account-feature-wide"><div class="account-feature-icon"><svg><use href="#i-device"></use></svg></div><div><span>APLICATIVO</span><h3>Autorize seu computador pelo navegador</h3><p>Quando o Paxinbot for aberto, ele exibirá uma solicitação de autorização. Confirme-a neste domínio, sem informar sua senha no aplicativo.</p></div><a class="button button-secondary" href="ajuda.html#primeiros-passos">Como funciona</a></article>
           <article class="account-feature"><div class="account-feature-icon"><svg><use href="#i-shield"></use></svg></div><div><span>SEGURANÇA</span><h3>Passkey</h3><p id="passkey-copy">Entre para cadastrar uma passkey neste dispositivo.</p></div><div class="account-feature-action"><small id="passkey-state">OPCIONAL</small><button id="passkey-register" type="button" disabled>Configurar</button></div></article>

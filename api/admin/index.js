@@ -4,10 +4,12 @@ const queries = { overview: ['paxinbot_owner_overview', () => ({})], users: ['pa
 module.exports = async (req, res) => {
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok: false, error: 'Entre com a conta do proprietário.' });
+  const ownerCheck = await upstream('/rest/v1/rpc/paxinbot_is_owner', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
+  if (!ownerCheck.response.ok || ownerCheck.payload !== true) return json(res, 403, { ok: false, error: 'Esta conta está autenticada, mas ainda não foi registrada como proprietária no Supabase.' });
   if (req.method === 'GET') {
     const item = queries[String(req.query?.action || 'overview')]; if (!item) return json(res, 404, { ok: false, error: 'Consulta não encontrada.' });
     const { response, payload } = await upstream(`/rest/v1/rpc/${item[0]}`, { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: item[1](req.query || {}) });
-    return json(res, response.ok ? 200 : 403, response.ok ? { ok: true, data: payload } : { ok: false, error: 'Acesso restrito ao proprietário.' });
+    return json(res, response.ok ? 200 : 403, response.ok ? { ok: true, data: payload } : { ok: false, error: 'O painel não encontrou as funções de proprietário no banco. Execute a migração principal novamente.' });
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const body = await readBody(req); const action = String(body.action || '');

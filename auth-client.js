@@ -81,6 +81,9 @@ async function initClientPage() {
   document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
   document.getElementById('passkey-login')?.addEventListener('click', () => loginWithPasskey().catch(error => { setClientStatus(error.message || 'Não foi possível usar a passkey.'); window.showToast?.(error.message || 'Não foi possível usar a passkey.'); }));
   document.getElementById('passkey-register')?.addEventListener('click', () => registerPasskey().catch(error => window.showToast?.(error.message || 'Não foi possível cadastrar a passkey.')));
+  const modalities = document.getElementById('account-modalities');
+  document.getElementById('open-modalities')?.addEventListener('click', () => { modalities.hidden = false; modalities.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  document.getElementById('close-modalities')?.addEventListener('click', () => { modalities.hidden = true; });
   document.getElementById('client-logout')?.addEventListener('click', async () => { try { await PaxinbotAuth.request('/api/auth/logout', { method: 'POST' }); } catch {} passkeySession = null; renderClientDashboard(null); setClientStatus('Sessão encerrada.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 }
 
