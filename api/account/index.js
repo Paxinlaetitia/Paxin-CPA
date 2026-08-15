@@ -4,7 +4,8 @@ const { json, readBody, browserSession, upstream, sameOriginRequest, safeUpstrea
 const queries = {
   overview: ['paxinbot_get_my_account', () => ({})],
   devices: ['paxinbot_list_my_devices', () => ({})],
-  orders: ['paxinbot_list_my_orders', () => ({})]
+  orders: ['paxinbot_list_my_orders', () => ({})],
+  products: ['paxinbot_list_active_products', () => ({})]
 };
 
 module.exports = async (req, res) => {

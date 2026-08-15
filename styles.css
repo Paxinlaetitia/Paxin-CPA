@@ -441,7 +441,9 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .billing-switch button { height: 37px; padding: 0 15px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 .billing-switch button.active { background: var(--accent-soft); color: var(--accent-bright); }.billing-switch span { margin-left: 5px; color: var(--green); font-size: 8px; }
 .plans-page-section { padding-top: 20px; }
-.compare-section { border-block: 1px solid var(--line); background: #080808; }
+.catalog-message { grid-column: 1 / -1; min-height: 170px; display: grid; place-items: center; border: 1px dashed var(--line-strong); border-radius: var(--radius); color: var(--text-2); font-size: 12px; text-align: center; }
+.catalog-message.is-error { border-color: rgba(240,165,0,.25); color: var(--accent-bright); }
+.compare-section { background: #080808; }
 .compare-table { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .compare-row { min-height: 62px; display: grid; grid-template-columns: 1.4fr repeat(3,1fr); align-items: center; border-bottom: 1px solid var(--line); }
 .compare-row:last-child { border-bottom: 0; }.compare-row > * { height: 100%; display: flex; align-items: center; justify-content: center; padding: 14px; border-right: 1px solid var(--line); font-style: normal; font-size: 11px; text-align: center; }.compare-row > *:last-child { border-right: 0; }.compare-row > *:first-child { justify-content: flex-start; color: var(--text-2); text-align: left; }.compare-head { min-height: 70px; background: rgba(255,255,255,.025); }.compare-head b { color: var(--text); }.compare-row svg { width: 16px; height: 16px; color: var(--green); }

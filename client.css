@@ -73,11 +73,17 @@
 .portal-plan-grid article { min-height: 330px; display: flex; flex-direction: column; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: #0a0a0a; }
 .portal-plan-grid article.is-featured { border-color: rgba(240,165,0,.38); background: #0d0b07; }
 .portal-plan-grid h3 { margin: 10px 0 8px; font-size: 21px; }
+.portal-plan-grid .portal-plan-loading { grid-column: 1 / -1; min-height: 130px; display: grid; place-items: center; border: 1px dashed var(--line-strong); border-radius: 14px; }
+.portal-plan-price { display: flex; flex-direction: column; gap: 2px; margin-top: 22px; }
+.portal-plan-price strong { font-size: 24px; letter-spacing: -.04em; }
+.portal-plan-price small { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
 .portal-plan-grid ul { display: grid; gap: 9px; margin: 22px 0; padding: 0; list-style: none; }
 .portal-plan-grid li { position: relative; padding-left: 17px; color: var(--text-2); font-size: 10px; }
 .portal-plan-grid li::before { content: ""; position: absolute; top: 5px; left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .portal-plan-grid a { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; margin-top: auto; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--text); font-size: 10px; font-weight: 700; transition: border-color 160ms ease-out, transform 160ms ease-out; }
 .portal-plan-grid a:hover { border-color: rgba(240,165,0,.48); transform: translateY(-1px); }
+.portal-plan-availability { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: auto; border: 1px solid rgba(85,182,133,.22); border-radius: 9px; background: rgba(85,182,133,.06); color: var(--green); font-size: 9px; font-weight: 750; }
+.portal-plan-availability i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
 .portal-current-plan { min-height: 116px; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 12px; padding: 22px; border: 1px solid rgba(240,165,0,.28); border-radius: 15px; background: #0d0b07; }
 .portal-current-plan span,.portal-section-title span { color: var(--accent); font-size: 9px; font-weight: 800; }

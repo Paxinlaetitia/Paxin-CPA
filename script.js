@@ -109,6 +109,28 @@ document.querySelector('.auth-eye')?.addEventListener('click', event => {
 
 document.querySelectorAll('.billing-switch button').forEach(button => button.addEventListener('click', () => document.querySelectorAll('.billing-switch button').forEach(item => item.classList.toggle('active', item === button))));
 
+function catalogEscape(value) { return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]); }
+function catalogMoney(cents) { return new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format((Number(cents) || 0) / 100); }
+function catalogDuration(product) {
+  if (product.accessKind === 'lifetime') return 'SEM EXPIRAÇÃO';
+  const minutes = Number(product.durationMinutes) || 0;
+  if (minutes >= 1440 && minutes % 1440 === 0) { const days = minutes / 1440; return `${days} ${days === 1 ? 'DIA' : 'DIAS'}`; }
+  if (minutes >= 60 && minutes % 60 === 0) { const hours = minutes / 60; return `${hours} ${hours === 1 ? 'HORA' : 'HORAS'}`; }
+  return `${minutes} MINUTOS`;
+}
+async function loadPublicCatalog() {
+  const root = document.getElementById('public-products-list'); if (!root) return;
+  try {
+    const response = await fetch('/api/catalog'); const payload = await response.json();
+    if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'Não foi possível carregar as modalidades.');
+    const products = payload.data || [];
+    if (!products.length) { root.innerHTML = '<div class="catalog-message">Nenhuma modalidade está disponível neste momento.</div>'; return; }
+    const featured = products.length === 1 ? 0 : Math.min(1, products.length - 1);
+    root.innerHTML = products.map((product, index) => `<article class="plan-card ${index === featured ? 'featured' : ''}">${index === featured ? '<div class="plan-label">DESTAQUE</div>' : ''}<div class="plan-head"><span>${catalogEscape(catalogDuration(product))}</span><h3>${catalogEscape(product.name)}</h3><p>${catalogEscape(product.description || 'Acesso completo ao Paxinbot durante a validade contratada.')}</p></div><div class="price"><b>${catalogMoney(product.priceCents)}</b><small>valor da modalidade</small></div><ul><li><svg><use href="#i-check"></use></svg> Todos os recursos disponíveis</li><li><svg><use href="#i-check"></use></svg> Acesso vinculado à sua conta</li><li><svg><use href="#i-check"></use></svg> Validade controlada pelo servidor</li><li><svg><use href="#i-check"></use></svg> Gestão pela Área do Cliente</li></ul><a class="button ${index === featured ? 'button-primary' : 'button-secondary'} button-full" href="/conta/assinatura">Adquirir pela minha conta</a></article>`).join('');
+  } catch (error) { root.innerHTML = `<div class="catalog-message is-error">${catalogEscape(error.message)}</div>`; }
+}
+loadPublicCatalog();
+
 document.querySelectorAll('a[href="#"]').forEach(link => link.addEventListener('click', event => event.preventDefault()));
 
 const revealObserver = new IntersectionObserver(entries => {

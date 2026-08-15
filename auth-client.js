@@ -94,13 +94,33 @@ function renderOrders(orders) {
   root.innerHTML = orders.map(order => `<article class="portal-list-row"><span class="portal-icon"><svg><use href="#i-card"></use></svg></span><div><b>${escapeHtml(order.productName || 'Pedido Paxinbot')}</b><small>${formatDate(order.createdAt)} · ${money(order.amountCents, order.currency)}</small></div><span class="portal-status ${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></article>`).join('');
 }
 
+function productDuration(product) {
+  if (product.accessKind === 'lifetime') return 'SEM EXPIRAÇÃO';
+  const minutes = Number(product.durationMinutes) || 0;
+  if (minutes >= 1440 && minutes % 1440 === 0) { const days = minutes / 1440; return `${days} ${days === 1 ? 'DIA' : 'DIAS'}`; }
+  if (minutes >= 60 && minutes % 60 === 0) { const hours = minutes / 60; return `${hours} ${hours === 1 ? 'HORA' : 'HORAS'}`; }
+  return `${minutes} MINUTOS`;
+}
+
+function renderProducts(products, error = '') {
+  const root = document.getElementById('account-products-list'); if (!root) return;
+  if (error) { root.innerHTML = `<div class="portal-empty portal-plan-loading">${escapeHtml(error)}</div>`; return; }
+  if (!products?.length) { root.innerHTML = '<div class="portal-empty portal-plan-loading">Nenhuma modalidade ativa foi publicada.</div>'; return; }
+  const featured = products.length === 1 ? 0 : Math.min(1, products.length - 1);
+  root.innerHTML = products.map((product, index) => `<article class="${index === featured ? 'is-featured' : ''}"><span>${escapeHtml(productDuration(product))}</span><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.description || 'Acesso completo ao Paxinbot durante a validade contratada.')}</p><div class="portal-plan-price"><strong>${money(product.priceCents)}</strong><small>valor da modalidade</small></div><ul><li>Todos os recursos do aplicativo</li><li>${product.accessKind === 'lifetime' ? 'Acesso sem data de expiração' : `Validade de ${escapeHtml(productDuration(product).toLocaleLowerCase('pt-BR'))}`}</li></ul><div class="portal-plan-availability"><i></i>Disponível para aquisição</div></article>`).join('');
+}
+
 async function loadPortalData(basePayload) {
   let account = null; const notice = document.getElementById('portal-system-notice'); notice.hidden = true;
   try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
   const merged = { ...basePayload, profile: account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders] = await Promise.all([PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []), PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => [])]);
-  renderDevices(devices); renderOrders(orders);
+  const [devices, orders, products] = await Promise.all([
+    PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
+    PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
+    PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data })).catch(error => ({ error:error.message }))
+  ]);
+  renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error);
 }
 
 async function getPasskeyClient() {
@@ -141,6 +161,7 @@ async function initClientPage() {
   document.getElementById('passkey-password-confirm')?.addEventListener('click', async () => { const password = document.getElementById('passkey-password').value; if (!currentAccount?.user?.email || !password) return window.showToast?.('Informe sua senha.'); try { const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:currentAccount.user.email, password } }); passkeySession = result.passkeySession; document.getElementById('passkey-dialog').close(); document.getElementById('passkey-password').value = ''; await registerPasskey(); } catch (error) { window.showToast?.(error.message); } });
   document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountView)));
   document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => setAccountView(button.dataset.accountOpen, true)));
+  document.getElementById('view-account-products')?.addEventListener('click', () => document.getElementById('account-products-list')?.scrollIntoView({ behavior:'smooth', block:'center' }));
   document.querySelector('.portal-nav')?.addEventListener('keydown', event => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; const tabs = [...document.querySelectorAll('[data-account-view]')]; const current = tabs.indexOf(document.activeElement); if (current < 0) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; setAccountView(tabs[next].dataset.accountView, true); });
   window.addEventListener('popstate', () => setAccountView(viewFromPath(), false, false));
   document.getElementById('account-profile-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('button'); button.disabled = true; try { const displayName = new FormData(event.currentTarget).get('displayName'); const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'profile', displayName } }); currentAccount.profile = result.data; renderClientDashboard(currentAccount); window.showToast?.('Dados atualizados.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });

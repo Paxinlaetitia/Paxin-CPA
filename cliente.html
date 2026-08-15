@@ -79,8 +79,8 @@
 
           <section class="portal-page" id="account-panel-subscription" role="tabpanel" aria-labelledby="account-tab-subscription" data-account-panel="subscription" hidden>
             <div class="portal-page-head"><div><span>ASSINATURA</span><h2>Plano, validade e histórico.</h2><p>As modalidades disponíveis e suas compras ficam reunidas aqui.</p></div></div>
-            <article class="portal-current-plan"><div><span>PLANO ATUAL</span><h3 id="subscription-plan">Sem acesso ativo</h3><p id="subscription-expiry">Escolha uma modalidade para começar.</p></div><a class="button button-secondary" href="/planos">Ver opções públicas</a></article>
-            <div class="portal-plan-grid"><article><span>USO PONTUAL</span><h3>Por horas</h3><p>Para operações específicas, com validade definida.</p><ul><li>Acesso vinculado à conta</li><li>Validade visível no painel</li></ul><a href="/ajuda">Consultar disponibilidade</a></article><article class="is-featured"><span>RECORRENTE</span><h3>Quinzenal, mensal ou trimestral</h3><p>Períodos maiores para manter sua rotina.</p><ul><li>Gestão pela Área do Cliente</li><li>Atualizações oficiais</li></ul><a href="/ajuda">Consultar disponibilidade</a></article><article><span>SEM EXPIRAÇÃO</span><h3>Vitalício</h3><p>Acesso sem vencimento vinculado à conta.</p><ul><li>Sem renovação periódica</li><li>Download oficial</li></ul><a href="/ajuda">Consultar disponibilidade</a></article></div>
+            <article class="portal-current-plan"><div><span>PLANO ATUAL</span><h3 id="subscription-plan">Sem acesso ativo</h3><p id="subscription-expiry">Escolha uma modalidade para começar.</p></div><button class="button button-secondary" id="view-account-products" type="button">Ver modalidades</button></article>
+            <div class="portal-plan-grid" id="account-products-list" aria-live="polite"><div class="portal-empty portal-plan-loading">Carregando modalidades disponíveis…</div></div>
             <div class="portal-section-title"><div><span>HISTÓRICO</span><h3>Pedidos</h3></div></div><div class="portal-list" id="account-order-list"><div class="portal-empty">Nenhum pedido encontrado.</div></div>
           </section>
 
