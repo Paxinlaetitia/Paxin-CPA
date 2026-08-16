@@ -104,6 +104,45 @@ function serverFingerprint(purpose, value) {
   if (!secret) throw new Error('Segredo interno do servidor ausente.');
   return crypto.createHmac('sha256', secret).update(`${String(purpose)}\0${String(value)}`).digest('hex');
 }
+function canonicalDeviceProof(value) {
+  return [
+    'paxinbot-device-proof-v1', value.installId, value.publicKey, value.fingerprint,
+    value.fingerprintStrength, String(value.issuedAt), value.nonce, value.appVersion
+  ].join('\n');
+}
+function verifyDeviceIdentityProof(body) {
+  const proof = {
+    installId: String(body?.installId || '').toLowerCase(),
+    publicKey: String(body?.publicKey || ''),
+    fingerprint: String(body?.fingerprint || '').toLowerCase(),
+    fingerprintStrength: String(body?.fingerprintStrength || ''),
+    issuedAt: Number(body?.issuedAt),
+    nonce: String(body?.nonce || ''),
+    appVersion: String(body?.appVersion || '').trim(),
+    signature: String(body?.signature || '')
+  };
+  if (!isUuid(proof.installId) || !/^[A-Za-z0-9_-]{50,200}$/.test(proof.publicKey) ||
+      !/^[a-f0-9]{64}$/.test(proof.fingerprint) || !['hardware', 'installation'].includes(proof.fingerprintStrength) ||
+      !Number.isSafeInteger(proof.issuedAt) || Math.abs(Date.now() - proof.issuedAt) > 5 * 60 * 1000 ||
+      !/^[A-Za-z0-9_-]{32}$/.test(proof.nonce) || !/^[A-Za-z0-9_-]{80,100}$/.test(proof.signature) ||
+      !/^\d{1,4}(?:\.\d{1,4}){1,3}(?:-[0-9A-Za-z.-]{1,24})?$/.test(proof.appVersion)) {
+    throw new Error('device_identity_invalid');
+  }
+  let key;
+  try {
+    key = crypto.createPublicKey({ key: Buffer.from(proof.publicKey, 'base64url'), format: 'der', type: 'spki' });
+  } catch { throw new Error('device_identity_invalid'); }
+  if (key.asymmetricKeyType !== 'ed25519' || !crypto.verify(null, Buffer.from(canonicalDeviceProof(proof), 'utf8'), key, Buffer.from(proof.signature, 'base64url'))) {
+    throw new Error('device_identity_signature_invalid');
+  }
+  return {
+    ...proof,
+    deviceKeyHash: serverFingerprint('device-key-v1', proof.publicKey),
+    fingerprintHash: serverFingerprint('device-fingerprint-v1', proof.fingerprint),
+    installIdHash: serverFingerprint('device-install-v1', proof.installId),
+    proofNonceHash: serverFingerprint('device-proof-nonce-v1', proof.nonce)
+  };
+}
 function clientAddress(req) {
   const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   return forwarded || String(req.socket?.remoteAddress || 'unknown').trim().slice(0, 128);
@@ -174,6 +213,10 @@ function safeUpstreamError(payload, fallback = 'Não foi possível concluir a op
 function safeDeviceAuthError(payload, fallback = 'Não foi possível concluir a autorização.') {
   const upstreamCode = String(payload?.code || '').toUpperCase();
   const message = String(payload?.message || payload?.error || '');
+  if (/device_banned/i.test(message)) return { code: 'device_banned', error: 'Este computador está bloqueado para usar o Paxinbot. Entre em contato com o suporte.' };
+  if (/device_identity_mismatch/i.test(message)) return { code: 'device_identity_mismatch', error: 'A identidade segura deste computador não corresponde ao cadastro anterior.' };
+  if (/promotion_device_already_used/i.test(message)) return { code: 'promotion_device_already_used', error: 'O presente de boas-vindas já foi utilizado neste computador.' };
+  if (/device_identity_invalid|device_identity_signature_invalid|device_proof_replayed/i.test(message)) return { code: 'device_identity_invalid', error: 'A identificação segura deste computador não pôde ser validada.' };
   if (/no_active_access/i.test(message)) return { code: 'access_required', error: 'Sua conta não possui acesso ativo ao aplicativo.' };
   if (/device_expired/i.test(message)) return { code: 'request_expired', error: 'A solicitação expirou. Inicie o login novamente no aplicativo.' };
   if (/device_consumed/i.test(message)) return { code: 'request_consumed', error: 'Esta solicitação já foi utilizada. Inicie um novo login no aplicativo.' };
@@ -207,4 +250,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   if (!response.ok) throw new Error('email_provider_error');
   return { sent:true, configured:true };
 }
-module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

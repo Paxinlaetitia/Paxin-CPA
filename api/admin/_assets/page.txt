@@ -14,6 +14,7 @@
         <button type="button" role="tab" data-admin-view="products" aria-selected="false"><svg><use href="#i-card"></use></svg>Produtos</button>
         <button type="button" role="tab" data-admin-view="coupons" aria-selected="false"><svg><use href="#i-bolt"></use></svg>Cupons</button>
         <button type="button" role="tab" data-admin-view="promotions" aria-selected="false"><svg><use href="#i-bolt"></use></svg>Promoções</button>
+        <button type="button" role="tab" data-admin-view="devices" aria-selected="false"><svg><use href="#i-shield"></use></svg>Dispositivos</button>
         <button type="button" role="tab" data-admin-view="orders" aria-selected="false"><svg><use href="#i-file"></use></svg>Pedidos</button>
         <button type="button" role="tab" data-admin-view="tickets" aria-selected="false"><svg><use href="#i-mail"></use></svg>Atendimento</button>
         <button type="button" role="tab" data-admin-view="audit" aria-selected="false"><svg><use href="#i-shield"></use></svg>Auditoria</button>
@@ -31,6 +32,8 @@
         <section class="admin-page-panel" data-admin-panel="coupons" hidden><div class="admin-panel-toolbar"><button class="button button-primary" id="new-coupon" type="button">Novo cupom</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Código</th><th>Desconto</th><th>Usos</th><th>Expiração</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-coupons-list"><tr><td colspan="6">Carregando…</td></tr></tbody></table></div></div></section>
 
         <section class="admin-page-panel" data-admin-panel="promotions" hidden><div class="admin-panel-toolbar"><button class="button button-primary" id="new-promotion" type="button">Nova promoção</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Campanha</th><th>Público</th><th>Benefício</th><th>Resgates</th><th>Período</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-promotions-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
+
+        <section class="admin-page-panel" data-admin-panel="devices" hidden><div class="admin-panel-toolbar"><form class="admin-search" id="admin-device-search"><svg><use href="#i-shield"></use></svg><input name="query" type="search" placeholder="Pesquisar por computador ou e-mail" /><button type="submit">Pesquisar</button></form></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Computador</th><th>Contas vinculadas</th><th>Proteção</th><th>Primeiro acesso</th><th>Última atividade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-devices-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
 
         <section class="admin-page-panel" data-admin-panel="orders" hidden><div class="admin-panel-toolbar"><button class="button button-secondary" id="admin-export-orders" type="button">Exportar CSV</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Cliente</th><th>Produto</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Data</th></tr></thead><tbody id="admin-orders-list"><tr><td colspan="6">Carregando…</td></tr></tbody></table></div></div></section>
 

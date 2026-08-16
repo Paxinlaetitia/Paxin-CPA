@@ -26,6 +26,7 @@ const queries = {
   products: ['paxinbot_owner_list_products', () => ({})],
   coupons: ['paxinbot_owner_list_coupons', () => ({})],
   promotions: ['paxinbot_owner_list_promotions', () => ({})],
+  devices: ['paxinbot_owner_list_device_identities', q => ({ p_query: String(q.q || '') })],
   orders: ['paxinbot_owner_list_orders', () => ({})],
   audit: ['paxinbot_owner_list_audit', () => ({})],
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
@@ -88,6 +89,12 @@ module.exports = async (req, res) => {
   if (action === 'revokeAccess' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) {
     return json(res, 400, { ok: false, error: 'Identificador de cliente inválido.' });
   }
+  if (action === 'deviceBan') {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.deviceIdentityId || ''))) return json(res, 400, { ok:false, error:'Identificador de dispositivo inválido.' });
+    body.banned = body.banned === true;
+    body.reason = String(body.reason || '').trim();
+    if (body.banned && (body.reason.length < 3 || body.reason.length > 200)) return json(res, 400, { ok:false, error:'Informe um motivo de bloqueio entre 3 e 200 caracteres.' });
+  }
   if (['ticketReply','ticketStatus'].includes(action) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.ticketId || ''))) return json(res, 400, { ok:false, error:'Chamado inválido.' });
   if (action === 'ticketReply' && (String(body.message || '').trim().length < 2 || String(body.message || '').trim().length > 3000)) return json(res, 400, { ok:false, error:'A resposta deve ter entre 2 e 3000 caracteres.' });
   if (action === 'ticketStatus' && !['open','in_progress','resolved','closed'].includes(String(body.status || ''))) return json(res, 400, { ok:false, error:'Status de chamado inválido.' });
@@ -99,6 +106,7 @@ module.exports = async (req, res) => {
       ? ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: 'lifetime', p_expires_at: null, p_source: 'owner-panel' })]
       : ['paxinbot_owner_grant_usage', () => ({ p_email: body.email, p_total_seconds: body.durationSeconds, p_source: 'owner-panel' })],
     revokeAccess: ['paxinbot_owner_revoke_access', () => ({ p_user_id: body.userId })],
+    deviceBan: ['paxinbot_owner_set_device_ban', () => ({ p_device_identity_id:body.deviceIdentityId,p_banned:body.banned,p_reason:body.banned ? body.reason : null })],
     ticketReply: ['paxinbot_owner_reply_support_ticket', () => ({ p_ticket_id:body.ticketId, p_message:String(body.message || '').trim() })],
     ticketStatus: ['paxinbot_owner_update_support_status', () => ({ p_ticket_id:body.ticketId, p_status:body.status })]
   };

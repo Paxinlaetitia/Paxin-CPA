@@ -38,3 +38,15 @@ test('owner can create, edit and pause promotions independently from coupons', (
   assert.match(client, /data-toggle-promotion/);
   assert.match(api, /paxinbot_owner_save_promotion/);
 });
+
+test('owner can search, block and unblock protected device identities', () => {
+  const page=read('api/admin/_assets/page.txt');
+  const client=read('api/admin/_assets/client.txt');
+  const api=read('api/admin/index.js');
+  assert.match(page,/data-admin-view="devices"/);
+  assert.match(page,/id="admin-devices-list"/);
+  assert.match(client,/data-device-ban/);
+  assert.match(client,/action:'deviceBan'/);
+  assert.match(api,/paxinbot_owner_list_device_identities/);
+  assert.match(api,/paxinbot_owner_set_device_ban/);
+});
