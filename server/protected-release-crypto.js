@@ -134,7 +134,10 @@ const SAFE_DENIAL_REASONS = new Set([
 
 function safeDenialReason(payload) {
   const reason = String(payload && payload.message || '').trim();
-  return SAFE_DENIAL_REASONS.has(reason) ? reason : 'upstream_rejected';
+  if (SAFE_DENIAL_REASONS.has(reason)) return reason;
+  const code = String(payload && payload.code || '').trim().toUpperCase();
+  if (/^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(code)) return `database_${code}`;
+  return 'upstream_rejected';
 }
 
 module.exports = {

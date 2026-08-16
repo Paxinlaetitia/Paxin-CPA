@@ -71,6 +71,8 @@ test('alteracao do envelope invalida a assinatura', () => {
 
 test('registra somente motivos de recusa permitidos', () => {
   assert.equal(safeDenialReason({ message:'device_banned' }), 'device_banned');
+  assert.equal(safeDenialReason({ code:'PGRST202', message:'details' }), 'database_PGRST202');
+  assert.equal(safeDenialReason({ code:'42703', message:'details' }), 'database_42703');
   assert.equal(safeDenialReason({ message:'sensitive database detail' }), 'upstream_rejected');
   assert.equal(safeDenialReason(null), 'upstream_rejected');
 });
