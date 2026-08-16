@@ -37,6 +37,9 @@ jobs:
       - name: Run regression suite
         run: node --test tests/*.test.js
 
+      - name: Validate local release gates
+        run: node scripts/release-audit.js --mode local
+
       - name: Audit locked npm dependencies when present
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: |

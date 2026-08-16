@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "environment": "preview",
+  "commit": "0000000000000000000000000000000000000000",
+  "verifiedAt": "2000-01-01T00:00:00.000Z",
+  "approvedBy": "owner",
+  "checks": {
+    "supabase.migrations": { "passed": false, "evidence": "" },
+    "supabase.security_advisor": { "passed": false, "evidence": "" },
+    "supabase.auth_smtp_oauth": { "passed": false, "evidence": "" },
+    "vercel.preview_smoke": { "passed": false, "evidence": "" },
+    "vercel.environment_scope": { "passed": false, "evidence": "" },
+    "cloudflare.edge_controls": { "passed": false, "evidence": "" },
+    "cloudflare.origin_gate": { "passed": false, "evidence": "" },
+    "payments.sandbox_and_webhook": { "passed": false, "evidence": "" },
+    "email.transactional": { "passed": false, "evidence": "" },
+    "github.protected_branches": { "passed": false, "evidence": "" },
+    "desktop.release_integrity": { "passed": false, "evidence": "" },
+    "recovery.restore_drill": { "passed": false, "evidence": "" }
+  }
+}

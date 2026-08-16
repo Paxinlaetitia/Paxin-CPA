@@ -16,7 +16,7 @@ produção somente depois que todos os pacotes e o preview estiverem aprovados.
 | 6 | RLS, grants opt-in e RPCs mínimos no Supabase | nenhuma regra nova; revisar DNS e segredos de origem |
 | 7 | CI somente leitura, actions imutáveis e verificação de supply chain | nenhuma regra nova; proteger `staging` e `main` no GitHub |
 | 8 | porta de origem, rotação e recuperação | Worker em `/api/*`, Secret binding e runbook; ativar somente após o Pacote 9 |
-| 9 | pendente: auditoria integrada e lançamento | será documentado no Pacote 9 |
+| 9 | auditoria integrada e gate de liberação fail-closed | executar Etapa 11 e `release-checklist.md`; produção continua pendente |
 
 ## Etapa 0 — pré-requisitos
 
@@ -180,11 +180,15 @@ o Secret do Worker. Ao final, remova as variáveis anteriores.
 
 ## Etapa 11 — verificação final
 
+- executar `node scripts/release-audit.js --mode local` e confirmar que o código
+  passou enquanto os gates externos continuam pendentes;
 - executar login, cadastro, recuperação, checkout e autorização do aplicativo;
 - confirmar respostas `429` em rajadas e funcionamento normal abaixo do limite;
 - verificar `CF-Cache-Status` como não armazenado nas rotas privadas;
 - revisar Security Events por falsos positivos durante 48 horas;
-- registrar data, responsável e resultado de cada etapa neste documento.
+- registrar data, responsável e resultado de cada etapa neste documento;
+- preencher a evidência local conforme `release-checklist.md` e executar a
+  auditoria de liberação para o mesmo commit. Sem essa aprovação, não promover.
 
 ## Registro de ativação
 
@@ -201,7 +205,7 @@ o Secret do Worker. Ao final, remova as variáveis anteriores.
 | 8 | revisão | — | — |
 | 9 | GitHub | — | — |
 | 10 | Cloudflare + Vercel | — | — |
-| 11 | final | — | — |
+| 11 | gate final pendente | — | — |
 
 ## Referências oficiais
 

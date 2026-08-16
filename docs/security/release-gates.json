@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "package": 9,
+  "environment": "preview",
+  "externalGates": [
+    { "id": "supabase.migrations", "required": true, "label": "Migrações aplicadas no preview" },
+    { "id": "supabase.security_advisor", "required": true, "label": "Security Advisor revisado sem alerta crítico pendente" },
+    { "id": "supabase.auth_smtp_oauth", "required": true, "label": "Auth, SMTP e Google OAuth validados" },
+    { "id": "vercel.preview_smoke", "required": true, "label": "Fluxos críticos aprovados no preview da Vercel" },
+    { "id": "vercel.environment_scope", "required": true, "label": "Variáveis isoladas por ambiente e marcadas como sensíveis" },
+    { "id": "cloudflare.edge_controls", "required": true, "label": "DNS, SSL, WAF, cache e limites validados" },
+    { "id": "cloudflare.origin_gate", "required": true, "label": "Worker e barreira de origem validados sem acesso direto" },
+    { "id": "payments.sandbox_and_webhook", "required": true, "label": "Checkout e webhook validados em sandbox" },
+    { "id": "email.transactional", "required": true, "label": "Domínio e entregabilidade do e-mail transacional validados" },
+    { "id": "github.protected_branches", "required": true, "label": "Branches e status de segurança protegidos" },
+    { "id": "desktop.release_integrity", "required": true, "label": "Download, versão e integridade do aplicativo validados" },
+    { "id": "recovery.restore_drill", "required": true, "label": "Backup e restauração ensaiados no ambiente de teste" }
+  ]
+}
