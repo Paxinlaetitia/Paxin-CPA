@@ -14,6 +14,9 @@ produção somente depois que todos os pacotes e o preview estiverem aprovados.
 | 4 | CSP bloqueante, host oficial e cache privado | SSL estrito, cache bypass, WAF e HSTS gradual |
 | 5 | correlação, auditoria sanitizada e retenção limitada | alerta HTTP DDoS por e-mail e rotina de revisão |
 | 6 | RLS, grants opt-in e RPCs mínimos no Supabase | nenhuma regra nova; revisar DNS e segredos de origem |
+| 7 | CI somente leitura, actions imutáveis e verificação de supply chain | nenhuma regra nova; proteger `staging` e `main` no GitHub |
+| 8 | pendente: resposta, rotação e recuperação | será documentado no Pacote 8 |
+| 9 | pendente: auditoria integrada e lançamento | será documentado no Pacote 9 |
 
 ## Etapa 0 — pré-requisitos
 
@@ -141,7 +144,19 @@ pacote. Faça apenas esta revisão:
    revisar individualmente qualquer função `SECURITY DEFINER` exposta. Somente
    os RPCs enumerados no Pacote 6 são esperados.
 
-## Etapa 9 — verificação final
+## Etapa 9 — cadeia de build do Pacote 7
+
+Não há configuração equivalente no painel da Cloudflare. Depois do primeiro
+push de teste:
+
+1. confirmar no GitHub Actions que `Security CI` passou em `staging`;
+2. no ruleset de `staging`, exigir o status
+   `Validate source and security boundaries`;
+3. repetir a exigência em `main` somente após o preview ser aprovado;
+4. manter o projeto Vercel conectado apenas ao repositório oficial;
+5. não adicionar tokens da Cloudflare, Supabase ou Mercado Pago ao workflow.
+
+## Etapa 10 — verificação final
 
 - executar login, cadastro, recuperação, checkout e autorização do aplicativo;
 - confirmar respostas `429` em rajadas e funcionamento normal abaixo do limite;
@@ -162,6 +177,8 @@ pacote. Faça apenas esta revisão:
 | 6 | pendente | — | — |
 | 7 | pendente | — | — |
 | 8 | revisão | — | — |
+| 9 | GitHub | — | — |
+| 10 | final | — | — |
 
 ## Referências oficiais
 

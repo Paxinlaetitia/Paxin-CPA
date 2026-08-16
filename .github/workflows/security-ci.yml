@@ -1,0 +1,44 @@
+name: Security CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Validate source and security boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout immutable revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Validate tracked source
+        run: node scripts/security-ci.js
+
+      - name: Run regression suite
+        run: node --test tests/*.test.js
+
+      - name: Audit locked npm dependencies when present
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
