@@ -6,5 +6,6 @@
 
 # Saídas e metadados de ferramentas
 .vercel
+supabase/.temp/
 node_modules
 coverage

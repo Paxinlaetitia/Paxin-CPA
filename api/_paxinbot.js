@@ -3,15 +3,24 @@
 const crypto = require('node:crypto');
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
+function environmentValue(name) {
+  return String(process.env[name] || '').trim();
+}
+function hasMinimumBytes(value, minimum) {
+  return Buffer.byteLength(String(value || ''), 'utf8') >= minimum;
+}
+
 function config() {
-  const url = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
-  const key = String(process.env.SUPABASE_PUBLISHABLE_KEY || '');
+  const url = environmentValue('SUPABASE_URL').replace(/\/$/, '');
+  const key = environmentValue('SUPABASE_PUBLISHABLE_KEY');
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !key.startsWith('sb_publishable_')) throw new Error('Configuração Supabase ausente no ambiente da Vercel.');
   return { url, key };
 }
 function serviceConfig() {
   const { url } = config();
-  const key = String(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+  // Não aceite nomes legados nem use outra credencial como fallback. Uma
+  // função privilegiada deve falhar fechada quando a chave própria não existe.
+  const key = environmentValue('SUPABASE_SECRET_KEY');
   if (!key || (!key.startsWith('sb_secret_') && key.split('.').length !== 3)) throw new Error('Chave secreta do Supabase ausente no ambiente da Vercel.');
   return { url, key };
 }
@@ -24,7 +33,26 @@ function json(res, status, body, headers = {}) {
 }
 function cookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim().split(/=(.*)/s)).filter(([k]) => k).map(([k, v]) => [k, decodeURIComponent(v || '')])); }
 function secure(req) { return process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https'); }
-function sessionSecret() { return String(process.env.PAXINBOT_SESSION_SECRET || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''); }
+function sessionSecret() {
+  const secret = environmentValue('PAXINBOT_SESSION_SECRET');
+  if (!hasMinimumBytes(secret, 32)) throw new Error('Segredo de sessão interno ausente ou inválido.');
+  return secret;
+}
+function validateCoreEnvironment() {
+  config();
+  const serviceKey = serviceConfig().key;
+  const sessionKey = sessionSecret();
+  const configuredSecrets = [
+    ['SUPABASE_SECRET_KEY', serviceKey],
+    ['PAXINBOT_SESSION_SECRET', sessionKey],
+    ['MERCADOPAGO_ACCESS_TOKEN', environmentValue('MERCADOPAGO_ACCESS_TOKEN')],
+    ['MERCADOPAGO_WEBHOOK_SECRET', environmentValue('MERCADOPAGO_WEBHOOK_SECRET')],
+    ['RESEND_API_KEY', environmentValue('RESEND_API_KEY')]
+  ].filter(([, value]) => value);
+  const unique = new Set(configuredSecrets.map(([, value]) => value));
+  if (unique.size !== configuredSecrets.length) throw new Error('Credenciais internas precisam ser exclusivas por finalidade.');
+  return true;
+}
 function signSessionDeadline(deadline) {
   const secret = sessionSecret(); if (!secret) return '';
   const value = String(deadline); const signature = crypto.createHmac('sha256', secret).update(value).digest('base64url'); return `${value}.${signature}`;
@@ -250,4 +278,8 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
   if (!response.ok) throw new Error('email_provider_error');
   return { sent:true, configured:true };
 }
-module.exports = { config, serviceConfig, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+// Em produção, uma configuração central ausente não pode ser descoberta apenas
+// depois de uma operação comercial ou autorização de dispositivo.
+if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
+
+module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

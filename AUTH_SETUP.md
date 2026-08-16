@@ -4,15 +4,29 @@ O código já contém cadastro por e-mail/senha, login com Google, recuperação
 
 ## 1. Variáveis na Vercel
 
-Em **Settings → Environment Variables**, adicione para Production, Preview e Development:
+Em **Settings → Environment Variables**, mantenha os ambientes separados:
+
+- **Production** usa exclusivamente o projeto Supabase e os provedores reais;
+- **Preview** deve usar um projeto Supabase de homologação, Mercado Pago sandbox e remetente de teste;
+- **Development** usa valores locais de desenvolvimento.
+
+Não compartilhe credenciais secretas entre esses ambientes. Enquanto a
+homologação não existir, deixe os segredos ausentes em Preview: as funções
+privilegiadas falharão fechadas sem expor a produção.
+
+Variáveis necessárias no ambiente correspondente:
 
 - `SUPABASE_URL` — URL base do projeto Supabase, sem `/rest/v1`.
 - `SUPABASE_PUBLISHABLE_KEY` — chave `sb_publishable_...`.
 - `SUPABASE_SECRET_KEY` — chave secreta usada exclusivamente pelas funções do backend.
-- `PAXINBOT_SESSION_SECRET` — segredo aleatório com pelo menos 32 bytes para assinar a expiração das sessões.
+- `PAXINBOT_SESSION_SECRET` — segredo exclusivo, aleatório e com pelo menos 32 bytes para assinar a expiração das sessões. Nunca reutilize a chave do Supabase.
 - `PUBLIC_SITE_URL` — `https://www.paxincpa.store`.
 
 Segredos podem existir nas variáveis protegidas do backend da Vercel, mas nunca no HTML, JavaScript do navegador, repositório ou logs.
+
+O backend não aceita mais `SUPABASE_SERVICE_ROLE_KEY` como fallback e recusa a
+configuração de produção se `SUPABASE_SECRET_KEY` ou
+`PAXINBOT_SESSION_SECRET` estiverem ausentes, inválidos ou reutilizados.
 
 ## 2. URLs no Supabase
 

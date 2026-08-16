@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { json, readBody, serviceUpstream } = require('../_paxinbot');
+const { securityDiagnostic } = require('../../server/security-log');
 
 function safeEqual(left, right) {
   const a = Buffer.from(String(left), 'utf8'); const b = Buffer.from(String(right), 'utf8');
@@ -24,7 +25,7 @@ function mercadoPagoToken() {
   return token;
 }
 function webhookDiagnostic(event, details = {}) {
-  console.warn(JSON.stringify({ event, ...details }));
+  securityDiagnostic(event, details);
 }
 function isExpandedSimulation(body) {
   const data = body?.data;

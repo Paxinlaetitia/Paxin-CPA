@@ -40,6 +40,13 @@ de tentativas e reduz a sessão do aplicativo para sete dias. As variáveis
 Vercel. O arquivo `paxinbot-auth.json` distribuído com o aplicativo contém apenas
 a URL pública do site.
 
+Cada segredo possui uma finalidade única. O backend recusa a configuração de
+produção quando a chave de sessão estiver ausente, tiver menos de 32 bytes ou
+reutilizar outra credencial. Credenciais reais são exclusivas de Production;
+Preview deve usar sandbox/homologação ou permanecer sem funções privilegiadas.
+Consulte `docs/security/secrets-inventory.md` para a matriz de ambientes e
+rotação.
+
 ## Checkout e liberação automática
 
 O fluxo comercial usa PIX interno pela Orders API e Checkout Pro para cartão e outros meios. Antes de habilitar compras em produção:
