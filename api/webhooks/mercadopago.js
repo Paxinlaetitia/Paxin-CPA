@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, requireTrustedHost, readBodyResult, serviceUpstream, recordSiteSecurityEvent } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream, recordSiteSecurityEvent, mercadoPagoWebhookConfig } = require('../_paxinbot');
 const { securityDiagnostic } = require('../../server/security-log');
 
 function safeEqual(left, right) {
@@ -8,16 +8,15 @@ function safeEqual(left, right) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 function verifySignature(req, dataId) {
-  const secret = String(process.env.MERCADOPAGO_WEBHOOK_SECRET || '');
+  const secrets = mercadoPagoWebhookConfig().active;
   const signature = String(req.headers['x-signature'] || '');
   const requestId = String(req.headers['x-request-id'] || '');
   const parts = Object.fromEntries(signature.split(',').map(part => part.trim().split(/=(.*)/s)).filter(([key,value]) => key && value));
-  if (!secret || !requestId || !parts.ts || !parts.v1 || !dataId) return false;
+  if (!secrets.length || !requestId || !parts.ts || !parts.v1 || !dataId) return false;
   const timestamp = Number(parts.ts); const timestampMs = timestamp < 1e12 ? timestamp * 1000 : timestamp;
   if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) return false;
   const manifest = `id:${dataId};request-id:${requestId};ts:${parts.ts};`;
-  const expected = crypto.createHmac('sha256', secret).update(manifest).digest('hex');
-  return safeEqual(expected, parts.v1);
+  return secrets.some(value => safeEqual(crypto.createHmac('sha256', value).update(manifest).digest('hex'), parts.v1));
 }
 function mercadoPagoToken() {
   const token = String(process.env.MERCADOPAGO_ACCESS_TOKEN || '');

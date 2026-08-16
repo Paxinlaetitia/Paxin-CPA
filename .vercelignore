@@ -12,6 +12,10 @@ docs
 supabase
 coverage
 node_modules
+scripts
+cloudflare
+.github
+SECURITY.md
 AUTH_SETUP.md
 PAXIN_CORE_DESIGN.md
 README.md

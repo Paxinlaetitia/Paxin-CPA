@@ -15,7 +15,7 @@ process.env.PUBLIC_SITE_URL='https://www.paxincpa.store';
 const helpers=require('../api/_paxinbot');
 const root=path.join(__dirname,'..');
 
-function req(host) { return { headers:{ host },socket:{} }; }
+function req(host, originKey = '') { return { headers:{ host, ...(originKey ? { 'x-paxinbot-origin-key':originKey } : {}) },socket:{} }; }
 function res() { return { statusCode:0,headers:{},setHeader(name,value){this.headers[name.toLowerCase()]=value;},end(value){this.body=JSON.parse(value);} }; }
 
 test('production APIs accept only the official custom domain',()=>{
@@ -35,17 +35,43 @@ test('production APIs accept only the official custom domain',()=>{
   }
 });
 
+test('production origin gate rejects direct requests and supports a bounded rotation overlap',()=>{
+  const previous={ node:process.env.NODE_ENV,vercel:process.env.VERCEL_ENV,current:process.env.PAXINBOT_ORIGIN_GATE_SECRET,old:process.env.PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET,until:process.env.PAXINBOT_ORIGIN_GATE_PREVIOUS_UNTIL };
+  const current='current-origin-gate-secret-with-at-least-32-bytes';
+  const old='previous-origin-gate-secret-with-at-least-32-bytes';
+  try {
+    process.env.NODE_ENV='production'; process.env.VERCEL_ENV='production';
+    process.env.PAXINBOT_ORIGIN_GATE_SECRET=current;
+    process.env.PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET=old;
+    process.env.PAXINBOT_ORIGIN_GATE_PREVIOUS_UNTIL=new Date(Date.now()+60*60*1000).toISOString();
+    assert.equal(helpers.trustedEdgeRequest(req('www.paxincpa.store')),false);
+    assert.equal(helpers.trustedEdgeRequest(req('www.paxincpa.store',current)),true);
+    assert.equal(helpers.trustedEdgeRequest(req('www.paxincpa.store',old)),true);
+    const response=res(); assert.equal(helpers.requireTrustedHost(req('www.paxincpa.store'),response),false);
+    assert.equal(response.statusCode,404);
+    process.env.PAXINBOT_ORIGIN_GATE_PREVIOUS_UNTIL=new Date(Date.now()-1000).toISOString();
+    assert.equal(helpers.trustedEdgeRequest(req('www.paxincpa.store',old)),false);
+  } finally {
+    for(const [name,value] of [['NODE_ENV',previous.node],['VERCEL_ENV',previous.vercel],['PAXINBOT_ORIGIN_GATE_SECRET',previous.current],['PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET',previous.old],['PAXINBOT_ORIGIN_GATE_PREVIOUS_UNTIL',previous.until]]) {
+      if(value===undefined) delete process.env[name]; else process.env[name]=value;
+    }
+  }
+});
+
 test('preview accepts only its exact Vercel host in addition to the official domain',()=>{
-  const previous={ node:process.env.NODE_ENV,vercel:process.env.VERCEL_ENV,url:process.env.VERCEL_URL };
+  const previous={ node:process.env.NODE_ENV,vercel:process.env.VERCEL_ENV,url:process.env.VERCEL_URL,gate:process.env.PAXINBOT_ORIGIN_GATE_SECRET };
   try {
     process.env.NODE_ENV='production'; process.env.VERCEL_ENV='preview'; process.env.VERCEL_URL='paxinbot-git-staging-owner.vercel.app';
+    process.env.PAXINBOT_ORIGIN_GATE_SECRET='production-origin-gate-secret-with-at-least-32-bytes';
     assert.equal(helpers.trustedRequestHost(req('paxinbot-git-staging-owner.vercel.app')),true);
+    assert.equal(helpers.requireTrustedHost(req('paxinbot-git-staging-owner.vercel.app'),res()),true);
     assert.equal(helpers.trustedRequestHost(req('other-preview.vercel.app')),false);
     assert.equal(helpers.publicOrigin(req('paxinbot-git-staging-owner.vercel.app')),'https://paxinbot-git-staging-owner.vercel.app');
   } finally {
     process.env.NODE_ENV=previous.node;
     if(previous.vercel===undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV=previous.vercel;
     if(previous.url===undefined) delete process.env.VERCEL_URL; else process.env.VERCEL_URL=previous.url;
+    if(previous.gate===undefined) delete process.env.PAXINBOT_ORIGIN_GATE_SECRET; else process.env.PAXINBOT_ORIGIN_GATE_SECRET=previous.gate;
   }
 });
 
@@ -68,7 +94,7 @@ test('every deployed API handler rejects an untrusted origin host first',()=>{
 
 test('deployment excludes internal development material and contains no inline scripts',()=>{
   const ignore=fs.readFileSync(path.join(root,'.vercelignore'),'utf8');
-  for(const name of ['tests','docs','supabase','.env.example','AUTH_SETUP.md']) assert.match(ignore,new RegExp(`^${name.replace('.','\\.')}\\s*$`,'m'));
+  for(const name of ['tests','docs','supabase','scripts','cloudflare','.github','.env.example','SECURITY.md','AUTH_SETUP.md']) assert.match(ignore,new RegExp(`^${name.replace('.','\\.')}\\s*$`,'m'));
   const htmlFiles=fs.readdirSync(root).filter(name=>name.endsWith('.html'));
   for(const name of htmlFiles) {
     const html=fs.readFileSync(path.join(root,name),'utf8');

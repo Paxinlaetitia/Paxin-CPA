@@ -8,6 +8,7 @@ Este documento registra nomes e finalidades. Ele nunca deve conter valores.
 | `SUPABASE_PUBLISHABLE_KEY` | pública | autenticação pública Supabase | projeto real | projeto de homologação | conforme Supabase |
 | `SUPABASE_SECRET_KEY` | crítica | acesso privilegiado exclusivo da API | chave real | chave de homologação, nunca a real | após incidente ou mudança de acesso |
 | `PAXINBOT_SESSION_SECRET` | crítica | assinatura e pseudonimização de sessões | exclusivo de Production | exclusivo de Preview | planejada, com invalidação de sessões |
+| `PAXINBOT_ORIGIN_GATE_SECRET` | crítica | autenticação Cloudflare Worker → Vercel API | mesmo valor secreto do Worker | ausente | sobreposição limitada a 48 horas |
 | `MERCADOPAGO_ACCESS_TOKEN` | crítica | consulta e criação de pagamentos | produção | sandbox | após incidente ou revogação no provedor |
 | `MERCADOPAGO_WEBHOOK_SECRET` | crítica | autenticação dos webhooks | produção | sandbox | junto da configuração do webhook |
 | `RESEND_API_KEY` | crítica | envio transacional | chave restrita de produção | remetente/chave de teste | após incidente ou troca de escopo |
@@ -23,6 +24,8 @@ Este documento registra nomes e finalidades. Ele nunca deve conter valores.
 - Nenhum valor é enviado a tickets, commits, screenshots ou logs.
 - Uma credencial não pode ser reutilizada para outra finalidade.
 - Em incidente, primeiro revogue no provedor, depois substitua na Vercel e invalide as sessões relacionadas.
+- Variáveis `*_PREVIOUS` só podem existir durante a janela registrada em
+  `*_PREVIOUS_UNTIL`; o limite implementado é de 48 horas.
 
 ## Responsabilidade
 

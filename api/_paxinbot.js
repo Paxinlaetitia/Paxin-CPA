@@ -8,7 +8,7 @@ const CSRF_COOKIE = 'paxinbot_csrf';
 const CSRF_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const REQUEST_ID = Symbol('paxinbotRequestId');
 const SITE_SECURITY_EVENT_TYPES = new Set([
-  'edge.host_rejected', 'csrf.rejected', 'rate_limit.blocked',
+  'edge.host_rejected', 'edge.origin_rejected', 'csrf.rejected', 'rate_limit.blocked',
   'auth.login_rejected', 'auth.code_rejected', 'auth.session_rejected',
   'auth.password_changed', 'checkout.provider_failure',
   'webhook.signature_rejected', 'webhook.provider_failure',
@@ -66,17 +66,56 @@ function sessionSecret() {
   if (!hasMinimumBytes(secret, 32)) throw new Error('Segredo de sessão interno ausente ou inválido.');
   return secret;
 }
+function originGateConfig() {
+  const current = environmentValue('PAXINBOT_ORIGIN_GATE_SECRET');
+  const previous = environmentValue('PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET');
+  const previousUntilRaw = environmentValue('PAXINBOT_ORIGIN_GATE_PREVIOUS_UNTIL');
+  if (!current) {
+    if (previous || previousUntilRaw) throw new Error('Rotação da origem configurada sem o segredo atual.');
+    return { current:'', previous:'', previousUntil:0 };
+  }
+  if (!hasMinimumBytes(current, 32) || Buffer.byteLength(current, 'utf8') > 128) throw new Error('Segredo da origem ausente ou inválido.');
+  if (!previous && previousUntilRaw) throw new Error('Prazo de rotação da origem configurado sem segredo anterior.');
+  if (!previous) return { current, previous:'', previousUntil:0 };
+  if (!hasMinimumBytes(previous, 32) || Buffer.byteLength(previous, 'utf8') > 128 || previous === current) throw new Error('Segredo anterior da origem inválido.');
+  const previousUntil = Date.parse(previousUntilRaw);
+  if (!Number.isFinite(previousUntil)) throw new Error('Prazo de rotação da origem inválido.');
+  if (previousUntil > Date.now() + 48 * 60 * 60 * 1000) throw new Error('Sobreposição da origem não pode exceder 48 horas.');
+  return { current, previous, previousUntil };
+}
+function mercadoPagoWebhookConfig() {
+  const current = environmentValue('MERCADOPAGO_WEBHOOK_SECRET');
+  const previous = environmentValue('MERCADOPAGO_WEBHOOK_SECRET_PREVIOUS');
+  const previousUntilRaw = environmentValue('MERCADOPAGO_WEBHOOK_SECRET_PREVIOUS_UNTIL');
+  if (!current) {
+    if (previous || previousUntilRaw) throw new Error('Rotação do webhook configurada sem o segredo atual.');
+    return { current:'', previous:'', previousUntil:0, active:[] };
+  }
+  if (!hasMinimumBytes(current, 16) || Buffer.byteLength(current, 'utf8') > 256) throw new Error('Segredo do webhook do Mercado Pago inválido.');
+  if (!previous && previousUntilRaw) throw new Error('Prazo do webhook configurado sem segredo anterior.');
+  if (!previous) return { current, previous:'', previousUntil:0, active:[current] };
+  if (!hasMinimumBytes(previous, 16) || Buffer.byteLength(previous, 'utf8') > 256 || previous === current) throw new Error('Segredo anterior do webhook inválido.');
+  const previousUntil = Date.parse(previousUntilRaw);
+  if (!Number.isFinite(previousUntil)) throw new Error('Prazo de rotação do webhook inválido.');
+  if (previousUntil > Date.now() + 48 * 60 * 60 * 1000) throw new Error('Sobreposição do webhook não pode exceder 48 horas.');
+  return { current, previous, previousUntil, active:previousUntil > Date.now() ? [current, previous] : [current] };
+}
 function validateCoreEnvironment() {
   config();
   if (process.env.NODE_ENV === 'production') configuredSiteOrigin(true);
   const serviceKey = serviceConfig().key;
   const sessionKey = sessionSecret();
+  const originGate = originGateConfig();
+  const webhook = mercadoPagoWebhookConfig();
   const configuredSecrets = [
     ['SUPABASE_SECRET_KEY', serviceKey],
     ['PAXINBOT_SESSION_SECRET', sessionKey],
     ['MERCADOPAGO_ACCESS_TOKEN', environmentValue('MERCADOPAGO_ACCESS_TOKEN')],
-    ['MERCADOPAGO_WEBHOOK_SECRET', environmentValue('MERCADOPAGO_WEBHOOK_SECRET')],
-    ['RESEND_API_KEY', environmentValue('RESEND_API_KEY')]
+    ['MERCADOPAGO_WEBHOOK_SECRET', webhook.current],
+    ['MERCADOPAGO_WEBHOOK_SECRET_PREVIOUS', webhook.previous],
+    ['RESEND_API_KEY', environmentValue('RESEND_API_KEY')],
+    ['PAXINBOT_ORIGIN_GATE_SECRET', originGate.current],
+    ['PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET', originGate.previous]
   ].filter(([, value]) => value);
   const unique = new Set(configuredSecrets.map(([, value]) => value));
   if (unique.size !== configuredSecrets.length) throw new Error('Credenciais internas precisam ser exclusivas por finalidade.');
@@ -115,10 +154,25 @@ function trustedRequestHost(req) {
   }
   return allowed.has(received);
 }
+function safeSecretEqual(left, right) {
+  if (!left || !right) return false;
+  const a = crypto.createHash('sha256').update(String(left), 'utf8').digest();
+  const b = crypto.createHash('sha256').update(String(right), 'utf8').digest();
+  return crypto.timingSafeEqual(a, b);
+}
+function trustedEdgeRequest(req) {
+  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'preview') return true;
+  const gate = originGateConfig();
+  if (!gate.current) return true;
+  const supplied = String(req.headers['x-paxinbot-origin-key'] || '').trim().slice(0, 256);
+  if (safeSecretEqual(supplied, gate.current)) return true;
+  return gate.previousUntil > Date.now() && safeSecretEqual(supplied, gate.previous);
+}
 function requireTrustedHost(req, res) {
   const correlationId = requestId(req, res);
-  if (trustedRequestHost(req)) return true;
-  securityDiagnostic('edge.host_rejected', { requestId:correlationId, route:requestRoute(req), outcome:'blocked' });
+  const hostAccepted = trustedRequestHost(req);
+  if (hostAccepted && trustedEdgeRequest(req)) return true;
+  securityDiagnostic(hostAccepted ? 'edge.origin_rejected' : 'edge.host_rejected', { requestId:correlationId, route:requestRoute(req), outcome:'blocked' });
   json(res, 404, { ok:false, code:'not_found', error:'Recurso não encontrado.' });
   return false;
 }
@@ -502,4 +556,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, originGateConfig, mercadoPagoWebhookConfig, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, trustedEdgeRequest, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

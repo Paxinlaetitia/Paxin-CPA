@@ -56,13 +56,13 @@ for (const file of files) {
   }
 }
 
-const javascript = files.filter(file => file.endsWith('.js'));
+const javascript = files.filter(file => /\.(?:c|m)?js$/.test(file));
 for (const file of javascript) {
   const checked = spawnSync(process.execPath, ['--check', file], { cwd: root, encoding: 'utf8' });
   if (checked.status !== 0) fail(`JavaScript inválido em ${file}: ${String(checked.stderr || checked.stdout).trim()}`);
 }
 
-const apiHandlers = javascript.filter(file => file.startsWith('api/'));
+const apiHandlers = javascript.filter(file => file.startsWith('api/') && file.endsWith('.js'));
 if (apiHandlers.length > 12) fail(`Vercel Hobby aceita 12 funções; foram encontradas ${apiHandlers.length}`);
 
 try { JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8')); }

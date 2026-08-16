@@ -15,7 +15,7 @@ produção somente depois que todos os pacotes e o preview estiverem aprovados.
 | 5 | correlação, auditoria sanitizada e retenção limitada | alerta HTTP DDoS por e-mail e rotina de revisão |
 | 6 | RLS, grants opt-in e RPCs mínimos no Supabase | nenhuma regra nova; revisar DNS e segredos de origem |
 | 7 | CI somente leitura, actions imutáveis e verificação de supply chain | nenhuma regra nova; proteger `staging` e `main` no GitHub |
-| 8 | pendente: resposta, rotação e recuperação | será documentado no Pacote 8 |
+| 8 | porta de origem, rotação e recuperação | Worker em `/api/*`, Secret binding e runbook; ativar somente após o Pacote 9 |
 | 9 | pendente: auditoria integrada e lançamento | será documentado no Pacote 9 |
 
 ## Etapa 0 — pré-requisitos
@@ -156,7 +156,29 @@ push de teste:
 4. manter o projeto Vercel conectado apenas ao repositório oficial;
 5. não adicionar tokens da Cloudflare, Supabase ou Mercado Pago ao workflow.
 
-## Etapa 10 — verificação final
+## Etapa 10 — porta de origem do Pacote 8
+
+Não executar antes do Pacote 9. Quando o preview estiver aprovado:
+
+1. em **Workers & Pages**, criar o Worker `paxinbot-origin-gate` com o arquivo
+   `cloudflare/origin-gate-worker.mjs`;
+2. em **Settings > Variables and Secrets**, adicionar
+   `PAXINBOT_ORIGIN_GATE_SECRET` como **Secret**, nunca como texto aberto;
+3. em **Settings > Domains & Routes**, adicionar as Routes
+   `paxincpa.store/api/*` e `www.paxincpa.store/api/*`;
+4. confirmar antes que os dois registros DNS estão como **Proxied**;
+5. testar login, catálogo e um webhook ainda sem configurar o segredo na Vercel;
+6. somente então adicionar o mesmo segredo na Vercel como Sensitive, escopo
+   Production, e reimplantar;
+7. confirmar que o domínio oficial funciona e que a origem direta não alcança
+   as APIs;
+8. se houver falha, remover a variável da Vercel e fazer rollback do deployment.
+
+Na rotação, primeiro implante na Vercel o segredo novo como atual e o antigo em
+`PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET`, com prazo de até 48 horas. Depois troque
+o Secret do Worker. Ao final, remova as variáveis anteriores.
+
+## Etapa 11 — verificação final
 
 - executar login, cadastro, recuperação, checkout e autorização do aplicativo;
 - confirmar respostas `429` em rajadas e funcionamento normal abaixo do limite;
@@ -178,7 +200,8 @@ push de teste:
 | 7 | pendente | — | — |
 | 8 | revisão | — | — |
 | 9 | GitHub | — | — |
-| 10 | final | — | — |
+| 10 | Cloudflare + Vercel | — | — |
+| 11 | final | — | — |
 
 ## Referências oficiais
 
@@ -191,3 +214,5 @@ push de teste:
 - https://developers.cloudflare.com/ddos-protection/reference/alerts/
 - https://developers.cloudflare.com/waf/analytics/security-events/
 - https://developers.cloudflare.com/waf/analytics/security-analytics/
+- https://developers.cloudflare.com/workers/configuration/routing/routes/
+- https://developers.cloudflare.com/workers/configuration/secrets/
