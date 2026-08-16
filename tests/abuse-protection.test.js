@@ -28,13 +28,20 @@ test('distributed limiter hashes the subject and returns standard rate headers',
   assert.equal(response.headers.ratelimit,'limit=30, remaining=7, reset=90');
 });
 
-test('distributed limiter emits 429 and fails closed when storage is unavailable',async()=>{
+test('distributed limiter emits 429, falls back only for a missing v2 migration and otherwise fails closed',async()=>{
   global.fetch=async()=>reply(200,{ allowed:false,remaining:0,resetAfter:45 });
   const blocked=res();
   assert.equal(await requestRateLimit(req(),blocked,{ scope:'checkout_create_user',subject:'user-id',limit:10,windowSeconds:600 }),false);
   assert.equal(blocked.statusCode,429); assert.equal(blocked.body.code,'rate_limited'); assert.equal(blocked.headers['retry-after'],'45');
 
-  global.fetch=async()=>reply(503,{ code:'PGRST202' });
+  let calls=0;
+  global.fetch=async()=>++calls===1 ? reply(404,{ code:'PGRST202' }) : reply(200,true);
+  const compatible=res();
+  assert.equal(await requestRateLimit(req(),compatible,{ scope:'checkout_create_user',subject:'user-id',limit:10,windowSeconds:600 }),true);
+  assert.equal(calls,2);
+  assert.equal(compatible.headers['ratelimit-policy'],'10;w=600');
+
+  global.fetch=async()=>reply(503,{ code:'UPSTREAM_DOWN' });
   const unavailable=res();
   assert.equal(await requestRateLimit(req(),unavailable,{ scope:'checkout_create_user',subject:'user-id',limit:10,windowSeconds:600 }),false);
   assert.equal(unavailable.statusCode,503); assert.equal(unavailable.body.code,'rate_limit_unavailable');

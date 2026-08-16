@@ -374,16 +374,37 @@ async function requestRateLimit(req, res, options = {}) {
   const subject = String(options.subject || clientAddress(req));
   const limit = Math.max(1, Math.min(1000, Number(options.limit) || 1));
   const windowSeconds = Math.max(10, Math.min(86400, Number(options.windowSeconds) || 60));
+  const subjectHash = serverFingerprint(scope, subject);
   const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
     method:'POST',
     body:{
       p_scope:scope,
-      p_subject_hash:serverFingerprint(scope, subject),
+      p_subject_hash:subjectHash,
       p_limit:limit,
       p_window_seconds:windowSeconds,
       p_cost:1
     }
   });
+  if (!response.ok && String(payload?.code || '').toUpperCase() === 'PGRST202') {
+    const legacy = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit', {
+      method:'POST',
+      body:{ p_scope:scope, p_subject_hash:subjectHash, p_limit:limit, p_window_seconds:windowSeconds }
+    });
+    if (legacy.response.ok && typeof legacy.payload === 'boolean') {
+      res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
+      res.setHeader('RateLimit', `limit=${limit}, remaining=${legacy.payload ? Math.max(0, limit - 1) : 0}, reset=${windowSeconds}`);
+      if (legacy.payload) return true;
+      await recordSiteSecurityEvent(req, {
+        eventType:'rate_limit.blocked', severity:35, subject,
+        details:{ scope, outcome:'blocked', status:'429' }
+      });
+      json(res, 429, {
+        ok:false, code:'rate_limited', retryAfter:windowSeconds,
+        error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
+      }, { 'retry-after':String(windowSeconds) });
+      return false;
+    }
+  }
   const allowed = payload?.allowed === true;
   const remaining = Number(payload?.remaining);
   const resetAfter = Number(payload?.resetAfter);
