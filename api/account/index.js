@@ -12,7 +12,6 @@ const WINDOWS_RELEASE = Object.freeze({
 });
 
 async function signedWindowsRelease(req, res) {
-  if (!await requestRateLimit(req, res, { scope:'public_download_ip', limit:20, windowSeconds:3600 })) return;
   try {
     const expires=Math.floor(Date.now()/1000)+WINDOWS_RELEASE.expiresIn;
     const nonce=crypto.randomBytes(18).toString('base64url');
