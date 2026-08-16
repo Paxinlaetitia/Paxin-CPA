@@ -68,6 +68,8 @@ test('passkey enrollment uses the existing HttpOnly browser session and CSRF', a
   assert.match(source, /passkey-delete/);
   assert.doesNotMatch(source, /passkey-password-confirm|passkey-dialog|paxinbot_passkey_session|intent=passkey/);
   assert.doesNotMatch(read('auth-client.js'), /setSession\(\{ access_token:passkey/);
+  assert.match(read('api/auth/[action].js'), /auth\.passkey_failure/);
+  assert.match(read('cliente.html'), /auth-client\.js\?v=20260816-3/);
 
   const csrf = 'a'.repeat(43); const originalFetch = global.fetch; const calls = [];
   global.fetch = async (url, options = {}) => {
@@ -84,4 +86,3 @@ test('passkey enrollment uses the existing HttpOnly browser session and CSRF', a
     assert.ok(calls.some(url => url.endsWith('/auth/v1/passkeys/registration/options')));
   } finally { global.fetch = originalFetch; }
 });
-

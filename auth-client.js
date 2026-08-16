@@ -544,7 +544,14 @@ async function initClientPage() {
   document.getElementById('client-email-code-cancel')?.addEventListener('click', cancelEmailCode);
   document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method:'POST', body:{ username:data.get('username'), email:data.get('email'), password:data.get('password') } }); setClientStatus(result.message, true); signup.reset(); if (result.verificationRequired) return setEmailCodeStep(result, 'signup'); await completeClientLogin(result, 'Conta criada.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
   document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
-  document.querySelectorAll('.google-button').forEach(link=>link.addEventListener('click',()=>{ const view=viewFromPath(); if (view==='checkout' && selectedCheckoutProductId()) sessionStorage.setItem('paxinbot_auth_return',`${location.pathname}?product=${encodeURIComponent(selectedCheckoutProductId())}`); else if (view==='downloads') sessionStorage.setItem('paxinbot_auth_return',accountRoutes.downloads); }));
+  document.querySelectorAll('.google-button').forEach(link=>link.addEventListener('click',event=>{
+    if (link.dataset.opening === 'true') { event.preventDefault(); return; }
+    const view=viewFromPath();
+    if (view==='checkout' && selectedCheckoutProductId()) sessionStorage.setItem('paxinbot_auth_return',`${location.pathname}?product=${encodeURIComponent(selectedCheckoutProductId())}`);
+    else if (view==='downloads') sessionStorage.setItem('paxinbot_auth_return',accountRoutes.downloads);
+    link.dataset.opening='true'; link.setAttribute('aria-disabled','true');
+    const text=link.childNodes[link.childNodes.length - 1]; if (text?.nodeType === Node.TEXT_NODE) text.textContent=' Abrindo Google…';
+  }));
   document.getElementById('passkey-login')?.addEventListener('click', () => loginWithPasskey().catch(error => window.showToast?.(error.message)));
   document.getElementById('passkey-register')?.addEventListener('click', () => registerPasskey().catch(error => window.showToast?.(error.message)));
   document.querySelectorAll('[data-account-view]').forEach(button => button.addEventListener('click', () => { setAccountView(button.dataset.accountView); if (button.dataset.accountView === 'account') setAccountSection('profile', false, false); }));

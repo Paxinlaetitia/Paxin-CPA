@@ -7,6 +7,11 @@ const MAX_REQUEST_BODY_BYTES = 32 * 1024;
 const CSRF_COOKIE = 'paxinbot_csrf';
 const CSRF_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const REQUEST_ID = Symbol('paxinbotRequestId');
+// Vercel reaproveita instancias quentes. Quando a migracao v2 ainda nao esta
+// instalada, lembrar disso evita uma chamada 404 antes de cada autenticacao.
+// Uma nova instancia volta a testar a v2, permitindo a adocao automatica assim
+// que a migracao for aplicada.
+let rateLimitV2State = 'unknown';
 const SITE_SECURITY_EVENT_TYPES = new Set([
   'edge.host_rejected', 'edge.origin_rejected', 'csrf.rejected', 'rate_limit.blocked',
   'auth.login_rejected', 'auth.code_rejected', 'auth.session_rejected',
@@ -375,17 +380,23 @@ async function requestRateLimit(req, res, options = {}) {
   const limit = Math.max(1, Math.min(1000, Number(options.limit) || 1));
   const windowSeconds = Math.max(10, Math.min(86400, Number(options.windowSeconds) || 60));
   const subjectHash = serverFingerprint(scope, subject);
-  const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
-    method:'POST',
-    body:{
-      p_scope:scope,
-      p_subject_hash:subjectHash,
-      p_limit:limit,
-      p_window_seconds:windowSeconds,
-      p_cost:1
-    }
-  });
-  if (!response.ok && String(payload?.code || '').toUpperCase() === 'PGRST202') {
+  let response = { ok:false, status:404 };
+  let payload = { code:'PGRST202' };
+  if (rateLimitV2State !== 'missing') {
+    ({ response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
+      method:'POST',
+      body:{
+        p_scope:scope,
+        p_subject_hash:subjectHash,
+        p_limit:limit,
+        p_window_seconds:windowSeconds,
+        p_cost:1
+      }
+    }));
+    if (response.ok) rateLimitV2State = 'available';
+    else if (String(payload?.code || '').toUpperCase() === 'PGRST202') rateLimitV2State = 'missing';
+  }
+  if (rateLimitV2State === 'missing') {
     const legacy = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit', {
       method:'POST',
       body:{ p_scope:scope, p_subject_hash:subjectHash, p_limit:limit, p_window_seconds:windowSeconds }
@@ -404,6 +415,10 @@ async function requestRateLimit(req, res, options = {}) {
       }, { 'retry-after':String(windowSeconds) });
       return false;
     }
+    // Preserve the actual fallback failure in diagnostics instead of reporting
+    // the already-known v2 schema-cache miss again.
+    response = legacy.response;
+    payload = legacy.payload;
   }
   const allowed = payload?.allowed === true;
   const remaining = Number(payload?.remaining);

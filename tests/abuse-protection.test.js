@@ -59,6 +59,19 @@ test('migration keeps counters private, atomic and bounded',()=>{
   assert.doesNotMatch(sql,/grant .*api_rate_limits.*authenticated/i);
 });
 
+test('missing v2 limiter is remembered by warm instances to avoid repeated 404 latency',async()=>{
+  let v2Calls=0; let legacyCalls=0;
+  global.fetch=async url=>{
+    if (String(url).endsWith('paxinbot_service_rate_limit_v2')) { v2Calls++; return reply(404,{ code:'PGRST202' }); }
+    if (String(url).endsWith('paxinbot_service_rate_limit')) { legacyCalls++; return reply(200,true); }
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+  assert.equal(await requestRateLimit(req(),res(),{ scope:'auth_google_ip',subject:'203.0.113.42',limit:30,windowSeconds:600 }),true);
+  assert.equal(await requestRateLimit(req(),res(),{ scope:'auth_google_ip',subject:'203.0.113.42',limit:30,windowSeconds:600 }),true);
+  assert.ok(v2Calls <= 1);
+  assert.equal(legacyCalls,2);
+});
+
 test('sensitive web flows use separate scopes and Cloudflare stays staged',()=>{
   const root=path.join(__dirname,'..');
   const source=['api/auth/[action].js','api/account/index.js','api/checkout/index.js','api/admin/index.js'].map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');

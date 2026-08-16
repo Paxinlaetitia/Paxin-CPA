@@ -33,7 +33,18 @@ function friendlyPasskeyError(payload, fallback = 'Não foi possível concluir a
   if (code === 'webauthn_credential_exists' || /credential.*exists|already.*registered/i.test(message)) return 'Esta passkey já está cadastrada para a conta.';
   if (code === 'webauthn_challenge_expired') return 'A confirmação da passkey expirou. Tente novamente.';
   if (code === 'webauthn_verification_failed') return 'A passkey não pôde ser validada por este dispositivo.';
+  if (/origin|relying.?party|rp.?id/i.test(`${code} ${message}`)) return 'O domínio da passkey não corresponde ao site aberto. Use https://www.paxincpa.store e tente novamente.';
   return fallback;
+}
+function passkeyDiagnostic(req, action, response, payload) {
+  const code = String(payload?.code || '').toUpperCase();
+  console.warn(JSON.stringify({
+    event:'auth.passkey_failure',
+    route:`/api/auth/${action}`,
+    status:Number(response?.status) || 0,
+    diagnosticCode:/^[A-Z0-9_]{3,48}$/.test(code) ? code : 'UPSTREAM_REJECTED',
+    requestId:String(req.headers['x-vercel-id'] || '').split(':')[0].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64)
+  }));
 }
 function normalizedPasskeys(payload) {
   const values = Array.isArray(payload) ? payload : Array.isArray(payload?.passkeys) ? payload.passkeys : [];
@@ -155,7 +166,7 @@ module.exports = async (req, res) => {
     const session = await browserSession(req, res);
     if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para gerenciar passkeys.' });
     const { response, payload } = await upstream('/auth/v1/passkeys', { headers:{ authorization:`Bearer ${session.access}` } });
-    if (!response.ok) return json(res, response.status === 401 ? 401 : 503, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível consultar as passkeys agora.') });
+    if (!response.ok) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 503, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível consultar as passkeys agora.') }); }
     return json(res, 200, { ok:true, data:normalizedPasskeys(payload) });
   }
 
@@ -167,7 +178,7 @@ module.exports = async (req, res) => {
     const { response, payload } = await upstream('/auth/v1/passkeys/registration/options', {
       method:'POST', headers:{ authorization:`Bearer ${session.access}` }, body:{}
     });
-    if (!response.ok || !payload?.challenge_id || !payload?.options) return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) });
+    if (!response.ok || !payload?.challenge_id || !payload?.options) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }
     return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
   }
 
@@ -183,7 +194,7 @@ module.exports = async (req, res) => {
       method:'POST', headers:{ authorization:`Bearer ${session.access}` },
       body:{ challenge_id:challengeId, credential }
     });
-    if (!response.ok) return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) });
+    if (!response.ok) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }
     return json(res, 200, { ok:true, data:normalizedPasskeys([payload])[0] || null });
   }
 
