@@ -111,7 +111,11 @@ module.exports = async (req, res) => {
   const paymentMethod = String(body.paymentMethod || 'pix');
   const payerName = String(body.payerName || '').trim().replace(/\s+/g, ' ');
   const clientRequestId = String(body.clientRequestId || '');
-  if (!UUID.test(productId) || !UUID.test(clientRequestId) || !['pix','checkout_pro'].includes(paymentMethod) || !PAYER_NAME.test(payerName) || (couponCode && !COUPON.test(couponCode))) return json(res, 400, { ok:false, error:'Confira os dados da compra e tente novamente.' });
+  if (!UUID.test(productId)) return json(res, 400, { ok:false, error:'A modalidade selecionada não é válida.' });
+  if (!UUID.test(clientRequestId)) return json(res, 400, { ok:false, error:'Não foi possível identificar esta tentativa. Atualize a página e tente novamente.' });
+  if (!['pix','checkout_pro'].includes(paymentMethod)) return json(res, 400, { ok:false, error:'Selecione uma forma de pagamento válida.' });
+  if (!PAYER_NAME.test(payerName)) return json(res, 400, { ok:false, error:'Informe seu nome completo usando apenas letras.' });
+  if (couponCode && !COUPON.test(couponCode)) return json(res, 400, { ok:false, error:'O formato do cupom não é válido.' });
 
   const prepared = await rpc(session.access, 'paxinbot_prepare_checkout_v2', {
     p_product_id:productId, p_coupon_code:couponCode || null, p_client_request_id:clientRequestId,

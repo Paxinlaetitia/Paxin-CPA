@@ -75,8 +75,12 @@ test('Mercado Pago webhook supports signed Order events without dropping Checkou
 
 test('client locks the payment action and reuses one request id per attempt', () => {
   const client = read('auth-client.js');
+  const checkout = read('api/checkout/index.js');
   assert.match(client, /button\.disabled = true; button\.textContent = 'Preparando pagamento/);
   assert.match(client, /checkoutClientRequestId \|\|= newCheckoutRequestId\(\)/);
+  assert.match(client, /CLIENT_PAYER_NAME\.test\(displayName\)/);
+  assert.match(client, /Informe seu nome completo usando apenas letras\./);
+  assert.match(checkout, /if \(!PAYER_NAME\.test\(payerName\)\) return json\(res, 400/);
   assert.match(client, /showPixResult\(result\.orderId,result\.pix\)/);
   assert.match(client, /window\.open\(result\.checkoutUrl,'_blank','noopener,noreferrer'\)/);
 });

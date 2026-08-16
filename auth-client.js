@@ -11,6 +11,7 @@ const PaxinbotAuth = (() => {
   return { baseUrl, request };
 })();
 const CLIENT_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLIENT_PAYER_NAME=/^[\p{L}\p{M}][\p{L}\p{M}' .-]{1,99}$/u;
 const CLIENT_CHECKOUT_INTENT_KEY='paxinbot_checkout_intent';
 const CHECKOUT_INTENT_MAX_AGE=2*60*60*1000;
 
@@ -305,8 +306,9 @@ function prepareCheckoutPage(productId) {
   const error = document.getElementById('checkout-error');
   if (!checkoutProduct) { if (error) { error.hidden=false; error.textContent='A modalidade selecionada não está mais disponível.'; } return; }
   error.hidden=true; checkoutClientRequestId=null;
-  const displayName = currentAccount?.profile?.displayName || '';
-  const payerName = document.getElementById('checkout-payer-name'); if (payerName && !payerName.value) payerName.value=displayName;
+  const displayName = String(currentAccount?.profile?.displayName || '').trim().replace(/\s+/g, ' ');
+  const payerName = document.getElementById('checkout-payer-name');
+  if (payerName && !payerName.value && CLIENT_PAYER_NAME.test(displayName)) payerName.value=displayName;
   document.getElementById('checkout-payer-email').value=currentAccount?.user?.email || '';
   renderCheckoutQuote({ ...checkoutProduct, productName:checkoutProduct.name, productDescription:checkoutProduct.description, subtotalCents:checkoutProduct.priceCents, discountCents:0, amountCents:checkoutProduct.priceCents });
 }
@@ -457,11 +459,13 @@ async function initClientPage() {
   document.getElementById('checkout-apply-coupon')?.addEventListener('click',async event=>{ const status=document.getElementById('checkout-coupon-status'); event.currentTarget.disabled=true; status.classList.remove('is-error'); status.textContent='Validando…'; try { const quote=await quoteCheckout(); status.textContent=Number(quote.discountCents)>0 ? 'Cupom aplicado ao resumo.' : 'Preço confirmado.'; } catch(error) { status.textContent=error.message; status.classList.add('is-error'); } finally { event.currentTarget.disabled=false; } });
   document.getElementById('checkout-form')?.addEventListener('submit', async event => {
     event.preventDefault(); if (!checkoutProduct) return;
-    const button = document.getElementById('checkout-submit'); const errorBox=document.getElementById('checkout-error'); const data=new FormData(event.currentTarget); const paymentMethod=String(data.get('paymentMethod') || 'pix'); button.disabled = true; button.textContent = 'Preparando pagamento…'; errorBox.hidden=true;
+    const button = document.getElementById('checkout-submit'); const errorBox=document.getElementById('checkout-error'); const data=new FormData(event.currentTarget); const paymentMethod=String(data.get('paymentMethod') || 'pix'); const payerName=String(data.get('payerName') || '').trim().replace(/\s+/g, ' ');
+    if (!CLIENT_PAYER_NAME.test(payerName)) { errorBox.hidden=false; errorBox.textContent='Informe seu nome completo usando apenas letras.'; document.getElementById('checkout-payer-name')?.focus(); return; }
+    button.disabled = true; button.textContent = 'Preparando pagamento…'; errorBox.hidden=true;
     try {
       const couponCode = document.getElementById('checkout-coupon').value.trim().toUpperCase();
       checkoutClientRequestId ||= newCheckoutRequestId();
-      const result = await PaxinbotAuth.request('/api/checkout', { method:'POST', body:{ productId:checkoutProduct.id, couponCode, payerName:String(data.get('payerName') || ''), paymentMethod, clientRequestId:checkoutClientRequestId } });
+      const result = await PaxinbotAuth.request('/api/checkout', { method:'POST', body:{ productId:checkoutProduct.id, couponCode, payerName, paymentMethod, clientRequestId:checkoutClientRequestId } });
       if (paymentMethod==='pix') { showPixResult(result.orderId,result.pix); return; }
       const popup=window.open(result.checkoutUrl,'_blank','noopener,noreferrer'); if (!popup) location.assign(result.checkoutUrl); else { button.disabled=false; updateCheckoutPaymentButton(); window.showToast?.('O pagamento foi aberto em uma nova aba.'); }
     } catch (error) {
