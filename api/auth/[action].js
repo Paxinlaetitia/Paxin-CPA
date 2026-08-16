@@ -1,6 +1,6 @@
 'use strict';
 
-const { config, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, publicOrigin, sameOriginRequest } = require('../_paxinbot');
+const { config, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, publicOrigin, issueCsrfToken, sameOriginRequest } = require('../_paxinbot');
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
@@ -39,12 +39,16 @@ async function persistSignupUsername(accessToken, username) {
 
 module.exports = async (req, res) => {
   const action = actionOf(req);
+  if (action === 'csrf') {
+    if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    return json(res, 200, { ok: true, token: issueCsrfToken(req, res) });
+  }
   const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code'];
   if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
 
   if (action === 'login') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
     const purpose = String(body.purpose || '') === 'passkey' ? 'passkey' : 'login';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 1 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe seu e-mail e sua senha.' });
     const authenticated = await upstream('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
@@ -58,7 +62,7 @@ module.exports = async (req, res) => {
 
   if (action === 'verify-email-code') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const jar = cookies(req); const code = String(body.code || '').replace(/\s/g, '');
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const jar = cookies(req); const code = String(body.code || '').replace(/\s/g, '');
     const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || ''); const temporaryAccess = String(jar.paxinbot_verify_access || '');
     if (!/^[0-9]{6}$/.test(code)) return json(res, 400, { ok: false, error: 'Informe o código de seis dígitos enviado ao seu e-mail.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup', 'passkey'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
@@ -123,12 +127,12 @@ module.exports = async (req, res) => {
   }
   if (action === 'recover') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const { email } = await readBody(req); await upstream('/auth/v1/recover', { method: 'POST', body: { email: String(email || '').trim(), redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=recovery` } });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const { email } = parsed.body; await upstream('/auth/v1/recover', { method: 'POST', body: { email: String(email || '').trim(), redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=recovery` } });
     return json(res, 200, { ok: true, message: 'Se existir uma conta para este e-mail, enviaremos as instruções.' });
   }
   if (action === 'signup') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
     if (!USERNAME_PATTERN.test(username)) return json(res, 400, { ok: false, error: 'Use um nome de usuário de 3 a 24 caracteres, com letras, números, ponto, hífen ou sublinhado.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 10 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 10 caracteres.' });
     const { response, payload } = await upstream('/auth/v1/signup', { method: 'POST', body: { email, password, data: { display_name: username }, email_redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=signup` } });
@@ -143,7 +147,7 @@ module.exports = async (req, res) => {
   }
   if (action === 'session') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const accessToken = String(body.accessToken || ''); const receivedRefreshToken = String(body.refreshToken || '');
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const accessToken = String(body.accessToken || ''); const receivedRefreshToken = String(body.refreshToken || '');
     if (accessToken.length < 80) return json(res, 400, { ok: false, error: 'Sessão de autenticação inválida.' });
     const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${accessToken}` } });
     if (!response.ok || !payload?.id) return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
@@ -154,7 +158,7 @@ module.exports = async (req, res) => {
   if (action === 'password') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Sua sessão expirou. Entre novamente para alterar a senha.' });
-    const body = await readBody(req); const value = String(body.password || ''); const currentPassword = String(body.currentPassword || '');
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const value = String(body.password || ''); const currentPassword = String(body.currentPassword || '');
     if (value.length < 10 || value.length > 128 || currentPassword.length < 1 || currentPassword.length > 128) return json(res, 400, { ok: false, error: 'Confirme a senha atual e use uma nova senha entre 10 e 128 caracteres.' });
     const reauthenticated = await upstream('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: session.user.email, password: currentPassword } });
     if (!reauthenticated.response.ok || reauthenticated.payload?.user?.id !== session.user.id) return json(res, 401, { ok: false, error: 'A senha atual está incorreta.' });

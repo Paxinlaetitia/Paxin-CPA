@@ -1,6 +1,6 @@
 'use strict';
 
-const { json, readBody, serviceUpstream, serviceRateLimit, sha256 } = require('../../_paxinbot');
+const { json, readBodyResult, serviceUpstream, serviceRateLimit, sha256 } = require('../../_paxinbot');
 const {
   parseReleaseRequest, readReleaseEnvironment, assertOfficialRelease, createAuthorization,
   safeDenialReason
@@ -14,7 +14,8 @@ module.exports = async (req, res) => {
 
   let request; let release;
   try {
-    request = parseReleaseRequest(await readBody(req));
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    request = parseReleaseRequest(parsed.body);
     release = readReleaseEnvironment();
     assertOfficialRelease(request, release);
   } catch (error) {

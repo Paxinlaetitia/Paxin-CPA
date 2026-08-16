@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBody, browserSession, upstream, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COUPON = /^[A-Z0-9_-]{3,32}$/;
@@ -78,7 +78,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok:false, error:'Origem da solicitação não autorizada.' });
 
-  const body = await readBody(req);
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const action = String(body.action || 'create');
   if (action === 'quote') {
     const productId = String(body.productId || '');

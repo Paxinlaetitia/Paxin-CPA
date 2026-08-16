@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { json, readBody, browserSession, upstream, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
 function hiddenAdminResponse(res) {
   res.statusCode = 404;
   res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
-  const body = await readBody(req); const action = String(body.action || '');
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
   if (action === 'product') {
     const code = String(body.code || '').trim().toLowerCase(); const name = String(body.name || '').trim(); const kind = String(body.accessKind || '');
     const duration = kind === 'lifetime' ? null : Number(body.durationMinutes); const price = Number(body.priceCents);

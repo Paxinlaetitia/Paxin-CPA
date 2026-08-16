@@ -13,7 +13,8 @@ process.env.PUBLIC_SITE_URL = 'https://www.paxincpa.store';
 const handler = require('../api/auth/[action]');
 
 function request(body) {
-  return { method:'POST', query:{ action:'signup' }, url:'/api/auth/signup', body, headers:{ origin:'https://www.paxincpa.store', host:'www.paxincpa.store', 'x-forwarded-proto':'https' } };
+  const csrf='a'.repeat(43);
+  return { method:'POST', query:{ action:'signup' }, url:'/api/auth/signup', body, headers:{ origin:'https://www.paxincpa.store', host:'www.paxincpa.store', 'x-forwarded-proto':'https', 'content-type':'application/json', cookie:`paxinbot_csrf=${csrf}`, 'x-paxinbot-csrf':csrf } };
 }
 function response() {
   const headers = {};

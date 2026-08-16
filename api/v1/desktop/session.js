@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBody, serviceUpstream, serviceRateLimit, sha256, isUuid } = require('../../_paxinbot');
+const { json, readBodyResult, serviceUpstream, serviceRateLimit, sha256, isUuid } = require('../../_paxinbot');
 
 const SECURITY_EVENT_TYPES = new Set([
   'integrity_failure','release_rollback_blocked','debug_flag_detected',
@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
   if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const match = String(req.headers.authorization || '').match(/^Bearer\s+([a-f0-9]{64})$/i); if (!match) return json(res, 401, { ok: false, error: 'Sessão do aplicativo ausente.' });
   if (req.method === 'POST' && String(req.query?.action || '') === 'security-event') {
-    const body = await readBody(req);
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
     if (!validSecurityEvent(body)) return json(res, 400, { ok:false, error:'Evento de segurança inválido.' });
     if (!await serviceRateLimit('security_event_token', match[1], 60, 3600)) return json(res, 429, { ok:false, error:'Limite de eventos de segurança atingido.' }, { 'retry-after':'60' });
     const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_record_security_event', { method:'POST', body:{

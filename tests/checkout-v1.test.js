@@ -11,12 +11,12 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 test('public catalog preserves the selected existing product through authentication', () => {
   const publicClient = read('script.js');
   const accountClient = read('auth-client.js');
-  const callback = read('auth-callback.html');
+  const callback = read('auth-callback.js');
   assert.match(publicClient, /\/conta\/checkout\?product=\$\{encodeURIComponent\(product\.id\)\}/);
   assert.match(accountClient, /sessionStorage\.setItem\('paxinbot_auth_return'/);
-  assert.match(callback, /parsed\.origin===location\.origin/);
-  assert.match(callback, /parsed\.pathname==='\/conta\/checkout'/);
-  assert.match(callback, /parsed\.searchParams\.size===1/);
+  assert.match(callback, /parsed\.origin === location\.origin/);
+  assert.match(callback, /parsed\.pathname === '\/conta\/checkout'/);
+  assert.match(callback, /parsed\.searchParams\.size === 1/);
   assert.match(accountClient, /root\.hidden=true/);
   assert.match(accountClient, /selectedCheckoutIntentMatches\(productId\)/);
   assert.match(publicClient, /data-select-product/);

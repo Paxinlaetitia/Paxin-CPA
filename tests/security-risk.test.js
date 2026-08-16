@@ -13,7 +13,7 @@ process.env.PAXINBOT_SESSION_SECRET='test-only-session-secret-that-is-not-deploy
 
 function response() { return { statusCode:0,headers:{},setHeader(name,value){this.headers[name.toLowerCase()]=value;},end(value){this.body=JSON.parse(value);} }; }
 function reply(status,payload) { return Promise.resolve({ ok:status>=200&&status<300,status,json:async()=>payload }); }
-function request(body) { return { method:'POST',query:{ action:'security-event' },body,headers:{ authorization:`Bearer ${'a'.repeat(64)}` },socket:{} }; }
+function request(body) { return { method:'POST',query:{ action:'security-event' },body,headers:{ authorization:`Bearer ${'a'.repeat(64)}`,'content-type':'application/json' },socket:{} }; }
 function event(overrides={}) { return { eventId:'5c24bfb9-f29d-4eb0-a3bf-59bd2fdcefd6',type:'runtime_contract_failure',occurredAt:new Date().toISOString(),appVersion:'1.0.0',releaseSequence:8,details:{ reasonCode:'ipc_contract',component:'ipc-guard',operation:'invoke',outcome:'blocked' },...overrides }; }
 
 test('desktop security endpoint accepts only the minimal allowlisted contract',async()=>{

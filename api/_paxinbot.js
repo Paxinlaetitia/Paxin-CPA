@@ -2,6 +2,9 @@
 
 const crypto = require('node:crypto');
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+const MAX_REQUEST_BODY_BYTES = 32 * 1024;
+const CSRF_COOKIE = 'paxinbot_csrf';
+const CSRF_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 function environmentValue(name) {
   return String(process.env[name] || '').trim();
@@ -31,7 +34,11 @@ function json(res, status, body, headers = {}) {
   for (const [name, value] of Object.entries({ 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8', ...headers })) res.setHeader(name, value);
   res.end(JSON.stringify(body));
 }
-function cookies(req) { return Object.fromEntries(String(req.headers.cookie || '').split(';').map(v => v.trim().split(/=(.*)/s)).filter(([k]) => k).map(([k, v]) => [k, decodeURIComponent(v || '')])); }
+function cookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || '').split(';').map(value => value.trim().split(/=(.*)/s)).filter(([key]) => key).map(([key, value]) => {
+    try { return [key, decodeURIComponent(value || '')]; } catch { return [key, '']; }
+  }));
+}
 function secure(req) { return process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https'); }
 function sessionSecret() {
   const secret = environmentValue('PAXINBOT_SESSION_SECRET');
@@ -90,21 +97,68 @@ async function serviceUpstream(path, options = {}) {
   let payload = null; try { payload = await response.json(); } catch {}
   return { response, payload };
 }
-async function readBody(req) {
-  // O runtime pode fornecer objeto, string, Buffer ou ReadableStream. Só trate
-  // como objeto já analisado quando for um registro simples; streams não têm
-  // as propriedades de autenticação e precisam ser consumidos primeiro.
+class RequestBodyError extends Error {
+  constructor(status, code, message) { super(message); this.status = status; this.code = code; }
+}
+function requestMediaType(req) {
+  return String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+}
+function parseRequestBodyText(text, mediaType) {
+  if (!text) return {};
+  if (mediaType === 'application/json') {
+    let value;
+    try { value = JSON.parse(text); } catch { throw new RequestBodyError(400, 'invalid_json', 'O corpo JSON da solicitação é inválido.'); }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new RequestBodyError(400, 'invalid_body', 'O corpo da solicitação precisa ser um objeto JSON.');
+    return value;
+  }
+  if (mediaType === 'application/x-www-form-urlencoded') return Object.fromEntries(new URLSearchParams(text));
+  throw new RequestBodyError(415, 'unsupported_media_type', 'O formato do corpo da solicitação não é aceito.');
+}
+async function readBody(req, options = {}) {
+  const maximum = Number(options.maximumBytes) || MAX_REQUEST_BODY_BYTES;
+  const allowed = options.allowedMediaTypes || ['application/json', 'application/x-www-form-urlencoded'];
+  const contentLength = Number(req.headers['content-length']);
+  if (Number.isFinite(contentLength) && contentLength > maximum) throw new RequestBodyError(413, 'payload_too_large', 'A solicitação excede o tamanho permitido.');
+  const mediaType = requestMediaType(req);
+  if (!allowed.includes(mediaType)) throw new RequestBodyError(415, 'unsupported_media_type', 'O formato do corpo da solicitação não é aceito.');
+
+  // A Vercel pode entregar JSON já analisado. Mesmo nesse caso, valide tipo e
+  // tamanho para que o limite não dependa da forma usada pelo runtime.
   const raw = req.body;
-  if (raw && typeof raw === 'object' && !Buffer.isBuffer(raw) && (Object.getPrototypeOf(raw) === Object.prototype || Object.getPrototypeOf(raw) === null)) return raw;
-  if (typeof raw === 'string') { try { return JSON.parse(raw || '{}'); } catch { return {}; } }
-  if (Buffer.isBuffer(raw) || raw instanceof Uint8Array) { try { return JSON.parse(Buffer.from(raw).toString('utf8') || '{}'); } catch { return {}; } }
+  if (raw && typeof raw === 'object' && !Buffer.isBuffer(raw) && !(raw instanceof Uint8Array) &&
+      (Object.getPrototypeOf(raw) === Object.prototype || Object.getPrototypeOf(raw) === null)) {
+    const serialized = JSON.stringify(raw);
+    if (Buffer.byteLength(serialized, 'utf8') > maximum) throw new RequestBodyError(413, 'payload_too_large', 'A solicitação excede o tamanho permitido.');
+    if (mediaType !== 'application/json') throw new RequestBodyError(415, 'unsupported_media_type', 'O formato do corpo da solicitação não é aceito.');
+    return raw;
+  }
+
+  if (typeof raw === 'string' || Buffer.isBuffer(raw) || raw instanceof Uint8Array) {
+    const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    if (buffer.length > maximum) throw new RequestBodyError(413, 'payload_too_large', 'A solicitação excede o tamanho permitido.');
+    return parseRequestBodyText(buffer.toString('utf8'), mediaType);
+  }
+
   const source = raw && (typeof raw.getReader === 'function' || typeof raw[Symbol.asyncIterator] === 'function') ? raw : req;
-  const chunks = [];
+  const chunks = []; let total = 0;
+  const append = chunk => {
+    const buffer = Buffer.from(chunk); total += buffer.length;
+    if (total > maximum) throw new RequestBodyError(413, 'payload_too_large', 'A solicitação excede o tamanho permitido.');
+    chunks.push(buffer);
+  };
   if (typeof source.getReader === 'function') {
     const reader = source.getReader(); let item;
-    while (!(item = await reader.read()).done) chunks.push(Buffer.from(item.value));
-  } else for await (const chunk of source) chunks.push(Buffer.from(chunk));
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; }
+    while (!(item = await reader.read()).done) append(item.value);
+  } else for await (const chunk of source) append(chunk);
+  return parseRequestBodyText(Buffer.concat(chunks).toString('utf8'), mediaType);
+}
+async function readBodyResult(req, res, options = {}) {
+  try { return { ok: true, body: await readBody(req, options) }; }
+  catch (error) {
+    if (!(error instanceof RequestBodyError)) throw error;
+    json(res, error.status, { ok: false, code: error.code, error: error.message });
+    return { ok: false, body: null };
+  }
 }
 async function userFromAccess(access) {
   if (!access) return null;
@@ -200,17 +254,35 @@ function publicOrigin(req) {
   if (origin === 'https://paxincpa.store') origin = 'https://www.paxincpa.store';
   return origin;
 }
+function appendSetCookie(res, value) {
+  const existing = typeof res.getHeader === 'function' ? res.getHeader('Set-Cookie') : undefined;
+  const values = existing ? (Array.isArray(existing) ? existing : [existing]) : [];
+  res.setHeader('Set-Cookie', [...values, value]);
+}
+function issueCsrfToken(req, res) {
+  const current = String(cookies(req)[CSRF_COOKIE] || '');
+  const token = CSRF_TOKEN_PATTERN.test(current) ? current : crypto.randomBytes(32).toString('base64url');
+  const suffix = `Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}${secure(req) ? '; Secure' : ''}`;
+  appendSetCookie(res, `${CSRF_COOKIE}=${encodeURIComponent(token)}; ${suffix}`);
+  return token;
+}
 function sameOriginRequest(req) {
   const origin = String(req.headers.origin || '');
-  if (!origin) return true;
+  const referer = String(req.headers.referer || '');
+  if (!origin && !referer) return false;
   try {
-    const received = new URL(origin).origin;
+    const received = new URL(origin || referer).origin;
     const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
     const host = forwardedHost || String(req.headers.host || '').trim();
     const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
     const protocol = forwardedProto || (secure(req) ? 'https' : 'http');
     const requestOrigin = host ? new URL(`${protocol}://${host}`).origin : '';
-    return received === requestOrigin || received === new URL(publicOrigin(req)).origin;
+    const originMatches = received === requestOrigin || received === new URL(publicOrigin(req)).origin;
+    const token = String(req.headers['x-paxinbot-csrf'] || '');
+    const cookieToken = String(cookies(req)[CSRF_COOKIE] || '');
+    if (!originMatches || !CSRF_TOKEN_PATTERN.test(token) || !CSRF_TOKEN_PATTERN.test(cookieToken)) return false;
+    const left = Buffer.from(token); const right = Buffer.from(cookieToken);
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
   } catch { return false; }
 }
 function safeUpstreamError(payload, fallback = 'Não foi possível concluir a operação.') {
@@ -282,4 +354,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

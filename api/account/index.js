@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBody, browserSession, upstream, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
 const queries = {
   overview: ['paxinbot_get_my_account', () => ({})],
@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
-  const body = await readBody(req); const action = String(body.action || '');
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
   const actions = {
     profile: ['paxinbot_update_my_profile', () => ({ p_display_name: String(body.displayName || '').trim() })],
     revokeDevice: ['paxinbot_revoke_my_device', () => ({ p_session_id: String(body.sessionId || '') })],

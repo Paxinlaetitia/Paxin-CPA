@@ -2,8 +2,20 @@
 
 const PaxinbotAuth = (() => {
   const baseUrl = location.protocol === 'file:' ? 'http://127.0.0.1:8787' : location.origin;
+  let csrfToken = '';
+  const csrf = async () => {
+    if (csrfToken) return csrfToken;
+    const response = await fetch(`${baseUrl}/api/auth/csrf`, { credentials:'include', headers:{ accept:'application/json' } });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.token) throw new Error('Não foi possível preparar a solicitação segura.');
+    csrfToken = payload.token; return csrfToken;
+  };
   const request = async (route, options = {}) => {
-    const response = await fetch(`${baseUrl}${route}`, { method: options.method || 'GET', credentials: 'include', headers: { 'content-type': 'application/json', ...(options.headers || {}) }, body: options.body ? JSON.stringify(options.body) : undefined });
+    const method = String(options.method || 'GET').toUpperCase();
+    const hasBody = options.body !== undefined;
+    const headers = { accept:'application/json', ...(hasBody ? { 'content-type':'application/json' } : {}), ...(options.headers || {}) };
+    if (!['GET','HEAD','OPTIONS'].includes(method)) headers['x-paxinbot-csrf'] = await csrf();
+    const response = await fetch(`${baseUrl}${route}`, { method, credentials:'include', headers, body:hasBody ? JSON.stringify(options.body) : undefined });
     let payload = null; try { payload = await response.json(); } catch {}
     if (!response.ok || payload?.ok === false) throw Object.assign(new Error(payload?.error || 'Não foi possível concluir a operação.'), { code: payload?.code, status: response.status });
     return payload;
@@ -412,8 +424,8 @@ async function loadPortalData(basePayload) {
 async function getPasskeyClient() {
   if (passkeyClient) return passkeyClient;
   const config = await PaxinbotAuth.request('/api/auth/config');
-  const module = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0/+esm');
-  passkeyClient = module.createClient(config.url, config.key, { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, experimental:{ passkey:true } } });
+  if (!window.supabase?.createClient) throw new Error('O módulo seguro de autenticação não foi carregado.');
+  passkeyClient = window.supabase.createClient(config.url, config.key, { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, experimental:{ passkey:true } } });
   return passkeyClient;
 }
 

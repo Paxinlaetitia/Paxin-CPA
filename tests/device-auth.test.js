@@ -14,7 +14,7 @@ process.env.PAXINBOT_SESSION_SECRET = 'test-only-session-secret-that-is-not-depl
 process.env.PUBLIC_SITE_URL = 'https://www.paxincpa.store';
 
 function request(body = {}, headers = {}) {
-  return { method: 'POST', body, headers, socket: { remoteAddress: '127.0.0.1' } };
+  return { method: 'POST', body, headers: { 'content-type':'application/json', ...headers }, socket: { remoteAddress: '127.0.0.1' } };
 }
 
 function response() {

@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, readBody, serviceUpstream, serviceRateLimit, clientAddress, sha256, cleanDeviceName, publicOrigin, verifyDeviceIdentityProof, safeDeviceAuthError } = require('../../_paxinbot');
+const { json, readBodyResult, serviceUpstream, serviceRateLimit, clientAddress, sha256, cleanDeviceName, publicOrigin, verifyDeviceIdentityProof, safeDeviceAuthError } = require('../../_paxinbot');
 async function recordServerSignal(identity,type,appVersion) {
   if (!identity || !['device_identity_mismatch','device_proof_replayed','auth_rate_limited'].includes(type)) return;
   await serviceUpstream('/rest/v1/rpc/paxinbot_record_device_security_event',{ method:'POST',body:{
@@ -10,7 +10,7 @@ async function recordServerSignal(identity,type,appVersion) {
 }
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-  const body = await readBody(req);
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const appVersion = String(body.appVersion || '').trim();
   if (!/^\d{1,4}(?:\.\d{1,4}){1,3}(?:-[0-9A-Za-z.-]{1,24})?$/.test(appVersion)) return json(res, 400, { ok: false, error: 'Versão do aplicativo inválida.' });
   let identity;

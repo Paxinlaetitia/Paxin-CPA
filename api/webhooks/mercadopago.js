@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, readBody, serviceUpstream } = require('../_paxinbot');
+const { json, readBodyResult, serviceUpstream } = require('../_paxinbot');
 const { securityDiagnostic } = require('../../server/security-log');
 
 function safeEqual(left, right) {
@@ -68,7 +68,7 @@ async function sendConfirmation(result) {
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { webhookDiagnostic('mercadopago_webhook_method_rejected', { method:String(req.method || 'unknown').slice(0,12) }); return json(res, 405, { ok:false, code:'method_not_allowed' }, { allow:'POST' }); }
-  const body = await readBody(req);
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const dataId = String(req.query?.['data.id'] || req.query?.id || body?.data?.id || '');
   if (!verifySignature(req, dataId)) { webhookDiagnostic('mercadopago_webhook_signature_rejected', { reason:process.env.MERCADOPAGO_WEBHOOK_SECRET ? 'invalid_signature' : 'missing_webhook_secret' }); return json(res, 401, { ok:false, code:'invalid_signature' }); }
   const type = String(req.query?.type || body?.type || body?.action || '').toLowerCase();

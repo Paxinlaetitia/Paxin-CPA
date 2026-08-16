@@ -1,9 +1,10 @@
 'use strict';
-const { json, readBody, browserSession, serviceUpstream, serviceRateLimit, isUuid, safeDeviceAuthError } = require('../../_paxinbot');
+const { json, readBodyResult, browserSession, serviceUpstream, serviceRateLimit, isUuid, sameOriginRequest, safeDeviceAuthError } = require('../../_paxinbot');
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+  if (!sameOriginRequest(req)) return json(res, 403, { ok:false, error:'Origem da solicitação não autorizada.' });
   const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
-  const body = await readBody(req);
+  const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const userCode = String(body.userCode || '').toUpperCase().trim();
   if (!isUuid(body.requestId) || !/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/.test(userCode)) return json(res, 400, { ok: false, error: 'Código de autorização inválido.' });
   if (!await serviceRateLimit('device_approve_user', session.user.id, 20, 600)) return json(res, 429, { ok: false, error: 'Muitas tentativas. Aguarde alguns minutos.' }, { 'retry-after': '60' });
