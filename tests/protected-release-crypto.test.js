@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const {
   AUTH_SCHEMA, stableStringify, parseReleaseRequest, readReleaseEnvironment,
-  createAuthorization, authorizationAad
+  createAuthorization, authorizationAad, safeDenialReason
 } = require('../server/protected-release-crypto');
 
 function fixture() {
@@ -69,3 +69,8 @@ test('alteracao do envelope invalida a assinatura', () => {
   release.contentKey.fill(0);
 });
 
+test('registra somente motivos de recusa permitidos', () => {
+  assert.equal(safeDenialReason({ message:'device_banned' }), 'device_banned');
+  assert.equal(safeDenialReason({ message:'sensitive database detail' }), 'upstream_rejected');
+  assert.equal(safeDenialReason(null), 'upstream_rejected');
+});

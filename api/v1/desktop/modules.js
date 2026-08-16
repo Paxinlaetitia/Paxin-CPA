@@ -2,7 +2,8 @@
 
 const { json, readBody, serviceUpstream, serviceRateLimit, sha256 } = require('../../_paxinbot');
 const {
-  parseReleaseRequest, readReleaseEnvironment, assertOfficialRelease, createAuthorization
+  parseReleaseRequest, readReleaseEnvironment, assertOfficialRelease, createAuthorization,
+  safeDenialReason
 } = require('../../../server/protected-release-crypto');
 
 module.exports = async (req, res) => {
@@ -33,6 +34,10 @@ module.exports = async (req, res) => {
     }
   });
   if (!response.ok || payload?.allowed !== true) {
+    console.warn(JSON.stringify({
+      event:'protected_release.denied', reason:safeDenialReason(payload),
+      upstreamStatus:Number(response.status) || 0
+    }));
     return json(res, 401, { ok:false, error:'A sessão, o dispositivo ou o acesso não autoriza esta versão.' });
   }
 
@@ -45,4 +50,3 @@ module.exports = async (req, res) => {
     release.contentKey.fill(0);
   }
 };
-

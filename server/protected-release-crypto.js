@@ -124,8 +124,20 @@ function createAuthorization({ request, release, identity, now = Date.now(), ttl
   return { ...unsigned, signature: { algorithm: 'Ed25519', keyId: release.keyId, value: signature } };
 }
 
+const SAFE_DENIAL_REASONS = new Set([
+  'service_role_required', 'protected_release_request_invalid',
+  'desktop_session_invalid', 'protected_release_version_mismatch',
+  'account_unverified', 'account_disabled', 'device_banned',
+  'risk_reauthentication_required', 'no_active_access',
+  'protected_release_nonce_replayed'
+]);
+
+function safeDenialReason(payload) {
+  const reason = String(payload && payload.message || '').trim();
+  return SAFE_DENIAL_REASONS.has(reason) ? reason : 'upstream_rejected';
+}
+
 module.exports = {
   AUTH_SCHEMA, stableStringify, parseReleaseRequest, readReleaseEnvironment,
-  assertOfficialRelease, authorizationAad, createAuthorization
+  assertOfficialRelease, authorizationAad, createAuthorization, safeDenialReason
 };
-
