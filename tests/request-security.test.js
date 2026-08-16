@@ -101,3 +101,22 @@ test('Vercel enforces browser hardening and isolates private routes from cache',
     assert.match(rule.headers.find(item=>item.key.toLowerCase()==='cache-control').value,/no-store/);
   }
 });
+
+test('legal pages are static, hardened and linked from account-sensitive flows', () => {
+  const root=path.join(__dirname,'..');
+  const pages=['privacidade.html','termos.html','reembolso.html'];
+  for (const name of pages) {
+    const html=fs.readFileSync(path.join(root,name),'utf8');
+    assert.doesNotMatch(html,/<script(?![^>]*\bsrc=)/i);
+    assert.doesNotMatch(html,/<form\b/i);
+    assert.doesNotMatch(html,/\b(?:SUPABASE_SECRET_KEY|MERCADOPAGO_ACCESS_TOKEN|PAXINBOT_SESSION_SECRET)\b/);
+    assert.match(html,/src="\/site-shell\.js"/);
+    assert.match(html,/Vigência: 16 de agosto de 2026/);
+  }
+  const shell=fs.readFileSync(path.join(root,'site-shell.js'),'utf8');
+  const client=fs.readFileSync(path.join(root,'cliente.html'),'utf8');
+  for (const route of ['/privacidade','/termos','/reembolso']) assert.match(shell,new RegExp(`href="${route}"`));
+  assert.match(client,/href="\/termos"[^>]*rel="noopener"/);
+  assert.match(client,/href="\/privacidade"[^>]*rel="noopener"/);
+  assert.match(client,/href="\/reembolso"[^>]*rel="noopener"/);
+});

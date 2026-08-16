@@ -69,7 +69,7 @@
           <div class="footer-links">
             <div><b>PRODUTO</b><a href="/produto">Visão geral</a><a href="/recursos">Recursos</a><a href="/planos">Planos</a></div>
             <div><b>CLIENTE</b><a href="/conta">Área do cliente</a><a href="/download">Download</a><a href="/ajuda">Central de ajuda</a></div>
-            <div><b>LEGAL</b><a href="/seguranca">Segurança</a><a href="/ajuda#termos">Termos de uso</a><a href="/ajuda#privacidade">Privacidade</a></div>
+            <div><b>LEGAL</b><a href="/seguranca">Segurança</a><a href="/termos">Termos de uso</a><a href="/privacidade">Privacidade</a><a href="/reembolso">Reembolso</a></div>
           </div>
         </div>
         <div class="container footer-bottom"><span>© <span id="year"></span> Paxinbot. Todos os direitos reservados.</span><span class="prototype-badge">CANAL OFICIAL</span></div>

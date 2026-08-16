@@ -53,7 +53,7 @@
           <a class="button button-secondary button-full google-button" href="/api/auth/google"><span class="google-g" aria-hidden="true">G</span> Continuar com Google</a>
           <button class="button button-secondary button-full passkey-button" id="passkey-login" type="button">Entrar com passkey cadastrada</button>
           <button class="link-button auth-switch" id="auth-switch" type="button">Não tem conta? Criar agora</button>
-          <small class="auth-legal">Google e passkeys nunca entregam sua senha ao Paxinbot. Use somente o domínio oficial para entrar.</small>
+          <small class="auth-legal">Google e passkeys nunca entregam sua senha ao Paxinbot. Ao criar uma conta, você aceita os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</small>
           <div class="prototype-notice" id="auth-service-status"><i></i><span>Verificando a conexão segura…</span></div>
         </div>
       </div>
@@ -103,7 +103,7 @@
                 <section class="checkout-section"><div class="checkout-section-head"><span>3</span><div><h3>Cupom</h3><p>Se você tiver um código, valide antes de pagar.</p></div></div><div class="checkout-coupon-row"><label class="sr-only" for="checkout-coupon">Cupom de desconto</label><input id="checkout-coupon" name="couponCode" maxlength="32" pattern="[A-Za-z0-9_-]{3,32}" autocomplete="off" placeholder="Código do cupom" /><button class="button button-secondary" id="checkout-apply-coupon" type="button">Aplicar</button></div><p class="checkout-inline-status" id="checkout-coupon-status" role="status" aria-live="polite"></p></section>
                 <p class="checkout-inline-status is-error" id="checkout-error" role="alert" hidden></p>
                 <button class="button button-primary checkout-submit" id="checkout-submit" type="submit">Gerar PIX <svg><use href="#i-arrow"></use></svg></button>
-                <small class="checkout-terms">Ao continuar, você confirma a modalidade escolhida. O acesso só é liberado após a confirmação do pagamento.</small>
+                <small class="checkout-terms">Ao continuar, você confirma a modalidade escolhida e aceita os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/reembolso" target="_blank" rel="noopener">Política de Reembolso</a>. O acesso só é liberado após a confirmação do pagamento.</small>
               </form>
 
               <aside class="checkout-order-summary" aria-label="Resumo da compra"><span>RESUMO DA COMPRA</span><div class="checkout-product-mark"><img src="/assets/paxinbot-mark.svg" alt="" /><div><h3 id="checkout-product-name">Carregando…</h3><p id="checkout-product-duration">—</p></div></div><p id="checkout-product-description">Acesso ao Paxinbot vinculado à sua conta.</p><dl><div><dt>Subtotal</dt><dd id="checkout-subtotal">—</dd></div><div id="checkout-discount-row" hidden><dt>Desconto</dt><dd id="checkout-discount">—</dd></div><div class="checkout-total"><dt>Total</dt><dd id="checkout-total">—</dd></div></dl><div class="checkout-security"><svg><use href="#i-shield"></use></svg><p>Preço e cupom são validados no servidor. Nenhuma chave privada de pagamento é enviada ao navegador.</p></div></aside>
