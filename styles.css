@@ -604,7 +604,8 @@ main > section { border-block:0 !important; border-top:0 !important; border-bott
 .help-search button { height:48px; min-width:112px; margin:0; }
 .help-search-status { margin:10px 0 0 !important; }
 .help-categories { padding:28px 0 66px; }
-.help-categories .help-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 52px; }
+.help-categories > .container { max-width:980px; }
+.help-categories .help-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 44px; }
 .help-category { min-height:148px; display:grid; grid-template-columns:58px minmax(0,1fr); grid-template-rows:auto auto 1fr; column-gap:20px; align-content:start; padding:24px 0; border:0; border-radius:0; background:transparent; }
 .help-category:hover { border-color:transparent; transform:translateX(3px); }
 .help-category .feature-icon { grid-column:1; grid-row:1 / span 3; width:58px; height:58px; margin:0; border-radius:14px; }

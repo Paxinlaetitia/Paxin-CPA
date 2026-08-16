@@ -26,6 +26,8 @@ const CLIENT_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 const CLIENT_DEVICE_CODE=/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/;
 const CLIENT_PAYER_NAME=/^[\p{L}\p{M}][\p{L}\p{M}' .-]{1,99}$/u;
 const CLIENT_CHECKOUT_INTENT_KEY='paxinbot_checkout_intent';
+const CLIENT_CATALOG_CACHE_KEY='paxinbot_catalog_cache_v1';
+const CLIENT_CATALOG_CACHE_TTL=60*1000;
 const CHECKOUT_INTENT_MAX_AGE=2*60*60*1000;
 
 const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', checkout:'/conta/checkout', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
@@ -305,7 +307,12 @@ async function renderAuthPurchaseContext() {
   root.hidden=true; document.getElementById('auth-purchase-name').textContent='—'; document.getElementById('auth-purchase-price').textContent='—';
   const productId=selectedCheckoutProductId();
   if (viewFromPath() !== 'checkout' || !productId || !selectedCheckoutIntentMatches(productId)) { try { sessionStorage.removeItem(CLIENT_CHECKOUT_INTENT_KEY); } catch {} if (viewFromPath()==='checkout' && location.protocol!=='file:') history.replaceState({},'',accountRoutes.overview); return; }
-  try { const response=await fetch('/api/catalog',{ credentials:'include' }); const payload=await response.json(); const product=(payload.data || []).find(item=>item.id===productId); if (!product) { sessionStorage.removeItem(CLIENT_CHECKOUT_INTENT_KEY); if (location.protocol!=='file:') history.replaceState({},'',accountRoutes.overview); return; } root.hidden=false; document.getElementById('auth-purchase-name').textContent=product.name; document.getElementById('auth-purchase-price').textContent=`${money(product.priceCents)} · ${productDuration(product)}`; } catch {}
+  try {
+    let products=null;
+    try { const cached=JSON.parse(sessionStorage.getItem(CLIENT_CATALOG_CACHE_KEY) || 'null'); if (Array.isArray(cached?.data) && Date.now()-Number(cached.storedAt)>=0 && Date.now()-Number(cached.storedAt)<CLIENT_CATALOG_CACHE_TTL) products=cached.data; } catch {}
+    if (!products) { const response=await fetch('/api/catalog',{ credentials:'include' }); const payload=await response.json(); if (!response.ok || payload?.ok===false) return; products=Array.isArray(payload.data) ? payload.data : []; try { sessionStorage.setItem(CLIENT_CATALOG_CACHE_KEY,JSON.stringify({ storedAt:Date.now(), data:products })); } catch {} }
+    const product=products.find(item=>item.id===productId); if (!product) { sessionStorage.removeItem(CLIENT_CHECKOUT_INTENT_KEY); if (location.protocol!=='file:') history.replaceState({},'',accountRoutes.overview); return; } root.hidden=false; document.getElementById('auth-purchase-name').textContent=product.name; document.getElementById('auth-purchase-price').textContent=`${money(product.priceCents)} · ${productDuration(product)}`;
+  } catch {}
 }
 
 function accountSectionFromPath() {
@@ -465,10 +472,7 @@ function setCheckoutReturn(kind, title, copy) {
 }
 
 async function refreshOrderData() {
-  const [current, orders] = await Promise.all([PaxinbotAuth.request('/api/auth/me'), PaxinbotAuth.request('/api/account?action=orders')]);
-  const account = await PaxinbotAuth.request('/api/account?action=overview').then(result => result.data).catch(() => null);
-  renderClientDashboard({ ...current, profile:account?.profile || null, account });
-  renderOrders(orders.data);
+  await loadPortalData();
 }
 
 async function handleCheckoutReturn() {
@@ -492,30 +496,24 @@ async function handleCheckoutReturn() {
   setCheckoutReturn(flow === 'failure' ? 'failure' : 'pending', flow === 'failure' ? 'Pagamento não concluído' : 'Pagamento em análise', flow === 'failure' ? 'Você pode tentar novamente quando desejar.' : 'Assim que o Mercado Pago confirmar, o acesso será liberado automaticamente.');
 }
 
-async function loadPortalData(basePayload) {
-  let account = null; const notice = document.getElementById('portal-system-notice'); notice.hidden = true;
-  try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
-  const merged = { ...basePayload, profile: account?.profile || null, account };
+async function loadPortalData() {
+  const notice=document.getElementById('portal-system-notice'); notice.hidden=true;
+  const result=await PaxinbotAuth.request('/api/account?action=bootstrap');
+  const data=result.data || {};
+  const account=data.account || null;
+  const merged={ ...(result.current || {}), profile:account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders, products, preferences, activity, tickets, usageGrants, promotions, passkeys] = await Promise.all([
-    PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message })),
-    PaxinbotAuth.request('/api/account?action=preferences').then(result => result.data).catch(() => ({})),
-    PaxinbotAuth.request('/api/account?action=activity').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=usageGrants').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=promotions').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/auth/passkeys').then(result => ({ data:result.data })).catch(error => ({ error:error.message }))
-  ]);
-  renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error, products.checkoutReady);
-  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderUsageGrants(usageGrants); renderPromotions(promotions); renderPasskeys(passkeys.data, passkeys.error);
+  renderDevices(data.devices || []); renderOrders(data.orders || []); renderProducts(data.products || [], result.errors?.products, result.checkoutReady);
+  renderPreferences(data.preferences || {}); renderActivity(data.activity || []); renderTickets(data.tickets || []); renderUsageGrants(data.usageGrants || []); renderPromotions(data.promotions || []); renderPasskeys(data.passkeys || [], result.errors?.passkeys);
+  const messages=Object.values(result.errors || {}).filter(Boolean);
+  if (messages.length) { notice.textContent='Parte das informações será atualizada automaticamente em instantes.'; notice.hidden=false; }
+  return merged;
 }
 
 async function loginWithPasskey() {
   const button = document.getElementById('passkey-login'); if (!window.PublicKeyCredential) throw new Error('Este navegador não oferece suporte a passkeys.'); button.disabled = true;
   button.setAttribute('aria-busy', 'true');
-  try { const start = await PaxinbotAuth.request('/api/auth/passkey-login-options', { method:'POST', body:{} }); const credential = await navigator.credentials.get({ publicKey:passkeyRequestOptions(start.options) }); if (!credential) throw new Error('O dispositivo não retornou uma passkey.'); await PaxinbotAuth.request('/api/auth/passkey-login-verify', { method:'POST', body:{ challengeId:start.challengeId, credential:serializedAuthenticationCredential(credential) } }); const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
+  try { const start = await PaxinbotAuth.request('/api/auth/passkey-login-options', { method:'POST', body:{} }); const credential = await navigator.credentials.get({ publicKey:passkeyRequestOptions(start.options) }); if (!credential) throw new Error('O dispositivo não retornou uma passkey.'); await PaxinbotAuth.request('/api/auth/passkey-login-verify', { method:'POST', body:{ challengeId:start.challengeId, credential:serializedAuthenticationCredential(credential) } }); const current=await loadPortalData(); if (continueActivationAfterLogin()) return; await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
   catch (error) { throw new Error(friendlyPasskeyError(error)); }
   finally { button.disabled = false; button.removeAttribute('aria-busy'); }
 }
@@ -538,7 +536,7 @@ async function registerPasskey() {
 
 async function completeClientLogin(result, message = 'Login realizado.') {
   pendingEmailCode = null;
-  const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user);
+  const current=await loadPortalData(); if (continueActivationAfterLogin()) return; await syncOwnerPanelLink(current.user);
   const targetView=viewFromPath(); const returningFromPayment=new URLSearchParams(location.search).has('checkout'); clearAuthModeQuery(); setAccountView(returningFromPayment ? 'subscription' : targetView, false, false);
   setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-email-code-form').reset(); void handleCheckoutReturn();
 }
@@ -547,7 +545,7 @@ async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]');
   void renderAuthPurchaseContext();
   startAccessClock();
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
+  try { const current=await loadPortalData(); if (continueActivationAfterLogin()) return; await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
   form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.verificationRequired) return setEmailCodeStep(result, 'login'); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
   document.getElementById('client-email-code-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingEmailCode) return cancelEmailCode(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('client-email-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); await completeClientLogin(result, pendingEmailCode?.purpose === 'signup' ? 'E-mail confirmado e conta criada.' : 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
   document.getElementById('client-email-code-resend')?.addEventListener('click', async event => { const button = event.currentTarget; const status = document.getElementById('client-email-code-status'); button.disabled = true; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/resend-email-code', { method:'POST' }); status.textContent = result.message; } catch (error) { status.textContent = error.message; status.classList.add('is-error'); } finally { button.disabled = false; } });
@@ -577,8 +575,8 @@ async function initClientPage() {
     } catch (error) { window.showToast?.(error.message || 'Não foi possível preparar o download.'); }
     finally { button.disabled=false; button.removeAttribute('aria-busy'); button.innerHTML=original; }
   });
-  document.getElementById('activate-usage-credit')?.addEventListener('click', async event => { const card=document.getElementById('usage-credit-card'); const grantId=card?.dataset.grantId; if (!grantId || !confirm('Ativar este saldo agora? Depois da ativação, ele será consumido enquanto o aplicativo estiver conectado.')) return; event.currentTarget.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId } }); const current=await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); window.showToast?.('Saldo ativado. Agora você pode autorizar o aplicativo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; } });
-  document.getElementById('claim-promotion')?.addEventListener('click', async event => { const card=document.getElementById('portal-promotion-card'); const promotionId=card?.dataset.promotionId; if (!promotionId) return; event.currentTarget.disabled=true; event.currentTarget.setAttribute('aria-busy','true'); try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'claimPromotion', promotionId } }); const current=await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); setAccountView('subscription'); window.showToast?.('Presente resgatado. Seu saldo está guardado até você ativá-lo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; event.currentTarget.removeAttribute('aria-busy'); } });
+  document.getElementById('activate-usage-credit')?.addEventListener('click', async event => { const card=document.getElementById('usage-credit-card'); const grantId=card?.dataset.grantId; if (!grantId || !confirm('Ativar este saldo agora? Depois da ativação, ele será consumido enquanto o aplicativo estiver conectado.')) return; event.currentTarget.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId } }); await loadPortalData(); window.showToast?.('Saldo ativado. Agora você pode autorizar o aplicativo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; } });
+  document.getElementById('claim-promotion')?.addEventListener('click', async event => { const card=document.getElementById('portal-promotion-card'); const promotionId=card?.dataset.promotionId; if (!promotionId) return; event.currentTarget.disabled=true; event.currentTarget.setAttribute('aria-busy','true'); try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'claimPromotion', promotionId } }); await loadPortalData(); setAccountView('subscription'); window.showToast?.('Presente resgatado. Seu saldo está guardado até você ativá-lo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; event.currentTarget.removeAttribute('aria-busy'); } });
   document.getElementById('account-products-list')?.addEventListener('click', event => { const button = event.target.closest('[data-buy-product]'); if (button) openCheckout(button.dataset.buyProduct); });
   document.getElementById('account-order-list')?.addEventListener('click', event => { const button = event.target.closest('[data-order-details]'); if (button) openOrderDetails(button.dataset.orderDetails).catch(error => window.showToast?.(error.message)); });
   document.querySelector('[data-close-order]')?.addEventListener('click', () => document.getElementById('order-dialog').close());

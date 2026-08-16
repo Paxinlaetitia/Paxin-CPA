@@ -225,6 +225,12 @@ async function serviceUpstream(path, options = {}) {
   let payload = null; try { payload = await response.json(); } catch {}
   return { response, payload };
 }
+async function usageRuntimeState(userId, grantId) {
+  const runtime = await serviceUpstream('/rest/v1/rpc/paxinbot_get_usage_runtime_state', {
+    method:'POST', body:{ p_user_id:userId, p_usage_grant_id:grantId }
+  });
+  return Boolean(runtime.response.ok && runtime.payload?.running === true);
+}
 class RequestBodyError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
@@ -604,4 +610,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, downloadSigningSecret, originGateConfig, mercadoPagoWebhookConfig, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, trustedEdgeRequest, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, downloadSigningSecret, originGateConfig, mercadoPagoWebhookConfig, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, trustedEdgeRequest, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, usageRuntimeState, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

@@ -73,7 +73,7 @@ test('passkey enrollment uses the existing HttpOnly browser session and CSRF', a
   assert.match(read('api/auth/[action].js'), /passkeys\/authentication\/options/);
   assert.match(read('api/auth/[action].js'), /passkeys\/authentication\/verify/);
   assert.match(read('api/auth/[action].js'), /auth\.passkey_failure/);
-  assert.match(read('cliente.html'), /auth-client\.js\?v=20260816-7/);
+  assert.match(read('cliente.html'), /auth-client\.js\?v=20260816-8/);
 
   const csrf = 'a'.repeat(43); const originalFetch = global.fetch; const calls = [];
   global.fetch = async (url, options = {}) => {

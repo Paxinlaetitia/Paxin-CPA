@@ -54,7 +54,15 @@ const migrations = walk('supabase/migrations').filter(file => /\/\d{8}_[a-z0-9_]
 const migrationNames = migrations.map(file => path.posix.basename(file));
 if (migrations.length < 17) fail(`migrações esperadas: ao menos 17; encontradas: ${migrations.length}`);
 if (new Set(migrationNames).size !== migrationNames.length) fail('nomes de migração duplicados');
-if (migrationNames.at(-1) !== '20260831_database_least_privilege.sql') fail('migração final de menor privilégio ausente');
+const leastPrivilegeName = '20260831_database_least_privilege.sql';
+const leastPrivilegeIndex = migrationNames.indexOf(leastPrivilegeName);
+if (leastPrivilegeIndex < 0) fail('migração de menor privilégio ausente');
+for (const file of migrations.slice(leastPrivilegeIndex + 1)) {
+  const source = read(file);
+  if (/\b(?:create\s+(?:or\s+replace\s+)?function|create\s+table|alter\s+default\s+privileges|grant\s|revoke\s)/i.test(source)) {
+    fail(`migração posterior ao fechamento de privilégios amplia a superfície: ${file}`);
+  }
+}
 
 try { JSON.parse(read('vercel.json')); }
 catch (error) { fail(`vercel.json inválido: ${error.message}`); }

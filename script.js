@@ -6,6 +6,8 @@ const navigation = document.querySelector('.main-nav');
 const modal = document.getElementById('login-modal');
 const toast = document.querySelector('.toast');
 const PUBLIC_CHECKOUT_INTENT_KEY = 'paxinbot_checkout_intent';
+const PUBLIC_CATALOG_CACHE_KEY = 'paxinbot_catalog_cache_v1';
+const PUBLIC_CATALOG_CACHE_TTL = 60 * 1000;
 let toastTimer = null;
 
 function setHeaderState() {
@@ -135,9 +137,17 @@ function catalogDuration(product) {
 async function loadPublicCatalog() {
   const root = document.getElementById('public-products-list'); if (!root) return;
   try {
-    const response = await fetch('/api/catalog'); const payload = await response.json();
-    if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'Não foi possível carregar as modalidades.');
-    const products = payload.data || [];
+    let products = null;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || 'null');
+      if (Array.isArray(cached?.data) && Date.now() - Number(cached.storedAt) >= 0 && Date.now() - Number(cached.storedAt) < PUBLIC_CATALOG_CACHE_TTL) products = cached.data;
+    } catch {}
+    if (!products) {
+      const response = await fetch('/api/catalog'); const payload = await response.json();
+      if (!response.ok || payload?.ok === false) throw new Error(payload?.error || 'Não foi possível carregar as modalidades.');
+      products = Array.isArray(payload.data) ? payload.data : [];
+      try { sessionStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify({ storedAt:Date.now(), data:products })); } catch {}
+    }
     if (!products.length) { root.innerHTML = '<div class="catalog-message">Nenhuma modalidade está disponível neste momento.</div>'; return; }
     const featured = products.length === 1 ? 0 : Math.min(1, products.length - 1);
     root.innerHTML = products.map((product, index) => `<article class="plan-card ${index === featured ? 'featured' : ''}">${index === featured ? '<div class="plan-label">DESTAQUE</div>' : ''}<div class="plan-head"><span>${catalogEscape(catalogDuration(product))}</span><h3>${catalogEscape(product.name)}</h3><p>${catalogEscape(product.description || 'Acesso completo ao Paxinbot durante o período contratado.')}</p></div><div class="price"><b>${catalogMoney(product.priceCents)}</b><small>valor da modalidade</small></div><ul><li><svg><use href="#i-check"></use></svg> Todos os recursos disponíveis</li><li><svg><use href="#i-check"></use></svg> Acesso vinculado à sua conta</li><li><svg><use href="#i-check"></use></svg> ${product.accessKind === 'lifetime' ? 'Acesso sem expiração' : 'Saldo consumido somente com o app conectado'}</li><li><svg><use href="#i-check"></use></svg> Gestão pela Área do Cliente</li></ul><a class="button ${index === featured ? 'button-primary' : 'button-secondary'} button-full" data-select-product="${catalogEscape(product.id)}" href="/conta/checkout?product=${encodeURIComponent(product.id)}">Escolher modalidade</a></article>`).join('');

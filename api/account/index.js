@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, requireTrustedHost, readBodyResult, browserSession, upstream, downloadSigningSecret, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, usageRuntimeState, downloadSigningSecret, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
 const WINDOWS_RELEASE = Object.freeze({
   path: '/releases/PaxinbotSetup.exe',
@@ -46,6 +46,67 @@ const queries = {
   promotions: ['paxinbot_list_my_promotions', () => ({})]
 };
 
+const bootstrapQueries = Object.freeze({
+  account:queries.overview,
+  devices:queries.devices,
+  orders:queries.orders,
+  products:queries.products,
+  preferences:queries.preferences,
+  activity:queries.activity,
+  tickets:queries.tickets,
+  usageGrants:queries.usageGrants,
+  promotions:queries.promotions
+});
+
+const bootstrapDefaults = Object.freeze({
+  account:null, devices:[], orders:[], products:[], preferences:{}, activity:[], tickets:[], usageGrants:[], promotions:[], passkeys:[]
+});
+
+async function portalBootstrap(req, res, session) {
+  const started=Date.now();
+  const authorization={ authorization:`Bearer ${session.access}` };
+  const entries=Object.entries(bootstrapQueries);
+  const [accessResult, passkeyResult, ...queryResults]=await Promise.all([
+    upstream('/rest/v1/rpc/paxinbot_get_my_access', { method:'POST', headers:authorization, body:{} }),
+    upstream('/auth/v1/passkeys', { headers:authorization }),
+    ...entries.map(([, item]) => upstream(`/rest/v1/rpc/${item[0]}`, { method:'POST', headers:authorization, body:item[1]({}) }))
+  ]);
+  if (!accessResult.response.ok) return json(res, 503, { ok:false, error:safeUpstreamError(accessResult.payload, 'Não foi possível carregar sua conta agora.') });
+
+  const entitlement=accessResult.payload && typeof accessResult.payload === 'object' ? { ...accessResult.payload } : { active:false };
+  if (entitlement.kind === 'usage' && /^[0-9a-f-]{36}$/i.test(String(entitlement.grantId || ''))) {
+    try {
+      entitlement.usageRunning=await usageRuntimeState(session.user.id, entitlement.grantId);
+    } catch { entitlement.usageRunning=false; }
+  }
+
+  const data={ ...bootstrapDefaults };
+  const errors={};
+  queryResults.forEach((result, index) => {
+    const key=entries[index][0];
+    if (result.response.ok) data[key]=result.payload;
+    else errors[key]=safeUpstreamError(result.payload, 'Conteúdo temporariamente indisponível.');
+  });
+  if (passkeyResult.response.ok) data.passkeys=Array.isArray(passkeyResult.payload) ? passkeyResult.payload.map(item => ({
+    id:/^[0-9a-f-]{36}$/i.test(String(item?.id || '')) ? String(item.id) : '',
+    friendlyName:String(item?.friendly_name || item?.friendlyName || 'Passkey').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0,120) || 'Passkey',
+    createdAt:String(item?.created_at || item?.createdAt || '').slice(0,40),
+    lastUsedAt:String(item?.last_used_at || item?.lastUsedAt || '').slice(0,40)
+  })).filter(item => item.id) : [];
+  else errors.passkeys='Não foi possível consultar as passkeys agora.';
+
+  const providers=[...new Set((session.user.identities || []).map(identity => identity.provider).filter(Boolean))];
+  const checkoutReady=Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN && process.env.MERCADOPAGO_WEBHOOK_SECRET && process.env.SUPABASE_SECRET_KEY);
+  res.setHeader('Server-Timing',`portal;dur=${Math.max(0,Date.now()-started)}`);
+  return json(res, 200, {
+    ok:true,
+    current:{ serverNow:new Date().toISOString(), user:{ id:session.user.id, email:session.user.email, providers }, entitlement },
+    data,
+    checkoutReady,
+    errors
+  });
+}
+
 module.exports = async (req, res) => {
   if (!requireTrustedHost(req, res)) return;
   if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
@@ -58,6 +119,7 @@ module.exports = async (req, res) => {
     subject:session.user.id, limit:req.method === 'GET' ? 300 : 120, windowSeconds:600
   })) return;
   if (req.method === 'GET') {
+    if (queryAction === 'bootstrap') return portalBootstrap(req, res, session);
     const item = queries[queryAction];
     if (!item) return json(res, 404, { ok: false, error: 'Consulta não encontrada.' });
     if (queryAction === 'order' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(req.query?.orderId || ''))) return json(res, 400, { ok:false, error:'Pedido inválido.' });

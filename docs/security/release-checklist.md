@@ -19,7 +19,7 @@ Resend ou do instalador do aplicativo.
 
 ## 2. Supabase de teste
 
-- todas as migrações, até `20260831_database_least_privilege.sql`, aplicadas;
+- todas as migrações, até `20260901_portal_performance.sql`, aplicadas; a barreira de menor privilégio de `20260831_database_least_privilege.sql` permanece obrigatória;
 - Security Advisor revisado e nenhum alerta crítico ignorado;
 - RLS e grants confirmados para usuário anônimo, autenticado e backend;
 - cadastro, confirmação de e-mail, login, recuperação, Google e passkey testados;
