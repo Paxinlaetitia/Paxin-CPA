@@ -155,4 +155,5 @@ test('unknown public pages use a hardened redirect page without affecting API ro
   assert.doesNotMatch(fallback,/<script\b/i);
   assert.equal(fs.existsSync(path.join(root,'robots.txt')),false);
   assert.equal(config.rewrites.some(route=>route.source==='/api/:path*'),false);
+  assert.ok(config.redirects.some(route=>route.source==='/admin' && route.destination==='/' && route.permanent===false));
 });

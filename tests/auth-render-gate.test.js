@@ -31,7 +31,8 @@ test('every account route uses the gated client document and admin remains serve
   const rewrites = config.rewrites || [];
   assert.ok(rewrites.some(rule => rule.source === '/conta' && rule.destination === '/cliente'));
   assert.ok(rewrites.some(rule => rule.source === '/conta/:path*' && rule.destination === '/cliente'));
-  assert.ok(rewrites.some(rule => rule.source === '/admin' && rule.destination === '/api/admin?view=hidden'));
+  assert.ok(config.redirects.some(rule => rule.source === '/admin' && rule.destination === '/' && rule.permanent === false));
+  assert.equal(rewrites.some(rule => rule.source === '/admin'), false);
   assert.ok(rewrites.some(rule => /^\/gestao\//.test(rule.source) && rule.destination === '/api/admin?view=page'));
 });
 
