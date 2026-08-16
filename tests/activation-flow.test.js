@@ -25,3 +25,16 @@ test('approval client locks the action and does not depend on a custom protocol 
   assert.match(client, /approvalComplete=true/);
   assert.doesNotMatch(client, /window\.location\.assign\('paxinbot:\/\/auth-complete'\)/);
 });
+
+test('device authorization resumes automatically after every supported login method', () => {
+  const client = read('auth-client.js');
+  const callback = read('auth-callback.js');
+  assert.match(client, /sessionStorage\.setItem\('paxinbot_auth_return',activationReturn\)/);
+  assert.match(client, /location\.replace\('\/conta\?mode=login&continue=device'\)/);
+  assert.match(client, /function continueActivationAfterLogin\(\)/);
+  assert.match(client, /parsed\.origin!==location\.origin \|\| parsed\.pathname!=='\/activate'/);
+  assert.match(callback, /parsed\.pathname === '\/activate'/);
+  assert.match(callback, /parsed\.searchParams\.size === 2/);
+  assert.match(callback, /\^\[A-HJ-NP-Z2-9\]/);
+  assert.doesNotMatch(callback, /safeReturn\s*=\s*candidate/);
+});

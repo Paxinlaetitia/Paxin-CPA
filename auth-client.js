@@ -23,6 +23,7 @@ const PaxinbotAuth = (() => {
   return { baseUrl, request };
 })();
 const CLIENT_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLIENT_DEVICE_CODE=/^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/;
 const CLIENT_PAYER_NAME=/^[\p{L}\p{M}][\p{L}\p{M}' .-]{1,99}$/u;
 const CLIENT_CHECKOUT_INTENT_KEY='paxinbot_checkout_intent';
 const CHECKOUT_INTENT_MAX_AGE=2*60*60*1000;
@@ -51,6 +52,26 @@ function money(cents, currency = 'BRL') { return new Intl.NumberFormat('pt-BR', 
 function formatUsageTime(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.ceil((seconds % 3600) / 60); const parts = []; if (days) parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`); if (hours) parts.push(`${hours} ${hours === 1 ? 'hora' : 'horas'}`); if (minutes && parts.length < 2) parts.push(`${minutes} min`); return parts.join(' e ') || 'menos de 1 minuto'; }
 function formatUsageCountdown(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const days = Math.floor(seconds / 86400); const hours = Math.floor((seconds % 86400) / 3600); const minutes = Math.floor((seconds % 3600) / 60); const rest = seconds % 60; const pad = number => String(number).padStart(2, '0'); return days ? `${days}d ${pad(hours)}h ${pad(minutes)}min ${pad(rest)}s` : hours ? `${hours}h ${pad(minutes)}min ${pad(rest)}s` : `${minutes}min ${pad(rest)}s`; }
 function remainingUntil(value) { const timestamp = value ? new Date(value).valueOf() : NaN; return Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - Date.now()) / 1000)) : 0; }
+
+function pendingActivationReturn() {
+  if (new URLSearchParams(location.search).get('continue') !== 'device') return '';
+  try {
+    const candidate=sessionStorage.getItem('paxinbot_auth_return') || '';
+    const parsed=new URL(candidate,location.origin);
+    const requestId=parsed.searchParams.get('request') || '';
+    const userCode=String(parsed.searchParams.get('code') || '').toUpperCase();
+    if (parsed.origin!==location.origin || parsed.pathname!=='/activate' || parsed.hash || parsed.searchParams.size!==2 || !CLIENT_UUID.test(requestId) || !CLIENT_DEVICE_CODE.test(userCode)) return '';
+    return `/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`;
+  } catch { return ''; }
+}
+
+function continueActivationAfterLogin() {
+  const target=pendingActivationReturn();
+  if (!target) return false;
+  sessionStorage.removeItem('paxinbot_auth_return');
+  location.replace(target);
+  return true;
+}
 
 function accessSeconds(entitlement = accessClock?.entitlement || {}) {
   if (entitlement.kind !== 'usage') return remainingUntil(entitlement.expiresAt);
@@ -446,7 +467,7 @@ async function bridgeSession(session) {
 
 async function loginWithPasskey() {
   const button = document.getElementById('passkey-login'); if (!window.PublicKeyCredential) throw new Error('Este navegador não oferece suporte a passkeys.'); button.disabled = true;
-  try { const client = await getPasskeyClient(); const { data, error } = await client.auth.signInWithPasskey(); if (error) throw new Error(friendlyPasskeyError(error)); await bridgeSession(data.session); const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
+  try { const client = await getPasskeyClient(); const { data, error } = await client.auth.signInWithPasskey(); if (error) throw new Error(friendlyPasskeyError(error)); await bridgeSession(data.session); const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
   catch (error) { throw new Error(friendlyPasskeyError(error)); }
   finally { button.disabled = false; }
 }
@@ -462,7 +483,7 @@ async function registerPasskey() {
 
 async function completeClientLogin(result, message = 'Login realizado.') {
   passkeySession = result?.passkeySession || null; pendingEmailCode = null;
-  const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user);
+  const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user);
   const targetView=viewFromPath(); const returningFromPayment=new URLSearchParams(location.search).has('checkout'); clearAuthModeQuery(); setAccountView(returningFromPayment ? 'subscription' : targetView, false, false);
   setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-email-code-form').reset(); void handleCheckoutReturn();
 }
@@ -471,7 +492,7 @@ async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]'); consumePasskeySession();
   void renderAuthPurchaseContext();
   startAccessClock();
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
+  try { const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
   form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.verificationRequired) return setEmailCodeStep(result, 'login'); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
   document.getElementById('client-email-code-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingEmailCode) return cancelEmailCode(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('client-email-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); await completeClientLogin(result, pendingEmailCode?.purpose === 'signup' ? 'E-mail confirmado e conta criada.' : 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
   document.getElementById('client-email-code-resend')?.addEventListener('click', async event => { const button = event.currentTarget; const status = document.getElementById('client-email-code-status'); button.disabled = true; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/resend-email-code', { method:'POST' }); status.textContent = result.message; } catch (error) { status.textContent = error.message; status.classList.add('is-error'); } finally { button.disabled = false; } });
@@ -540,9 +561,9 @@ async function initClientPage() {
 }
 
 async function initActivationPage() {
-  const approve = document.getElementById('activate-approve'); if (!approve) return; const copy = document.getElementById('activate-copy'); const status = document.getElementById('activate-status'); const usagePanel=document.getElementById('activate-usage-panel'); const usageButton=document.getElementById('activate-usage'); const query = new URLSearchParams(location.search); const requestId = query.get('request'); const userCode = query.get('code'); let availableGrant=null; let approvalPending=false; let approvalComplete=false;
-  if (!requestId || !userCode) { copy.textContent = 'A solicitação de dispositivo é inválida ou está incompleta.'; return; }
-  try { const current = await PaxinbotAuth.request('/api/auth/me'); copy.textContent = `Você está conectado como ${current.user.email}. Confirme para autorizar este computador.`; approve.disabled = !current.entitlement.active; availableGrant=current.entitlement.availableGrant || null; if (!current.entitlement.active && availableGrant) { usagePanel.hidden=false; document.getElementById('activate-usage-duration').textContent=formatUsageTime(availableGrant.remainingSeconds); status.textContent='Ative o saldo antes de autorizar este computador.'; } else if (!current.entitlement.active) status.textContent = 'Esta conta ainda não possui um acesso ativo.'; else status.textContent='O Paxinbot será trazido para frente após a confirmação.'; } catch { copy.textContent = 'Entre na Área do Cliente nesta mesma janela e volte para confirmar o computador.'; status.textContent = 'A solicitação continuará válida apenas por alguns minutos.'; }
+  const approve = document.getElementById('activate-approve'); if (!approve) return; const copy = document.getElementById('activate-copy'); const status = document.getElementById('activate-status'); const usagePanel=document.getElementById('activate-usage-panel'); const usageButton=document.getElementById('activate-usage'); const query = new URLSearchParams(location.search); const requestId = query.get('request') || ''; const userCode = String(query.get('code') || '').toUpperCase(); let availableGrant=null; let approvalPending=false; let approvalComplete=false;
+  if (!CLIENT_UUID.test(requestId) || !CLIENT_DEVICE_CODE.test(userCode) || query.size!==2) { copy.textContent = 'A solicitação de dispositivo é inválida ou está incompleta.'; return; }
+  try { const current = await PaxinbotAuth.request('/api/auth/me'); copy.textContent = `Você está conectado como ${current.user.email}. Confirme para autorizar este computador.`; approve.disabled = !current.entitlement.active; availableGrant=current.entitlement.availableGrant || null; if (!current.entitlement.active && availableGrant) { usagePanel.hidden=false; document.getElementById('activate-usage-duration').textContent=formatUsageTime(availableGrant.remainingSeconds); status.textContent='Ative o saldo antes de autorizar este computador.'; } else if (!current.entitlement.active) status.textContent = 'Esta conta ainda não possui um acesso ativo.'; else status.textContent='O Paxinbot será trazido para frente após a confirmação.'; } catch (error) { if (error?.status===401) { const activationReturn=`/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`; sessionStorage.setItem('paxinbot_auth_return',activationReturn); location.replace('/conta?mode=login&continue=device'); return; } copy.textContent = 'Não foi possível verificar sua sessão agora.'; status.textContent = error?.message || 'Tente novamente em alguns instantes.'; }
   usageButton?.addEventListener('click', async () => { if (!availableGrant) return; usageButton.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId:availableGrant.id } }); usagePanel.hidden=true; approve.disabled=false; status.textContent='Saldo ativado. Agora autorize este computador.'; window.showToast?.('Saldo ativado.'); } catch (error) { status.textContent=error.message || 'Não foi possível ativar o saldo.'; usageButton.disabled=false; } });
   approve.addEventListener('click', async () => { if (approvalPending || approvalComplete) return; approvalPending=true; approve.disabled=true; approve.setAttribute('aria-busy','true'); approve.textContent='Autorizando…'; try { const result = await PaxinbotAuth.request('/api/v1/devices/approve', { method:'POST', body:{ requestId, userCode } }); approvalComplete=true; copy.textContent = `Computador “${result.deviceName}” autorizado.`; status.textContent = 'Autorização concluída. O Paxinbot será trazido para frente automaticamente.'; approve.hidden=true; window.showToast?.('Computador autorizado.'); } catch (error) { approve.disabled=false; approve.removeAttribute('aria-busy'); approve.innerHTML='Autorizar computador <svg><use href="#i-check"></use></svg>'; status.textContent=error.message || 'Não foi possível autorizar este computador.'; } finally { approvalPending=false; } });
 }

@@ -26,8 +26,11 @@
       sessionStorage.removeItem('paxinbot_auth_return');
       const parsed = new URL(candidate, location.origin);
       const productId = parsed.searchParams.get('product') || '';
+      const requestId = parsed.searchParams.get('request') || '';
+      const userCode = String(parsed.searchParams.get('code') || '').toUpperCase();
       if (parsed.origin === location.origin && parsed.pathname === '/conta/checkout' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId) && parsed.searchParams.size === 1) safeReturn = `/conta/checkout?product=${encodeURIComponent(productId)}`;
       else if (parsed.origin === location.origin && parsed.pathname === '/conta/downloads' && parsed.searchParams.size === 0) safeReturn = '/conta/downloads';
+      else if (parsed.origin === location.origin && parsed.pathname === '/activate' && !parsed.hash && parsed.searchParams.size === 2 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) && /^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/.test(userCode)) safeReturn = `/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`;
     } catch {}
     location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : params.get('flow') === 'passkey' ? '/conta/seguranca' : safeReturn);
   } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }
