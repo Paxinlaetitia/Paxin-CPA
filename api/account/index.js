@@ -11,8 +11,8 @@ const WINDOWS_RELEASE = Object.freeze({
   expiresIn: 120
 });
 
-async function signedWindowsRelease(req, res, session) {
-  if (!await requestRateLimit(req, res, { scope:'account_download_user', subject:session.user.id, limit:20, windowSeconds:3600 })) return;
+async function signedWindowsRelease(req, res) {
+  if (!await requestRateLimit(req, res, { scope:'public_download_ip', limit:20, windowSeconds:3600 })) return;
   try {
     const expires=Math.floor(Date.now()/1000)+WINDOWS_RELEASE.expiresIn;
     const nonce=crypto.randomBytes(18).toString('base64url');
@@ -21,6 +21,13 @@ async function signedWindowsRelease(req, res, session) {
     const url=new URL(WINDOWS_RELEASE.path,publicOrigin(req));
     url.searchParams.set('expires',String(expires)); url.searchParams.set('nonce',nonce); url.searchParams.set('signature',signature);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    if (String(req.query?.redirect || '') === '1') {
+      res.statusCode=302;
+      res.setHeader('Location',url.toString());
+      res.setHeader('Referrer-Policy','no-referrer');
+      res.setHeader('X-Content-Type-Options','nosniff');
+      return res.end();
+    }
     return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:WINDOWS_RELEASE.fileName, version:WINDOWS_RELEASE.version, sizeBytes:WINDOWS_RELEASE.sizeBytes, sha256:WINDOWS_RELEASE.sha256, expiresIn:WINDOWS_RELEASE.expiresIn } });
   } catch {
     return json(res, 503, { ok:false, error:'O instalador está temporariamente indisponível.' });
@@ -42,16 +49,16 @@ const queries = {
 
 module.exports = async (req, res) => {
   if (!requireTrustedHost(req, res)) return;
+  if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
+  const queryAction = String(req.query?.action || 'overview');
+  if (req.method === 'GET' && queryAction === 'download') return signedWindowsRelease(req, res);
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
-  if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!await requestRateLimit(req, res, {
     scope:req.method === 'GET' ? 'account_read_user' : 'account_write_user',
     subject:session.user.id, limit:req.method === 'GET' ? 300 : 120, windowSeconds:600
   })) return;
   if (req.method === 'GET') {
-    const queryAction = String(req.query?.action || 'overview');
-    if (queryAction === 'download') return signedWindowsRelease(req, res, session);
     const item = queries[queryAction];
     if (!item) return json(res, 404, { ok: false, error: 'Consulta não encontrada.' });
     if (queryAction === 'order' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(req.query?.orderId || ''))) return json(res, 400, { ok:false, error:'Pedido inválido.' });

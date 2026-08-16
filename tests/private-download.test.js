@@ -46,8 +46,8 @@ test('release is served only through the R2-bound Worker', () => {
   assert.equal(fs.existsSync(path.join(root,'supabase/migrations/20260901_private_app_download.sql')),false);
 });
 
-test('authenticated account receives only a short-lived signed installer URL', async () => {
-  const handler=loadHandler();
+test('public visitor receives only a short-lived signed installer URL', async () => {
+  const handler=loadHandler(false);
   const res=response();
   await handler({ method:'GET', query:{ action:'download' }, headers:{}, socket:{} }, res);
   const payload=JSON.parse(res.body);
@@ -68,23 +68,34 @@ test('authenticated account receives only a short-lived signed installer URL', a
   assert.equal(res.headers['cache-control'],'private, no-store, max-age=0');
 });
 
-test('download is unavailable without a browser session', async () => {
+test('public download does not require a browser session', async () => {
   const handler=loadHandler(false);
   const res=response();
   await handler({ method:'GET', query:{ action:'download' }, headers:{}, socket:{} }, res);
-  assert.equal(res.statusCode,401);
-  assert.doesNotMatch(res.body,/signed|supabase|sha256/i);
+  assert.equal(res.statusCode,200);
+  assert.equal(JSON.parse(res.body).data.fileName,'PaxinbotSetup.exe');
+});
+
+test('public download button redirects to the short-lived Worker URL', async () => {
+  const handler=loadHandler(false);
+  const res=response();
+  await handler({ method:'GET', query:{ action:'download', redirect:'1' }, headers:{}, socket:{} }, res);
+  assert.equal(res.statusCode,302);
+  const location=new URL(res.headers.location);
+  assert.equal(location.pathname,'/releases/PaxinbotSetup.exe');
+  assert.match(location.searchParams.get('signature'),/^[A-Za-z0-9_-]{43}$/);
+  assert.equal(res.headers['cache-control'],'private, no-store, max-age=0');
 });
 
 test('download fails closed when its dedicated secret is absent', async () => {
-  const handler=loadHandler(true,'');
+  const handler=loadHandler(false,'');
   const res=response();
   await handler({ method:'GET', query:{ action:'download' }, headers:{}, socket:{} }, res);
   assert.equal(res.statusCode,503);
   assert.doesNotMatch(res.body,/secret|token|signature/i);
 });
 
-test('client download is account-bound and does not expose a permanent asset URL', () => {
+test('client download remains short-lived and does not expose a permanent asset URL', () => {
   const page=fs.readFileSync(path.join(root,'cliente.html'),'utf8');
   const client=fs.readFileSync(path.join(root,'auth-client.js'),'utf8');
   assert.match(page,/id="account-download-installer"/);
@@ -93,12 +104,8 @@ test('client download is account-bound and does not expose a permanent asset URL
   assert.equal(fs.existsSync(path.join(root,'PaxinbotSetup.exe')),false);
 });
 
-test('public download actions open signup and preserve the protected downloads destination', () => {
-  const client=fs.readFileSync(path.join(root,'auth-client.js'),'utf8');
-  const callback=fs.readFileSync(path.join(root,'auth-callback.js'),'utf8');
+test('public download actions point directly to the short-lived download endpoint', () => {
   const publicFiles=['index.html','produto.html','download.html','site-shell.js'].map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');
-  assert.match(publicFiles,/\/conta\/downloads\?mode=signup/);
-  assert.match(client,/setAuthMode\(requestedAuthMode\(\)\)/);
-  assert.match(client,/paxinbot_auth_return',accountRoutes\.downloads/);
-  assert.match(callback,/parsed\.pathname === '\/conta\/downloads'/);
+  assert.match(publicFiles,/\/api\/account\?action=download&amp;redirect=1/);
+  assert.doesNotMatch(publicFiles,/\/conta\/downloads\?mode=signup/);
 });
