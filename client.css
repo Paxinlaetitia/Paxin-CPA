@@ -408,3 +408,26 @@
   .portal-page.is-active { animation: none; }
   .portal-nav button,.portal-nav a,.portal-logout,.portal-text-action,.portal-plan-grid a,.portal-quick-grid a svg { transition: none; }
 }
+.auth-eye {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.auth-eye svg { width: 18px; height: 18px; pointer-events: none; }
+.auth-eye:hover,
+.auth-eye:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.auth-eye:focus-visible { outline: 2px solid rgba(240, 165, 0, .55); outline-offset: 2px; }
+.auth-eye.is-animating svg { animation: auth-eye-toggle 160ms ease-out; }
+@keyframes auth-eye-toggle {
+  50% { opacity: .35; transform: scale(.78); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-eye.is-animating svg { animation: none; }
+}

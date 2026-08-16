@@ -29,6 +29,13 @@ function actionOf(req) {
   if (req.query?.action) return String(req.query.action);
   return new URL(req.url || '/', 'http://localhost').pathname.split('/').filter(Boolean).pop() || '';
 }
+const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,22}[a-z0-9])?$/;
+function normalizeUsername(value) { return String(value || '').trim().toLowerCase(); }
+async function persistSignupUsername(accessToken, username) {
+  if (!accessToken || !USERNAME_PATTERN.test(username)) return false;
+  const { response } = await upstream('/rest/v1/rpc/paxinbot_update_my_profile', { method: 'POST', headers: { authorization: `Bearer ${accessToken}` }, body: { p_display_name: username } });
+  return response.ok;
+}
 
 module.exports = async (req, res) => {
   const action = actionOf(req);
@@ -65,6 +72,10 @@ module.exports = async (req, res) => {
     const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { email, token: code, type: purpose === 'signup' ? 'signup' : 'email' } });
     if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'Não foi possível confirmar o código.') });
     if (passwordUser && passwordUser.id !== verified.payload.user.id) return json(res, 401, { ok: false, error: 'O código não corresponde à conta confirmada pela senha.' });
+    if (purpose === 'signup') {
+      const username = normalizeUsername(verified.payload.user.user_metadata?.display_name);
+      if (USERNAME_PATTERN.test(username)) await persistSignupUsername(verified.payload.access_token, username).catch(() => false);
+    }
     res.setHeader('Set-Cookie', [...sessionCookies(req, verified.payload.access_token, verified.payload.refresh_token), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]);
     const result = { ok: true, confirmed: true, flow: purpose === 'signup' ? 'signup' : 'login' };
     if (purpose === 'passkey') result.passkeySession = { accessToken: verified.payload.access_token, refreshToken: verified.payload.refresh_token };
@@ -117,11 +128,13 @@ module.exports = async (req, res) => {
   }
   if (action === 'signup') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
-    const body = await readBody(req); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    const body = await readBody(req); const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    if (!USERNAME_PATTERN.test(username)) return json(res, 400, { ok: false, error: 'Use um nome de usuário de 3 a 24 caracteres, com letras, números, ponto, hífen ou sublinhado.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 10 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 10 caracteres.' });
-    const { response, payload } = await upstream('/auth/v1/signup', { method: 'POST', body: { email, password, data: {}, email_redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=signup` } });
+    const { response, payload } = await upstream('/auth/v1/signup', { method: 'POST', body: { email, password, data: { display_name: username }, email_redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=signup` } });
     if (!response.ok) return json(res, 400, { ok: false, error: 'Não foi possível criar a conta com esses dados.' });
     if (payload?.access_token && payload?.user?.email_confirmed_at) {
+      await persistSignupUsername(payload.access_token, username).catch(() => false);
       res.setHeader('Set-Cookie', sessionCookies(req, payload.access_token, payload.refresh_token));
       return json(res, 200, { ok: true, confirmed: true, message: 'Conta criada e confirmada.' });
     }

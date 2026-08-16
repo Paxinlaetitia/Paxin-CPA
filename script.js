@@ -99,12 +99,20 @@ document.querySelector('.js-forgot')?.addEventListener('click', async () => {
 
 document.querySelector('.js-create-account')?.addEventListener('click', () => { window.location.href = '/planos'; });
 
-const passwordField = document.getElementById('client-password');
-document.querySelector('.auth-eye')?.addEventListener('click', event => {
-  if (!passwordField) return;
-  const showing = passwordField.type === 'text';
-  passwordField.type = showing ? 'password' : 'text';
-  event.currentTarget.textContent = showing ? 'Mostrar' : 'Ocultar';
+document.querySelectorAll('[data-password-toggle]').forEach(button => {
+  button.addEventListener('click', () => {
+    const field = document.querySelector(button.dataset.passwordToggle || '');
+    if (!(field instanceof HTMLInputElement)) return;
+    const willShow = field.type === 'password';
+    field.type = willShow ? 'text' : 'password';
+    button.setAttribute('aria-pressed', String(willShow));
+    button.setAttribute('aria-label', willShow ? 'Ocultar senha' : 'Mostrar senha');
+    button.querySelector('use')?.setAttribute('href', willShow ? '#i-eye-off' : '#i-eye');
+    button.classList.remove('is-animating');
+    void button.offsetWidth;
+    button.classList.add('is-animating');
+  });
+  button.addEventListener('animationend', () => button.classList.remove('is-animating'));
 });
 
 
