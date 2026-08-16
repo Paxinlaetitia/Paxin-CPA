@@ -142,4 +142,17 @@ test('page-wide separators are removed without stripping component boundaries', 
   assert.match(css,/\.legal-hero\s*\{[^}]*border-bottom:\s*0/);
   assert.match(css,/\.legal-document\s*>\s*section\s*\{[^}]*border-bottom:\s*0/);
   assert.match(css,/\.trust-strip,[\s\S]*?\.download-hero\s*\{[^}]*border-block:\s*0/);
+  assert.match(css,/\.eyebrow\s*\{[^}]*gap:\s*0/);
+  assert.match(css,/\.eyebrow\s*>\s*span:first-child:empty\s*\{[^}]*display:\s*none/);
+});
+
+test('unknown public pages use a hardened redirect page without affecting API routing', () => {
+  const root=path.join(__dirname,'..');
+  const fallback=fs.readFileSync(path.join(root,'404.html'),'utf8');
+  const config=JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
+  assert.match(fallback,/<meta\s+http-equiv="refresh"\s+content="0; url=\/"/i);
+  assert.match(fallback,/<meta\s+name="robots"\s+content="noindex, nofollow, noarchive"/i);
+  assert.doesNotMatch(fallback,/<script\b/i);
+  assert.equal(fs.existsSync(path.join(root,'robots.txt')),false);
+  assert.equal(config.rewrites.some(route=>route.source==='/api/:path*'),false);
 });

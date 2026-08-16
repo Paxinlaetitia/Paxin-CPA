@@ -44,10 +44,11 @@ test('admin-specific files are not deployed from the public root', () => {
   assert.equal(fs.existsSync(path.join(root, 'api', 'admin', '_assets', 'page.txt')), true);
 });
 
-test('unauthenticated visitors receive a generic 404 without admin markup', async () => {
+test('unauthenticated visitors are redirected home without admin markup', async () => {
   const handler = loadHandler(); const res = response();
   await handler({ method: 'GET', query: { view: 'page' }, headers: {}, socket: {} }, res);
-  assert.equal(res.statusCode, 404);
+  assert.equal(res.statusCode, 302);
+  assert.equal(res.headers.location, '/');
   assert.doesNotMatch(res.body, /Administração|GESTÃO PAXINBOT|admin-client/i);
   assert.equal(res.headers['cache-control'], 'private, no-store, max-age=0');
 });

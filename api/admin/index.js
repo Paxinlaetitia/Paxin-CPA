@@ -3,12 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256, clientAddress, recordSiteSecurityEvent } = require('../_paxinbot');
 function hiddenAdminResponse(res) {
-  res.statusCode = 404;
-  res.setHeader('content-type', 'text/html; charset=utf-8');
+  res.statusCode = 302;
+  res.setHeader('location', '/');
   res.setHeader('cache-control', 'private, no-store, max-age=0');
   res.setHeader('x-robots-tag', 'noindex, nofollow, noarchive');
-  res.setHeader('content-security-policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
-  return res.end('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Página não encontrada</title></head><body><main><h1>Página não encontrada</h1><p>Verifique o endereço informado.</p><a href="/">Voltar ao início</a></main></body></html>');
+  return res.end();
 }
 function protectedAdminFile(res, name, contentType) {
   const file = path.join(__dirname, '_assets', name);
