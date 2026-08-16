@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBodyResult, browserSession, upstream, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
 const queries = {
   overview: ['paxinbot_get_my_account', () => ({})],
@@ -17,6 +17,11 @@ const queries = {
 module.exports = async (req, res) => {
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
+  if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
+  if (!await requestRateLimit(req, res, {
+    scope:req.method === 'GET' ? 'account_read_user' : 'account_write_user',
+    subject:session.user.id, limit:req.method === 'GET' ? 300 : 120, windowSeconds:600
+  })) return;
   if (req.method === 'GET') {
     const queryAction = String(req.query?.action || 'overview');
     const item = queries[queryAction];
@@ -26,7 +31,6 @@ module.exports = async (req, res) => {
     const checkoutReady = Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN && process.env.MERCADOPAGO_WEBHOOK_SECRET && process.env.SUPABASE_SECRET_KEY);
     return json(res, response.ok ? 200 : 503, response.ok ? { ok: true, data: payload, ...(String(req.query?.action) === 'products' ? { checkoutReady } : {}) } : { ok: false, error: safeUpstreamError(payload, 'Esta área ainda não foi ativada no banco de dados.') });
   }
-  if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
   const actions = {
@@ -46,6 +50,16 @@ module.exports = async (req, res) => {
   if (action === 'replyTicket' && (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.ticketId || '')) || String(body.message || '').trim().length < 2 || String(body.message || '').trim().length > 3000)) return json(res, 400, { ok:false, error:'Resposta inválida.' });
   if (action === 'activateUsage' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.grantId || ''))) return json(res, 400, { ok:false, error:'Crédito de uso inválido.' });
   if (action === 'claimPromotion' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.promotionId || ''))) return json(res, 400, { ok:false, error:'Promoção inválida.' });
+  const sensitiveLimits = {
+    createTicket:['account_ticket_user', 5, 3600],
+    replyTicket:['account_ticket_reply_user', 30, 3600],
+    activateUsage:['account_usage_user', 20, 3600],
+    claimPromotion:['account_promotion_user', 10, 3600]
+  };
+  if (sensitiveLimits[action]) {
+    const [scope, limit, windowSeconds] = sensitiveLimits[action];
+    if (!await requestRateLimit(req, res, { scope, subject:session.user.id, limit, windowSeconds })) return;
+  }
   const { response, payload } = await upstream(`/rest/v1/rpc/${item[0]}`, { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: item[1]() });
   return json(res, response.ok ? 200 : 400, response.ok ? { ok: true, data: payload } : { ok: false, error: safeUpstreamError(payload) });
 };

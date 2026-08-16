@@ -36,12 +36,16 @@ test('signup rejects invalid usernames before contacting the identity provider',
 
 test('signup normalizes and stores the username as authenticated profile metadata', async () => {
   const calls = [];
-  global.fetch = async (url, options) => { calls.push({ url, options }); return jsonReply(200, { user:{ id:'2bb411cf-c4cd-4404-9ac2-f49fe9cd11b0' } }); };
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/paxinbot_service_rate_limit_v2')) return jsonReply(200, { allowed:true, remaining:9, resetAfter:3600 });
+    return jsonReply(200, { user:{ id:'2bb411cf-c4cd-4404-9ac2-f49fe9cd11b0' } });
+  };
   const res = response();
   await handler(request({ username:'  Guilherme.137  ', email:'CLIENTE@EXAMPLE.COM', password:'uma-senha-segura' }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.verificationRequired, true);
-  const payload = JSON.parse(calls[0].options.body);
+  const payload = JSON.parse(calls[2].options.body);
   assert.equal(payload.email, 'cliente@example.com');
   assert.deepEqual(payload.data, { display_name:'guilherme.137' });
   assert.equal(Object.hasOwn(payload, 'passwordConfirm'), false);

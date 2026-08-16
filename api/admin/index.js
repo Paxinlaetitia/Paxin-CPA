@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { json, readBodyResult, browserSession, upstream, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
 function hiddenAdminResponse(res) {
   res.statusCode = 404;
   res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -46,11 +46,13 @@ module.exports = async (req, res) => {
     return hiddenAdminResponse(res);
   }
   if (req.method === 'GET') {
+    if (!await requestRateLimit(req, res, { scope:'admin_read_user', subject:session.user.id, limit:600, windowSeconds:600 })) return;
     const item = queries[String(req.query?.action || 'overview')]; if (!item) return json(res, 404, { ok: false, error: 'Consulta não encontrada.' });
     const { response, payload } = await upstream(`/rest/v1/rpc/${item[0]}`, { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: item[1](req.query || {}) });
     return json(res, response.ok ? 200 : 403, response.ok ? { ok: true, data: payload, adminPath: '/gestao/e7fc8a8f64e6e0aed8e92b6a' } : { ok: false, error: 'O painel não encontrou as funções de proprietário no banco. Execute a migração principal novamente.' });
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+  if (!await requestRateLimit(req, res, { scope:'admin_write_user', subject:session.user.id, limit:120, windowSeconds:600 })) return;
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
   if (action === 'product') {

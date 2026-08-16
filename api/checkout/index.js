@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBodyResult, browserSession, upstream, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
+const { json, readBodyResult, browserSession, upstream, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COUPON = /^[A-Z0-9_-]{3,32}$/;
@@ -70,6 +70,7 @@ module.exports = async (req, res) => {
   if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para continuar.' });
 
   if (req.method === 'GET') {
+    if (!await requestRateLimit(req, res, { scope:'checkout_read_user', subject:session.user.id, limit:300, windowSeconds:600 })) return;
     const orderId = String(req.query?.orderId || '');
     if (!UUID.test(orderId)) return json(res, 400, { ok:false, error:'Pedido inválido.' });
     const { response, payload } = await rpc(session.access, 'paxinbot_get_checkout_status', { p_order_id:orderId });
@@ -80,6 +81,14 @@ module.exports = async (req, res) => {
 
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const action = String(body.action || 'create');
+  const checkoutLimits = {
+    quote:['checkout_quote_user', 60, 600],
+    create:['checkout_create_user', 10, 600],
+    resume:['checkout_resume_user', 10, 600],
+    receipt:['checkout_receipt_user', 5, 86400]
+  };
+  const selectedLimit = checkoutLimits[action];
+  if (selectedLimit && !await requestRateLimit(req, res, { scope:selectedLimit[0], subject:session.user.id, limit:selectedLimit[1], windowSeconds:selectedLimit[2] })) return;
   if (action === 'quote') {
     const productId = String(body.productId || '');
     const couponCode = String(body.couponCode || '').trim().toUpperCase();

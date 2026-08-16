@@ -246,6 +246,37 @@ async function serviceRateLimit(scope, subject, limit, windowSeconds) {
   });
   return response.ok && payload === true;
 }
+async function requestRateLimit(req, res, options = {}) {
+  const scope = String(options.scope || '').slice(0, 40);
+  const subject = String(options.subject || clientAddress(req));
+  const limit = Math.max(1, Math.min(1000, Number(options.limit) || 1));
+  const windowSeconds = Math.max(10, Math.min(86400, Number(options.windowSeconds) || 60));
+  const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
+    method:'POST',
+    body:{
+      p_scope:scope,
+      p_subject_hash:serverFingerprint(scope, subject),
+      p_limit:limit,
+      p_window_seconds:windowSeconds,
+      p_cost:1
+    }
+  });
+  const allowed = payload?.allowed === true;
+  const remaining = Number(payload?.remaining);
+  const resetAfter = Number(payload?.resetAfter);
+  if (!response.ok || !Number.isInteger(remaining) || remaining < 0 || !Number.isInteger(resetAfter) || resetAfter < 1 || resetAfter > windowSeconds) {
+    json(res, 503, { ok:false, code:'rate_limit_unavailable', error:'A proteção contra abuso está temporariamente indisponível. Tente novamente em instantes.' }, { 'retry-after':'10' });
+    return false;
+  }
+  res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
+  res.setHeader('RateLimit', `limit=${limit}, remaining=${Math.min(limit, remaining)}, reset=${resetAfter}`);
+  if (allowed) return true;
+  json(res, 429, {
+    ok:false, code:'rate_limited', retryAfter:resetAfter,
+    error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
+  }, { 'retry-after':String(resetAfter) });
+  return false;
+}
 function publicOrigin(req) {
   let origin = String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, '');
   // O domínio configurado na Vercel usa www como host canônico. Retornos OAuth
@@ -354,4 +385,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
