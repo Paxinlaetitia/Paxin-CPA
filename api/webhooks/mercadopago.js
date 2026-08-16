@@ -26,6 +26,15 @@ function mercadoPagoToken() {
 function webhookDiagnostic(event, details = {}) {
   console.warn(JSON.stringify({ event, ...details }));
 }
+function isExpandedSimulation(body) {
+  const data = body?.data;
+  if (!data || typeof data !== 'object' || !data.id) return false;
+  return Boolean(
+    (data.transactions && typeof data.transactions === 'object') ||
+    Object.prototype.hasOwnProperty.call(data, 'total_paid_amount') ||
+    Object.prototype.hasOwnProperty.call(data, 'transaction_amount')
+  );
+}
 function publicPaymentSnapshot(payment) {
   return {
     statusDetail:String(payment?.status_detail || '').slice(0,100),
@@ -65,6 +74,12 @@ module.exports = async (req, res) => {
   const isOrder = type === 'order' || type.startsWith('order.');
   const isPayment = !type || type === 'payment' || type.startsWith('payment.');
   if (!isOrder && !isPayment) return json(res, 200, { ok:true, ignored:true });
+  // O simulador do painel envia um recurso fictício expandido. Ele deve apenas
+  // validar a entrega da URL; nunca pode finalizar uma compra ou liberar acesso.
+  if (isExpandedSimulation(body)) {
+    webhookDiagnostic('mercadopago_webhook_simulation_acknowledged', { resource:isOrder ? 'order' : 'payment' });
+    return json(res, 200, { ok:true, simulated:true });
+  }
 
   try {
     if (isOrder) {

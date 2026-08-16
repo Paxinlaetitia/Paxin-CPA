@@ -67,6 +67,10 @@ test('Mercado Pago webhook supports signed Order events without dropping Checkou
   assert.match(webhook, /code:'invalid_signature'/);
   assert.match(webhook, /code:'provider_lookup_failed'/);
   assert.match(webhook, /code:'finalization_failed'/);
+  assert.match(webhook, /isExpandedSimulation\(body\)/);
+  assert.match(webhook, /mercadopago_webhook_simulation_acknowledged/);
+  assert.match(webhook, /return json\(res, 200, \{ ok:true, simulated:true \}\)/);
+  assert.ok(webhook.indexOf('verifySignature(req, dataId)') < webhook.indexOf('isExpandedSimulation(body)'), 'a simulação só pode ser aceita após validar a assinatura');
 });
 
 test('client locks the payment action and reuses one request id per attempt', () => {
