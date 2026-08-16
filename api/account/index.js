@@ -3,7 +3,7 @@ const { json, requireTrustedHost, readBodyResult, browserSession, upstream, serv
 
 const WINDOWS_RELEASE = Object.freeze({
   bucket: 'paxinbot-releases',
-  objectPath: 'windows/PaxinbotSetup.exe',
+  objectPath: 'PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
   version: '1.0.0',
   sizeBytes: 101433299,

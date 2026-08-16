@@ -63,7 +63,7 @@ As ações exatas e o registro por etapa ficam em
 ## 6. Aplicativo e distribuição
 
 - versão, ícone, instalador e URL de download correspondem ao release;
-- bucket `paxinbot-releases` privado e objeto `windows/PaxinbotSetup.exe` enviado;
+- bucket `paxinbot-releases` privado e objeto `PaxinbotSetup.exe` enviado na raiz;
 - download autenticado gera somente URL assinada de dois minutos;
 - hash/assinatura do artefato conferidos pelo fluxo de integridade;
 - autorização via navegador não envia senha ao executável;

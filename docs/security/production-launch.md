@@ -51,15 +51,13 @@ Não crie manualmente `NODE_ENV`, `VERCEL_ENV` ou `VERCEL_URL`.
 1. no SQL Editor do Supabase, aplique
    `supabase/migrations/20260901_private_app_download.sql`;
 2. abra **Storage > paxinbot-releases** e confirme que o bucket está `Private`;
-3. crie a pasta virtual `windows` apenas para organizar o Storage;
-4. envie `C:\Users\Guilh\OneDrive\Desktop\PaxinbotSetup.exe` com o nome exato
+3. envie `C:\Users\Guilh\OneDrive\Desktop\PaxinbotSetup.exe` com o nome exato
    `PaxinbotSetup.exe`;
-5. confirme o caminho final `windows/PaxinbotSetup.exe`;
-6. não torne o bucket público e não crie policy para `anon` ou `authenticated`;
-7. não envie o EXE para GitHub, `public/` ou a raiz do projeto Vercel.
+4. confirme que o arquivo está na raiz do bucket, sem pasta;
+5. não torne o bucket público e não crie policy para `anon` ou `authenticated`;
+6. não envie o EXE para GitHub, `public/` ou a raiz do projeto Vercel.
 
-O cliente baixa somente `PaxinbotSetup.exe`. A pasta virtual `windows` não é
-baixada e não aparece durante a instalação; o próprio setup cria as pastas do
+O cliente baixa somente `PaxinbotSetup.exe`; o próprio setup cria as pastas do
 programa no computador.
 
 O arquivo candidato possui:

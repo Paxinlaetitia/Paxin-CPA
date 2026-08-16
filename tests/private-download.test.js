@@ -40,7 +40,7 @@ test('private release bucket remains non-public and has a bounded executable siz
 });
 
 test('authenticated account receives only a short-lived signed installer URL', async () => {
-  const handler=loadHandler('/object/sign/paxinbot-releases/windows/PaxinbotSetup.exe?token=signed');
+  const handler=loadHandler('/object/sign/paxinbot-releases/PaxinbotSetup.exe?token=signed');
   const res=response();
   await handler({ method:'GET', query:{ action:'download' }, headers:{}, socket:{} }, res);
   const payload=JSON.parse(res.body);
@@ -48,12 +48,12 @@ test('authenticated account receives only a short-lived signed installer URL', a
   assert.equal(payload.data.expiresIn,120);
   assert.equal(payload.data.fileName,'PaxinbotSetup.exe');
   assert.equal(payload.data.sha256,'3139286a02c9c9746881ccacf38f922f1050e15e10a1d1d649f76f206b055387');
-  assert.match(payload.data.url,/^https:\/\/project\.supabase\.co\/storage\/v1\/object\/sign\/paxinbot-releases\/windows\/PaxinbotSetup\.exe\?/);
+  assert.match(payload.data.url,/^https:\/\/project\.supabase\.co\/storage\/v1\/object\/sign\/paxinbot-releases\/PaxinbotSetup\.exe\?/);
   assert.equal(res.headers['cache-control'],'private, no-store, max-age=0');
 });
 
 test('download is unavailable without a browser session', async () => {
-  const handler=loadHandler('/object/sign/paxinbot-releases/windows/PaxinbotSetup.exe?token=signed',false);
+  const handler=loadHandler('/object/sign/paxinbot-releases/PaxinbotSetup.exe?token=signed',false);
   const res=response();
   await handler({ method:'GET', query:{ action:'download' }, headers:{}, socket:{} }, res);
   assert.equal(res.statusCode,401);
