@@ -19,7 +19,6 @@
       body:JSON.stringify({ accessToken, refreshToken:refreshToken || '' })
     });
     if (!response.ok) throw new Error('session_unavailable');
-    if (params.get('flow') === 'passkey') sessionStorage.setItem('paxinbot_passkey_session', JSON.stringify({ accessToken, refreshToken:refreshToken || '' }));
     let safeReturn = '/conta';
     try {
       const candidate = sessionStorage.getItem('paxinbot_auth_return') || '';
@@ -32,6 +31,6 @@
       else if (parsed.origin === location.origin && parsed.pathname === '/conta/downloads' && parsed.searchParams.size === 0) safeReturn = '/conta/downloads';
       else if (parsed.origin === location.origin && parsed.pathname === '/activate' && !parsed.hash && parsed.searchParams.size === 2 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) && /^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/.test(userCode)) safeReturn = `/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`;
     } catch {}
-    location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : params.get('flow') === 'passkey' ? '/conta/seguranca' : safeReturn);
+    location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : safeReturn);
   } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }
 })();

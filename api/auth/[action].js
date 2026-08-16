@@ -25,6 +25,41 @@ function friendlyCodeError(payload, fallback) {
   if (/rate.?limit|too many/i.test(message)) return 'Muitas solicitações. Aguarde alguns minutos antes de tentar novamente.';
   return fallback;
 }
+function friendlyPasskeyError(payload, fallback = 'Não foi possível concluir a operação com a passkey.') {
+  const code = String(payload?.code || '').toLowerCase();
+  const message = String(payload?.msg || payload?.message || payload?.error_description || '');
+  if (code === 'passkey_disabled' || /passkey.*disabled|not enabled/i.test(message)) return 'As passkeys ainda não estão habilitadas no servidor de autenticação.';
+  if (code === 'too_many_passkeys') return 'Esta conta atingiu o limite de passkeys cadastradas.';
+  if (code === 'webauthn_credential_exists' || /credential.*exists|already.*registered/i.test(message)) return 'Esta passkey já está cadastrada para a conta.';
+  if (code === 'webauthn_challenge_expired') return 'A confirmação da passkey expirou. Tente novamente.';
+  if (code === 'webauthn_verification_failed') return 'A passkey não pôde ser validada por este dispositivo.';
+  return fallback;
+}
+function normalizedPasskeys(payload) {
+  const values = Array.isArray(payload) ? payload : Array.isArray(payload?.passkeys) ? payload.passkeys : [];
+  return values.filter(item => item && typeof item === 'object').map(item => ({
+    id:/^[0-9a-f-]{36}$/i.test(String(item.id || '')) ? String(item.id) : '',
+    friendlyName:String(item.friendly_name || item.friendlyName || 'Passkey').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 120) || 'Passkey',
+    createdAt:String(item.created_at || item.createdAt || '').slice(0, 40),
+    lastUsedAt:String(item.last_used_at || item.lastUsedAt || '').slice(0, 40)
+  })).filter(item => item.id);
+}
+function normalizedRegistrationCredential(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const response = value.response;
+  const encoded = input => typeof input === 'string' && input.length >= 1 && input.length <= 24576 && /^[A-Za-z0-9_-]+$/.test(input);
+  if (value.type !== 'public-key' || !encoded(value.id) || !encoded(value.rawId) || !response || typeof response !== 'object' ||
+      !encoded(response.attestationObject) || !encoded(response.clientDataJSON)) return null;
+  const extensions = value.clientExtensionResults && typeof value.clientExtensionResults === 'object' && !Array.isArray(value.clientExtensionResults)
+    ? value.clientExtensionResults : {};
+  if (Buffer.byteLength(JSON.stringify(extensions), 'utf8') > 4096) return null;
+  return {
+    id:value.id, rawId:value.rawId, type:'public-key',
+    response:{ attestationObject:response.attestationObject, clientDataJSON:response.clientDataJSON },
+    clientExtensionResults:extensions,
+    ...(typeof value.authenticatorAttachment === 'string' ? { authenticatorAttachment:value.authenticatorAttachment.slice(0, 32) } : {})
+  };
+}
 function actionOf(req) {
   if (req.query?.action) return String(req.query.action);
   return new URL(req.url || '/', 'http://localhost').pathname.split('/').filter(Boolean).pop() || '';
@@ -51,7 +86,7 @@ module.exports = async (req, res) => {
     if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     return json(res, 200, { ok: true, token: issueCsrfToken(req, res) });
   }
-  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code'];
+  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code', 'passkey-register-options', 'passkey-register-verify', 'passkey-delete'];
   if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) {
     await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:45, subject:clientAddress(req), details:{ reasonCode:'origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
     return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
@@ -60,7 +95,7 @@ module.exports = async (req, res) => {
   if (action === 'login') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
-    const purpose = String(body.purpose || '') === 'passkey' ? 'passkey' : 'login';
+    const purpose = 'login';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 1 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe seu e-mail e sua senha.' });
     if (!await authRate(req, res, 'auth_login_ip', 30, 900) || !await authRate(req, res, 'auth_login_pair', 8, 900, email)) return;
     const authenticated = await upstream('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
@@ -80,7 +115,7 @@ module.exports = async (req, res) => {
     const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const jar = cookies(req); const code = String(body.code || '').replace(/\s/g, '');
     const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || ''); const temporaryAccess = String(jar.paxinbot_verify_access || '');
     if (!/^[0-9]{6}$/.test(code)) return json(res, 400, { ok: false, error: 'Informe o código de seis dígitos enviado ao seu e-mail.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup', 'passkey'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
     if (!await authRate(req, res, 'auth_verify_pair', 10, 600, email)) return;
     let passwordUser = null;
     if (purpose !== 'signup') {
@@ -101,19 +136,70 @@ module.exports = async (req, res) => {
     }
     res.setHeader('Set-Cookie', [...sessionCookies(req, verified.payload.access_token, verified.payload.refresh_token), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]);
     const result = { ok: true, confirmed: true, flow: purpose === 'signup' ? 'signup' : 'login' };
-    if (purpose === 'passkey') result.passkeySession = { accessToken: verified.payload.access_token, refreshToken: verified.payload.refresh_token };
     return json(res, 200, result);
   }
 
   if (action === 'resend-email-code') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const jar = cookies(req); const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || '');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup', 'passkey'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
     if (purpose !== 'signup' && !jar.paxinbot_verify_access) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
     if (!await authRate(req, res, 'auth_resend_pair', 3, 600, email)) return;
     const sent = purpose === 'signup' ? await upstream('/auth/v1/resend', { method: 'POST', body: { type: 'signup', email } }) : await upstream('/auth/v1/otp', { method: 'POST', body: { email, create_user: false } });
     if (!sent.response.ok) return json(res, 429, { ok: false, error: friendlyCodeError(sent.payload, 'Não foi possível reenviar o código agora.') });
     return json(res, 200, { ok: true, message: 'Um novo código foi enviado ao seu e-mail.' });
+  }
+
+  if (action === 'passkeys') {
+    if (req.method !== 'GET') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para gerenciar passkeys.' });
+    const { response, payload } = await upstream('/auth/v1/passkeys', { headers:{ authorization:`Bearer ${session.access}` } });
+    if (!response.ok) return json(res, response.status === 401 ? 401 : 503, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível consultar as passkeys agora.') });
+    return json(res, 200, { ok:true, data:normalizedPasskeys(payload) });
+  }
+
+  if (action === 'passkey-register-options') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para cadastrar a passkey.' });
+    if (!await authRate(req, res, 'auth_passkey_register', 8, 600, session.user.id)) return;
+    const { response, payload } = await upstream('/auth/v1/passkeys/registration/options', {
+      method:'POST', headers:{ authorization:`Bearer ${session.access}` }, body:{}
+    });
+    if (!response.ok || !payload?.challenge_id || !payload?.options) return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) });
+    return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
+  }
+
+  if (action === 'passkey-register-verify') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para cadastrar a passkey.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const challengeId = String(parsed.body.challengeId || '');
+    const credential = normalizedRegistrationCredential(parsed.body.credential);
+    if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !credential) return json(res, 400, { ok:false, error:'A resposta da passkey é inválida.' });
+    const { response, payload } = await upstream('/auth/v1/passkeys/registration/verify', {
+      method:'POST', headers:{ authorization:`Bearer ${session.access}` },
+      body:{ challenge_id:challengeId, credential }
+    });
+    if (!response.ok) return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) });
+    return json(res, 200, { ok:true, data:normalizedPasskeys([payload])[0] || null });
+  }
+
+  if (action === 'passkey-delete') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para remover a passkey.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const passkeyId = String(parsed.body.passkeyId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(passkeyId)) return json(res, 400, { ok:false, error:'A passkey informada é inválida.' });
+    if (!await authRate(req, res, 'auth_passkey_delete', 12, 600, session.user.id)) return;
+    const { response, payload } = await upstream(`/auth/v1/passkeys/${encodeURIComponent(passkeyId)}`, {
+      method:'DELETE', headers:{ authorization:`Bearer ${session.access}` }
+    });
+    if (!response.ok) return json(res, response.status === 404 ? 404 : 400, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível remover esta passkey.') });
+    return json(res, 200, { ok:true });
   }
 
   if (action === 'logout') {
@@ -197,8 +283,8 @@ module.exports = async (req, res) => {
   if (action === 'google') {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     if (!await authRate(req, res, 'auth_google_ip', 30, 600)) return;
-    const { url } = config(); const target = new URL(`${url}/auth/v1/authorize`); const intent = String(req.query?.intent || '') === 'passkey' ? 'passkey' : 'google';
-    target.searchParams.set('provider', 'google'); target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=${intent}`);
+    const { url } = config(); const target = new URL(`${url}/auth/v1/authorize`);
+    target.searchParams.set('provider', 'google'); target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=google`);
     res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' }); res.end(); return;
   }
   return json(res, 404, { ok: false, error: 'Rota não encontrada.' });
