@@ -108,10 +108,12 @@ test('legal pages are static, hardened and linked from account-sensitive flows',
   for (const name of pages) {
     const html=fs.readFileSync(path.join(root,name),'utf8');
     assert.doesNotMatch(html,/<script(?![^>]*\bsrc=)/i);
-    assert.doesNotMatch(html,/<form\b/i);
+    assert.equal((html.match(/<form\b/gi) || []).length,1);
+    assert.match(html,/<form class="legal-site-search" action="\/ajuda" method="get" role="search">/);
     assert.doesNotMatch(html,/\b(?:SUPABASE_SECRET_KEY|MERCADOPAGO_ACCESS_TOKEN|PAXINBOT_SESSION_SECRET)\b/);
     assert.match(html,/src="\/site-shell\.js"/);
     assert.match(html,/Vigência: 16 de agosto de 2026/);
+    assert.doesNotMatch(html,/class="legal-document reveal/);
   }
   const shell=fs.readFileSync(path.join(root,'site-shell.js'),'utf8');
   const client=fs.readFileSync(path.join(root,'cliente.html'),'utf8');
@@ -142,8 +144,9 @@ test('page-wide separators are removed without stripping component boundaries', 
   assert.match(css,/\.legal-hero\s*\{[^}]*border-bottom:\s*0/);
   assert.match(css,/\.legal-document\s*>\s*section\s*\{[^}]*border-bottom:\s*0/);
   assert.match(css,/\.trust-strip,[\s\S]*?\.download-hero\s*\{[^}]*border-block:\s*0/);
+  assert.match(css,/main\s*>\s*section\s*\{[^}]*border-block:\s*0\s*!important/);
   assert.match(css,/\.eyebrow\s*\{[^}]*gap:\s*0/);
-  assert.match(css,/\.eyebrow\s*>\s*span:first-child:empty\s*\{[^}]*display:\s*none/);
+  assert.match(css,/\.eyebrow\s*>\s*span:first-child\s*\{[^}]*display:\s*none\s*!important/);
 });
 
 test('unknown public pages use a hardened redirect page without affecting API routing', () => {

@@ -87,6 +87,11 @@ function searchHelp() {
 }
 document.querySelector('.js-help-search')?.addEventListener('click', searchHelp);
 document.getElementById('help-search-input')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchHelp(); } });
+const initialHelpQuery = new URLSearchParams(window.location.search).get('q')?.trim();
+if (initialHelpQuery && document.getElementById('help-search-input')) {
+  document.getElementById('help-search-input').value = initialHelpQuery;
+  searchHelp();
+}
 
 document.querySelector('.js-forgot')?.addEventListener('click', async () => {
   const email = document.getElementById('client-email')?.value?.trim();
