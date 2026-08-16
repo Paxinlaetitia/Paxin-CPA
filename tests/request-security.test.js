@@ -120,3 +120,26 @@ test('legal pages are static, hardened and linked from account-sensitive flows',
   assert.match(client,/href="\/privacidade"[^>]*rel="noopener"/);
   assert.match(client,/href="\/reembolso"[^>]*rel="noopener"/);
 });
+
+test('help categories resolve to real article groups and support opens the account channel', () => {
+  const root=path.join(__dirname,'..');
+  const help=fs.readFileSync(path.join(root,'ajuda.html'),'utf8');
+  const shell=fs.readFileSync(path.join(root,'site-shell.js'),'utf8');
+  for (const id of ['primeiros-passos','aplicativo','conta','suporte']) {
+    assert.match(help,new RegExp(`id="${id}"`));
+    assert.match(help,new RegExp(`href="#${id}"`));
+  }
+  assert.equal((help.match(/<details/g) || []).length,13);
+  assert.match(help,/href="\/conta\/suporte"/);
+  assert.match(shell,/>AJUDA<\/b>/);
+  assert.match(shell,/href="\/conta\/suporte"/);
+});
+
+test('page-wide separators are removed without stripping component boundaries', () => {
+  const css=fs.readFileSync(path.join(__dirname,'..','styles.css'),'utf8');
+  assert.match(css,/\.site-footer\s*\{[^}]*border-top:\s*0/);
+  assert.match(css,/\.page-hero\s*\{[^}]*border-bottom:\s*0/);
+  assert.match(css,/\.legal-hero\s*\{[^}]*border-bottom:\s*0/);
+  assert.match(css,/\.legal-document\s*>\s*section\s*\{[^}]*border-bottom:\s*0/);
+  assert.match(css,/\.trust-strip,[\s\S]*?\.download-hero\s*\{[^}]*border-block:\s*0/);
+});

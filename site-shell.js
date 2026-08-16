@@ -68,7 +68,8 @@
           <div><a class="brand" href="/"><span class="brand-mark"><img src="/assets/paxinbot-mark.svg" alt="" /></span><span class="brand-name">Paxinbot</span></a><p>Ambiente de trabalho para organizar sessões, rotinas e acompanhamento operacional.</p></div>
           <div class="footer-links">
             <div><b>PRODUTO</b><a href="/produto">Visão geral</a><a href="/recursos">Recursos</a><a href="/planos">Planos</a></div>
-            <div><b>CLIENTE</b><a href="/conta">Área do cliente</a><a href="/download">Download</a><a href="/ajuda">Central de ajuda</a></div>
+            <div><b>CLIENTE</b><a href="/conta">Área do cliente</a><a href="/download">Download</a></div>
+            <div><b>AJUDA</b><a href="/ajuda">Central de ajuda</a><a href="/ajuda#primeiros-passos">Primeiros passos</a><a href="/conta/suporte">Abrir chamado</a></div>
             <div><b>LEGAL</b><a href="/seguranca">Segurança</a><a href="/termos">Termos de uso</a><a href="/privacidade">Privacidade</a><a href="/reembolso">Reembolso</a></div>
           </div>
         </div>

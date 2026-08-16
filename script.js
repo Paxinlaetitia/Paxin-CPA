@@ -68,7 +68,7 @@ document.querySelector('.js-download')?.addEventListener('click', () => {
   window.location.href = '/api/account?action=download&redirect=1';
 });
 
-document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = '/ajuda'; });
+document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = '/conta/suporte'; });
 
 function searchHelp() {
   const input = document.getElementById('help-search-input');
