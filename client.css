@@ -343,6 +343,7 @@
 .portal-download-mark { width: 56px; height: 56px; display: grid; place-items: center; border: 1px solid rgba(240,165,0,.22); border-radius: 14px; background: var(--accent-soft); }
 .portal-download-mark img { width: 34px; filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%); }
 .portal-download-card .button { white-space: nowrap; }
+.portal-download-card small { display:block; margin-top:7px; color:var(--text-3); font-size:10px; }
 
 @keyframes portal-page-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
