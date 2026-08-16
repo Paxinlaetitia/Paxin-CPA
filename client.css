@@ -10,10 +10,13 @@
 .client-benefits > div { min-height: 104px; padding: 16px; }
 .client-trust { margin-top: 18px; }
 .auth-card { width: 100%; padding: 28px; border-radius: 18px; background: #090909; box-shadow: 0 24px 60px rgba(0,0,0,.36); }
-.auth-head { gap: 15px; }
+.auth-head { gap: 16px; margin-bottom: 22px; }
+.auth-head > div:last-child { display: grid; gap: 6px; align-content: center; }
 .auth-logo { width: 50px; height: 50px; flex: 0 0 auto; }
 .auth-logo img { width: 31px; height: 31px; opacity: 1; filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%); }
-.auth-head h2 { font-size: 25px; }
+.auth-head span { line-height: 1; }
+.auth-head h2 { margin: 0; font-size: 25px; line-height: 1.12; text-wrap: balance; }
+.auth-card > .auth-copy { margin: 0 0 22px; line-height: 1.6; text-wrap: pretty; }
 .prototype-notice { margin: 18px -28px -28px; }
 .auth-step-copy { display: grid; gap: 5px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #070707; }
 .auth-step-copy span { color: var(--accent); font-size: 8px; font-weight: 800; }
@@ -214,7 +217,7 @@
 .checkout-security p { margin: 0; font-size: 9px; line-height: 1.55; }
 .checkout-terms { color: var(--muted); font-size: 8px; line-height: 1.5; text-align: center; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; }
-.auth-purchase-context { display: grid; gap: 4px; margin: 0 0 14px; padding: 13px 14px; border: 1px solid rgba(240,165,0,.25); border-radius: 11px; background: rgba(240,165,0,.055); }
+.auth-purchase-context { display: grid; gap: 5px; margin: 0 0 22px; padding: 15px 16px; border: 1px solid rgba(240,165,0,.25); border-radius: 11px; background: rgba(240,165,0,.055); }
 .auth-purchase-context[hidden] { display: none !important; }
 .auth-purchase-context > span { color: var(--accent); font-size: 8px; font-weight: 800; letter-spacing: .09em; }
 .auth-purchase-context > b { font-size: 12px; }

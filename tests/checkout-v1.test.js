@@ -34,6 +34,8 @@ test('checkout collects only the approved customer fields and supports PIX plus 
   assert.match(html, /id="checkout-pix-code" readonly/);
   assert.doesNotMatch(html, /checkout[^\n]{0,200}(CPF|endereço de cobrança)/i);
   assert.match(css, /\.auth-purchase-context\[hidden\] \{ display: none !important; \}/);
+  assert.match(css, /\.auth-head \{ gap: 16px; margin-bottom: 22px; \}/);
+  assert.match(css, /\.auth-purchase-context \{ display: grid; gap: 5px; margin: 0 0 22px;/);
 });
 
 test('checkout server keeps private credentials server-side and creates idempotent PIX orders', () => {
