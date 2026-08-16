@@ -8,6 +8,7 @@ process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
 process.env.SUPABASE_SECRET_KEY = 'sb_secret_unique_backend_credential';
 process.env.PAXINBOT_SESSION_SECRET = 'unique-session-secret-with-at-least-32-bytes';
+process.env.PAXINBOT_DOWNLOAD_SIGNING_SECRET = 'unique-download-secret-with-at-least-32-bytes';
 
 const helpers = require('../api/_paxinbot');
 const { securityDiagnostic } = require('../server/security-log');
@@ -17,6 +18,7 @@ function validEnvironment() {
   process.env.SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test';
   process.env.SUPABASE_SECRET_KEY = 'sb_secret_unique_backend_credential';
   process.env.PAXINBOT_SESSION_SECRET = 'unique-session-secret-with-at-least-32-bytes';
+  process.env.PAXINBOT_DOWNLOAD_SIGNING_SECRET = 'unique-download-secret-with-at-least-32-bytes';
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   delete process.env.MERCADOPAGO_ACCESS_TOKEN;
   delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
@@ -43,6 +45,14 @@ test('legacy service-role variable is not accepted as a fallback', () => {
 test('session signing never falls back to another provider credential', () => {
   delete process.env.PAXINBOT_SESSION_SECRET;
   assert.throws(() => helpers.sessionSecret(), /Segredo de sessão interno ausente/);
+});
+
+test('private downloads require a distinct signing secret', () => {
+  delete process.env.PAXINBOT_DOWNLOAD_SIGNING_SECRET;
+  assert.throws(() => helpers.downloadSigningSecret(), /download privado ausente/);
+  validEnvironment();
+  process.env.PAXINBOT_DOWNLOAD_SIGNING_SECRET = process.env.PAXINBOT_SESSION_SECRET;
+  assert.throws(() => helpers.validateCoreEnvironment(), /exclusivas por finalidade/);
 });
 
 test('credentials reused across purposes are rejected', () => {

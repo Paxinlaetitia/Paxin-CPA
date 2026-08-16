@@ -1,9 +1,9 @@
 'use strict';
-const { json, requireTrustedHost, readBodyResult, browserSession, upstream, serviceUpstream, serviceConfig, requestRateLimit, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
+const crypto = require('node:crypto');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, downloadSigningSecret, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
 const WINDOWS_RELEASE = Object.freeze({
-  bucket: 'paxinbot-releases',
-  objectPath: 'PaxinbotSetup.exe',
+  path: '/releases/PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
   version: '1.0.0',
   sizeBytes: 101433299,
@@ -11,33 +11,17 @@ const WINDOWS_RELEASE = Object.freeze({
   expiresIn: 120
 });
 
-function verifiedStorageUrl(value) {
-  const base = new URL(serviceConfig().url);
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  let signed;
-  try {
-    signed = raw.startsWith('http')
-      ? new URL(raw)
-      : new URL(raw.startsWith('/storage/v1/') ? raw : `/storage/v1${raw.startsWith('/') ? '' : '/'}${raw}`, base);
-  } catch { return null; }
-  const expectedPrefix = `/storage/v1/object/sign/${WINDOWS_RELEASE.bucket}/${WINDOWS_RELEASE.objectPath}`;
-  if (signed.origin !== base.origin || signed.pathname !== expectedPrefix) return null;
-  return signed.toString();
-}
-
 async function signedWindowsRelease(req, res, session) {
   if (!await requestRateLimit(req, res, { scope:'account_download_user', subject:session.user.id, limit:20, windowSeconds:3600 })) return;
   try {
-    const objectPath = `${WINDOWS_RELEASE.bucket}/${WINDOWS_RELEASE.objectPath}`;
-    const { response, payload } = await serviceUpstream(`/storage/v1/object/sign/${objectPath}`, {
-      method:'POST',
-      body:{ expiresIn:WINDOWS_RELEASE.expiresIn, download:WINDOWS_RELEASE.fileName }
-    });
-    const url = response.ok ? verifiedStorageUrl(payload?.signedURL || payload?.signedUrl) : null;
-    if (!url) return json(res, 503, { ok:false, error:'O instalador está temporariamente indisponível.' });
+    const expires=Math.floor(Date.now()/1000)+WINDOWS_RELEASE.expiresIn;
+    const nonce=crypto.randomBytes(18).toString('base64url');
+    const canonical=`GET\n${WINDOWS_RELEASE.path}\n${expires}\n${nonce}`;
+    const signature=crypto.createHmac('sha256',downloadSigningSecret()).update(canonical).digest('base64url');
+    const url=new URL(WINDOWS_RELEASE.path,publicOrigin(req));
+    url.searchParams.set('expires',String(expires)); url.searchParams.set('nonce',nonce); url.searchParams.set('signature',signature);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    return json(res, 200, { ok:true, data:{ url, fileName:WINDOWS_RELEASE.fileName, version:WINDOWS_RELEASE.version, sizeBytes:WINDOWS_RELEASE.sizeBytes, sha256:WINDOWS_RELEASE.sha256, expiresIn:WINDOWS_RELEASE.expiresIn } });
+    return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:WINDOWS_RELEASE.fileName, version:WINDOWS_RELEASE.version, sizeBytes:WINDOWS_RELEASE.sizeBytes, sha256:WINDOWS_RELEASE.sha256, expiresIn:WINDOWS_RELEASE.expiresIn } });
   } catch {
     return json(res, 503, { ok:false, error:'O instalador está temporariamente indisponível.' });
   }

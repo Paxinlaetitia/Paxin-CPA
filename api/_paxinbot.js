@@ -66,6 +66,11 @@ function sessionSecret() {
   if (!hasMinimumBytes(secret, 32)) throw new Error('Segredo de sessão interno ausente ou inválido.');
   return secret;
 }
+function downloadSigningSecret() {
+  const secret = environmentValue('PAXINBOT_DOWNLOAD_SIGNING_SECRET');
+  if (!hasMinimumBytes(secret, 32) || Buffer.byteLength(secret, 'utf8') > 128) throw new Error('Segredo do download privado ausente ou inválido.');
+  return secret;
+}
 function originGateConfig() {
   const current = environmentValue('PAXINBOT_ORIGIN_GATE_SECRET');
   const previous = environmentValue('PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET');
@@ -105,11 +110,13 @@ function validateCoreEnvironment() {
   if (process.env.NODE_ENV === 'production') configuredSiteOrigin(true);
   const serviceKey = serviceConfig().key;
   const sessionKey = sessionSecret();
+  const downloadKey = downloadSigningSecret();
   const originGate = originGateConfig();
   const webhook = mercadoPagoWebhookConfig();
   const configuredSecrets = [
     ['SUPABASE_SECRET_KEY', serviceKey],
     ['PAXINBOT_SESSION_SECRET', sessionKey],
+    ['PAXINBOT_DOWNLOAD_SIGNING_SECRET', downloadKey],
     ['MERCADOPAGO_ACCESS_TOKEN', environmentValue('MERCADOPAGO_ACCESS_TOKEN')],
     ['MERCADOPAGO_WEBHOOK_SECRET', webhook.current],
     ['MERCADOPAGO_WEBHOOK_SECRET_PREVIOUS', webhook.previous],
@@ -556,4 +563,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, originGateConfig, mercadoPagoWebhookConfig, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, trustedEdgeRequest, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, downloadSigningSecret, originGateConfig, mercadoPagoWebhookConfig, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, trustedEdgeRequest, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

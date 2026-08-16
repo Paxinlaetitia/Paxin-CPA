@@ -52,9 +52,9 @@ try {
 
 const migrations = walk('supabase/migrations').filter(file => /\/\d{8}_[a-z0-9_]+\.sql$/i.test(file)).sort();
 const migrationNames = migrations.map(file => path.posix.basename(file));
-if (migrations.length < 18) fail(`migrações esperadas: ao menos 18; encontradas: ${migrations.length}`);
+if (migrations.length < 17) fail(`migrações esperadas: ao menos 17; encontradas: ${migrations.length}`);
 if (new Set(migrationNames).size !== migrationNames.length) fail('nomes de migração duplicados');
-if (migrationNames.at(-1) !== '20260901_private_app_download.sql') fail('migração final de download privado ausente');
+if (migrationNames.at(-1) !== '20260831_database_least_privilege.sql') fail('migração final de menor privilégio ausente');
 
 try { JSON.parse(read('vercel.json')); }
 catch (error) { fail(`vercel.json inválido: ${error.message}`); }

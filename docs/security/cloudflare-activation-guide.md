@@ -164,15 +164,22 @@ Não executar antes do Pacote 9. Quando o preview estiver aprovado:
    `cloudflare/origin-gate-worker.mjs`;
 2. em **Settings > Variables and Secrets**, adicionar
    `PAXINBOT_ORIGIN_GATE_SECRET` como **Secret**, nunca como texto aberto;
-3. em **Settings > Domains & Routes**, adicionar as Routes
-   `paxincpa.store/api/*` e `www.paxincpa.store/api/*`;
-4. confirmar antes que os dois registros DNS estão como **Proxied**;
-5. testar login, catálogo e um webhook ainda sem configurar o segredo na Vercel;
-6. somente então adicionar o mesmo segredo na Vercel como Sensitive, escopo
+3. adicionar `PAXINBOT_DOWNLOAD_SIGNING_SECRET` como **Secret** e usar o mesmo
+   valor na Vercel Production;
+4. em **Settings > Bindings**, adicionar um binding R2 chamado
+   `PAXINBOT_RELEASES` apontando para o bucket privado `paxinbot-releases`;
+5. em **Settings > Domains & Routes**, adicionar as Routes
+   `paxincpa.store/api/*`, `www.paxincpa.store/api/*`,
+   `paxincpa.store/releases/*` e `www.paxincpa.store/releases/*`;
+6. confirmar antes que os dois registros DNS estão como **Proxied**;
+7. testar login, catálogo e um webhook ainda sem configurar o segredo na Vercel;
+8. somente então adicionar o mesmo segredo de origem na Vercel como Sensitive, escopo
    Production, e reimplantar;
-7. confirmar que o domínio oficial funciona e que a origem direta não alcança
+9. confirmar que o domínio oficial funciona, que a origem direta não alcança
    as APIs;
-8. se houver falha, remover a variável da Vercel e fazer rollback do deployment.
+10. entrar na Área do Cliente, gerar um download e confirmar que o Worker
+    responde com `Content-Disposition: attachment` e não expõe `r2.dev`;
+11. se houver falha, remover a variável da Vercel e fazer rollback do deployment.
 
 Na rotação, primeiro implante na Vercel o segredo novo como atual e o antigo em
 `PAXINBOT_ORIGIN_GATE_PREVIOUS_SECRET`, com prazo de até 48 horas. Depois troque

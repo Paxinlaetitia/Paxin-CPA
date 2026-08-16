@@ -13,6 +13,7 @@ SUPABASE_URL=https://drkyjgnctbxmupbfarnj.supabase.co
 SUPABASE_PUBLISHABLE_KEY=COLE_A_CHAVE_PUBLICAVEL
 SUPABASE_SECRET_KEY=COLE_A_CHAVE_SECRETA_DO_BACKEND
 PAXINBOT_SESSION_SECRET=COLE_UM_SEGREDO_ALEATORIO_EXCLUSIVO
+PAXINBOT_DOWNLOAD_SIGNING_SECRET=COLE_UM_SEGREDO_DIFERENTE_COM_PELO_MENOS_32_BYTES
 PUBLIC_SITE_URL=https://www.paxincpa.store
 MERCADOPAGO_ACCESS_TOKEN=COLE_O_TOKEN_DE_PRODUCAO
 MERCADOPAGO_WEBHOOK_SECRET=COLE_A_ASSINATURA_DO_WEBHOOK
@@ -48,14 +49,16 @@ Não crie manualmente `NODE_ENV`, `VERCEL_ENV` ou `VERCEL_URL`.
 
 ## 2. Importar o aplicativo sem expô-lo
 
-1. no SQL Editor do Supabase, aplique
-   `supabase/migrations/20260901_private_app_download.sql`;
-2. abra **Storage > paxinbot-releases** e confirme que o bucket está `Private`;
+1. abra **Cloudflare > R2 Object Storage > paxinbot-releases**;
+2. confirme que `r2.dev` e domínios públicos permanecem desativados;
 3. envie `C:\Users\Guilh\OneDrive\Desktop\PaxinbotSetup.exe` com o nome exato
    `PaxinbotSetup.exe`;
 4. confirme que o arquivo está na raiz do bucket, sem pasta;
-5. não torne o bucket público e não crie policy para `anon` ou `authenticated`;
-6. não envie o EXE para GitHub, `public/` ou a raiz do projeto Vercel.
+5. no Worker `paxinbot-origin-gate`, adicione um binding R2 chamado
+   `PAXINBOT_RELEASES` apontando para `paxinbot-releases`;
+6. adicione `PAXINBOT_DOWNLOAD_SIGNING_SECRET` como Secret no Worker e use o
+   mesmo valor na Vercel Production;
+7. não envie o EXE para Supabase, GitHub, `public/` ou a Vercel.
 
 O cliente baixa somente `PaxinbotSetup.exe`; o próprio setup cria as pastas do
 programa no computador.
@@ -66,11 +69,12 @@ O arquivo candidato possui:
 - SHA-256: `3139286A02C9C9746881CCACF38F922F1050E15E10A1D1D649F76F206B055387`.
 
 Após a implantação, entre em `/conta`, abra **Downloads** e teste o botão. A
-API cria um endereço assinado por 120 segundos e o navegador inicia o download.
+API cria um token HMAC válido por 120 segundos e o Worker transmite o arquivo
+diretamente do R2, sem deixar o bucket público e sem carregar o EXE na Vercel.
 
 ## 3. Produção na Vercel e remoção do Preview
 
-1. aplique todas as migrações e faça o upload do instalador;
+1. aplique todas as migrações e confirme o instalador no R2;
 2. configure as variáveis acima em **Production**;
 3. implante a branch `main` e associe `paxincpa.store` e
    `www.paxincpa.store` a esse deployment;
@@ -120,10 +124,13 @@ Depois que todo o site estiver funcionando sem o gate:
 1. publicar `cloudflare/origin-gate-worker.mjs` como
    `paxinbot-origin-gate`;
 2. criar o Secret `PAXINBOT_ORIGIN_GATE_SECRET` no Worker;
-3. adicionar Routes `paxincpa.store/api/*` e
-   `www.paxincpa.store/api/*`;
-4. gravar o mesmo segredo na Vercel Production e reimplantar;
-5. testar o domínio oficial e o rollback antes de excluir o Preview.
+3. criar o Secret `PAXINBOT_DOWNLOAD_SIGNING_SECRET` com o mesmo valor da
+   Vercel Production;
+4. adicionar o binding R2 `PAXINBOT_RELEASES` para `paxinbot-releases`;
+5. adicionar Routes `paxincpa.store/api/*`, `www.paxincpa.store/api/*`,
+   `paxincpa.store/releases/*` e `www.paxincpa.store/releases/*`;
+6. gravar o segredo da origem na Vercel Production e reimplantar;
+7. testar o domínio oficial e o rollback antes de excluir o Preview.
 
 O roteiro cumulativo e as expressões completas estão em
 `docs/security/cloudflare-activation-guide.md`.

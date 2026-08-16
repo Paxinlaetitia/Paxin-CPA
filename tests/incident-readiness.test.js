@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const crypto = require('node:crypto');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -28,6 +29,29 @@ test('Cloudflare Worker forwards only its own bound origin secret', async () => 
     }), { PAXINBOT_ORIGIN_GATE_SECRET:'worker-bound-origin-secret-with-at-least-32-bytes' });
     assert.equal(await response.text(), 'worker-bound-origin-secret-with-at-least-32-bytes');
   } finally { global.fetch = originalFetch; }
+});
+
+test('Cloudflare Worker validates a short token and streams only the fixed R2 installer', async () => {
+  const moduleUrl = `${pathToFileURL(path.join(root, 'cloudflare/origin-gate-worker.mjs')).href}?download=${Date.now()}`;
+  const worker = (await import(moduleUrl)).default;
+  const secret='worker-download-signing-secret-with-at-least-32-bytes';
+  const expires=Math.floor(Date.now()/1000)+120; const nonce='abcdefghijklmnopqrstuvwx';
+  const canonical=`GET\n/releases/PaxinbotSetup.exe\n${expires}\n${nonce}`;
+  const signature=crypto.createHmac('sha256',secret).update(canonical).digest('base64url');
+  let requested='';
+  const bucket={ get:async key=>{ requested=key; return { body:'installer',size:9,httpEtag:'"etag"',writeHttpMetadata(){} }; } };
+  const response=await worker.fetch(new Request(`https://www.paxincpa.store/releases/PaxinbotSetup.exe?expires=${expires}&nonce=${nonce}&signature=${signature}`),{ PAXINBOT_DOWNLOAD_SIGNING_SECRET:secret,PAXINBOT_RELEASES:bucket });
+  assert.equal(response.status,200); assert.equal(requested,'PaxinbotSetup.exe'); assert.equal(await response.text(),'installer');
+  assert.equal(response.headers.get('content-disposition'),'attachment; filename="PaxinbotSetup.exe"');
+  assert.equal(response.headers.get('cache-control'),'private, no-store, max-age=0');
+});
+
+test('Cloudflare Worker rejects expired or tampered download tokens before R2', async () => {
+  const moduleUrl = `${pathToFileURL(path.join(root, 'cloudflare/origin-gate-worker.mjs')).href}?expired=${Date.now()}`;
+  const worker = (await import(moduleUrl)).default; let called=false;
+  const bucket={ get:async()=>{ called=true; return null; } };
+  const response=await worker.fetch(new Request('https://www.paxincpa.store/releases/PaxinbotSetup.exe?expires=1000000000&nonce=abcdefghijklmnopqrstuvwx&signature=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),{ PAXINBOT_DOWNLOAD_SIGNING_SECRET:'worker-download-signing-secret-with-at-least-32-bytes',PAXINBOT_RELEASES:bucket });
+  assert.equal(response.status,403); assert.equal(called,false);
 });
 
 test('origin gate remains opt-in and never blocks a Vercel preview', () => {
