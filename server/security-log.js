@@ -1,7 +1,8 @@
 'use strict';
 
 const ALLOWED_FIELDS = new Set([
-  'reason', 'method', 'resource', 'status', 'upstreamStatus', 'diagnosticCode'
+  'reason', 'method', 'resource', 'status', 'upstreamStatus', 'diagnosticCode',
+  'requestId', 'route', 'outcome'
 ]);
 
 function safeText(value, maximum = 120) {

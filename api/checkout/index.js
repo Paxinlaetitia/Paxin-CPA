@@ -1,5 +1,5 @@
 'use strict';
-const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, recordSiteSecurityEvent } = require('../_paxinbot');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COUPON = /^[A-Z0-9_-]{3,32}$/;
@@ -78,7 +78,10 @@ module.exports = async (req, res) => {
     return json(res, response.ok ? 200 : 404, response.ok ? { ok:true, order:payload } : { ok:false, error:safeUpstreamError(payload, 'Pedido não encontrado.') });
   }
   if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
-  if (!sameOriginRequest(req)) return json(res, 403, { ok:false, error:'Origem da solicitação não autorizada.' });
+  if (!sameOriginRequest(req)) {
+    await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:50, actorUserId:session.user.id, details:{ reasonCode:'checkout_origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
+    return json(res, 403, { ok:false, error:'Origem da solicitação não autorizada.' });
+  }
 
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const action = String(body.action || 'create');
@@ -113,7 +116,10 @@ module.exports = async (req, res) => {
     const resumed = await rpc(session.access, 'paxinbot_resume_checkout', { p_order_id:orderId });
     if (!resumed.response.ok) return json(res, 400, { ok:false, error:safeUpstreamError(resumed.payload, 'Não foi possível retomar o pagamento.') });
     try { return json(res, 200, { ok:true, orderId, checkoutUrl:await createPreference(req, session.access, resumed.payload) }); }
-    catch { return json(res, 503, { ok:false, error:'O Mercado Pago não respondeu. Aguarde um momento e tente novamente.' }); }
+    catch {
+      await recordSiteSecurityEvent(req, { eventType:'checkout.provider_failure', severity:45, actorUserId:session.user.id, subject:orderId, details:{ provider:'mercadopago', outcome:'failed', reasonCode:'resume', status:'503' } });
+      return json(res, 503, { ok:false, error:'O Mercado Pago não respondeu. Aguarde um momento e tente novamente.' });
+    }
   }
   if (action !== 'create') return json(res, 400, { ok:false, error:'Ação inválida.' });
   const productId = String(body.productId || '');
@@ -138,6 +144,7 @@ module.exports = async (req, res) => {
     if (paymentMethod === 'pix') return json(res, 201, { ok:true, orderId:order.orderId, paymentMethod, pix:await createPixOrder(session.access, order) });
     return json(res, 201, { ok:true, orderId:order.orderId, paymentMethod, checkoutUrl:await createPreference(req, session.access, order) });
   } catch {
+    await recordSiteSecurityEvent(req, { eventType:'checkout.provider_failure', severity:45, actorUserId:session.user.id, subject:order.orderId, details:{ provider:'mercadopago', outcome:'failed', reasonCode:paymentMethod, status:'503' } });
     return json(res, 503, { ok:false, error:'O Mercado Pago não respondeu. Aguarde um momento e tente novamente.' });
   }
 };

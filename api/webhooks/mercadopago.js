@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, requireTrustedHost, readBodyResult, serviceUpstream } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream, recordSiteSecurityEvent } = require('../_paxinbot');
 const { securityDiagnostic } = require('../../server/security-log');
 
 function safeEqual(left, right) {
@@ -71,7 +71,12 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') { webhookDiagnostic('mercadopago_webhook_method_rejected', { method:String(req.method || 'unknown').slice(0,12) }); return json(res, 405, { ok:false, code:'method_not_allowed' }, { allow:'POST' }); }
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const dataId = String(req.query?.['data.id'] || req.query?.id || body?.data?.id || '');
-  if (!verifySignature(req, dataId)) { webhookDiagnostic('mercadopago_webhook_signature_rejected', { reason:process.env.MERCADOPAGO_WEBHOOK_SECRET ? 'invalid_signature' : 'missing_webhook_secret' }); return json(res, 401, { ok:false, code:'invalid_signature' }); }
+  if (!verifySignature(req, dataId)) {
+    const reason = process.env.MERCADOPAGO_WEBHOOK_SECRET ? 'invalid_signature' : 'missing_webhook_secret';
+    webhookDiagnostic('mercadopago_webhook_signature_rejected', { reason });
+    await recordSiteSecurityEvent(req, { eventType:'webhook.signature_rejected', severity:70, subject:String(req.headers['x-request-id'] || dataId), details:{ provider:'mercadopago', reasonCode:reason, outcome:'rejected', status:'401' } });
+    return json(res, 401, { ok:false, code:'invalid_signature' });
+  }
   const type = String(req.query?.type || body?.type || body?.action || '').toLowerCase();
   const isOrder = type === 'order' || type.startsWith('order.');
   const isPayment = !type || type === 'payment' || type.startsWith('payment.');
@@ -88,7 +93,11 @@ module.exports = async (req, res) => {
       const orderResponse = await fetch(`https://api.mercadopago.com/v1/orders/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
       const order = await orderResponse.json().catch(() => null);
       const payment = order?.transactions?.payments?.[0];
-      if (!orderResponse.ok || !order?.id || !payment?.id) { webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'order', status:Number(orderResponse.status) || 0 }); return json(res, 503, { ok:false, code:'provider_lookup_failed' }); }
+      if (!orderResponse.ok || !order?.id || !payment?.id) {
+        webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'order', status:Number(orderResponse.status) || 0 });
+        await recordSiteSecurityEvent(req, { eventType:'webhook.provider_failure', severity:50, subject:dataId, details:{ provider:'mercadopago', reasonCode:'order_lookup', outcome:'failed', status:String(Number(orderResponse.status) || 0) } });
+        return json(res, 503, { ok:false, code:'provider_lookup_failed' });
+      }
       const amountCents = Math.round(Number(payment.paid_amount || payment.amount || order.total_amount) * 100);
       if (!Number.isSafeInteger(amountCents) || amountCents < 0) return json(res, 400, { ok:false });
       const providerStatus = String(payment.status || order.status || '').toLowerCase();
@@ -100,13 +109,22 @@ module.exports = async (req, res) => {
           p_currency:String(order.currency || payment.currency_id || 'BRL'), p_provider_payload:publicOrderSnapshot(order,payment)
         }
       });
-      if (!finalized.response.ok) { webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'order', status:Number(finalized.response.status) || 0 }); return json(res, 503, { ok:false, code:'finalization_failed' }); }
+      if (!finalized.response.ok) {
+        webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'order', status:Number(finalized.response.status) || 0 });
+        await recordSiteSecurityEvent(req, { eventType:'webhook.provider_failure', severity:65, subject:dataId, details:{ provider:'mercadopago', reasonCode:'order_finalize', outcome:'failed', status:String(Number(finalized.response.status) || 0) } });
+        return json(res, 503, { ok:false, code:'finalization_failed' });
+      }
+      await recordSiteSecurityEvent(req, { eventType:'webhook.payment_processed', severity:10, subject:dataId, details:{ provider:'mercadopago', outcome:'processed', status:'200' } });
       await sendConfirmation(finalized.payload).catch(() => null);
       return json(res, 200, { ok:true });
     }
     const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, { headers:{ authorization:`Bearer ${mercadoPagoToken()}` } });
     const payment = await paymentResponse.json().catch(() => null);
-    if (!paymentResponse.ok || !payment?.id) { webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'payment', status:Number(paymentResponse.status) || 0 }); return json(res, 503, { ok:false, code:'provider_lookup_failed' }); }
+    if (!paymentResponse.ok || !payment?.id) {
+      webhookDiagnostic('mercadopago_webhook_provider_lookup_failed', { resource:'payment', status:Number(paymentResponse.status) || 0 });
+      await recordSiteSecurityEvent(req, { eventType:'webhook.provider_failure', severity:50, subject:dataId, details:{ provider:'mercadopago', reasonCode:'payment_lookup', outcome:'failed', status:String(Number(paymentResponse.status) || 0) } });
+      return json(res, 503, { ok:false, code:'provider_lookup_failed' });
+    }
     const externalReference = String(payment.external_reference || '');
     const amountCents = Math.round(Number(payment.transaction_amount) * 100);
     if (!Number.isSafeInteger(amountCents) || amountCents < 0) return json(res, 400, { ok:false });
@@ -117,11 +135,17 @@ module.exports = async (req, res) => {
         p_currency:String(payment.currency_id || ''), p_provider_payload:publicPaymentSnapshot(payment)
       }
     });
-    if (!finalized.response.ok) { webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'payment', status:Number(finalized.response.status) || 0 }); return json(res, 503, { ok:false, code:'finalization_failed' }); }
+    if (!finalized.response.ok) {
+      webhookDiagnostic('mercadopago_webhook_finalization_failed', { resource:'payment', status:Number(finalized.response.status) || 0 });
+      await recordSiteSecurityEvent(req, { eventType:'webhook.provider_failure', severity:65, subject:dataId, details:{ provider:'mercadopago', reasonCode:'payment_finalize', outcome:'failed', status:String(Number(finalized.response.status) || 0) } });
+      return json(res, 503, { ok:false, code:'finalization_failed' });
+    }
+    await recordSiteSecurityEvent(req, { eventType:'webhook.payment_processed', severity:10, subject:dataId, details:{ provider:'mercadopago', outcome:'processed', status:'200' } });
     await sendConfirmation(finalized.payload).catch(() => null);
     return json(res, 200, { ok:true });
   } catch {
     webhookDiagnostic('mercadopago_webhook_unexpected_failure');
+    await recordSiteSecurityEvent(req, { eventType:'webhook.provider_failure', severity:60, subject:dataId, details:{ provider:'mercadopago', reasonCode:'unexpected_failure', outcome:'failed', status:'503' } });
     return json(res, 503, { ok:false, code:'unexpected_failure' });
   }
 };

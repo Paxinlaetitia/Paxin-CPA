@@ -30,7 +30,8 @@ function loadHandler({ authenticated = false, owner = false } = {}) {
       upstream: async () => ({ response: { ok: true }, payload: owner }),
       json: (res, status, payload) => { res.statusCode = status; res.end(JSON.stringify(payload)); },
       readBody: async () => ({}), sameOriginRequest: () => true,
-      safeUpstreamError: () => 'Erro', sendTransactionalEmail: async () => null, sha256: value => String(value)
+      safeUpstreamError: () => 'Erro', sendTransactionalEmail: async () => null, sha256: value => String(value),
+      clientAddress: () => 'test-address', recordSiteSecurityEvent: async () => true
     }
   };
   return require('../api/admin');

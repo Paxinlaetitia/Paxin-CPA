@@ -1,10 +1,20 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { securityDiagnostic } = require('../server/security-log');
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 const MAX_REQUEST_BODY_BYTES = 32 * 1024;
 const CSRF_COOKIE = 'paxinbot_csrf';
 const CSRF_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const REQUEST_ID = Symbol('paxinbotRequestId');
+const SITE_SECURITY_EVENT_TYPES = new Set([
+  'edge.host_rejected', 'csrf.rejected', 'rate_limit.blocked',
+  'auth.login_rejected', 'auth.code_rejected', 'auth.session_rejected',
+  'auth.password_changed', 'checkout.provider_failure',
+  'webhook.signature_rejected', 'webhook.provider_failure',
+  'webhook.payment_processed', 'admin.access_denied'
+]);
+const SITE_SECURITY_DETAIL_KEYS = new Set(['reasonCode', 'outcome', 'provider', 'scope', 'method', 'status']);
 
 function environmentValue(name) {
   return String(process.env[name] || '').trim();
@@ -33,6 +43,17 @@ function json(res, status, body, headers = {}) {
   res.statusCode = status;
   for (const [name, value] of Object.entries({ 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8', ...headers })) res.setHeader(name, value);
   res.end(JSON.stringify(body));
+}
+function requestId(req, res) {
+  if (!req[REQUEST_ID]) req[REQUEST_ID] = crypto.randomUUID();
+  if (res && typeof res.setHeader === 'function' && !res.headersSent) res.setHeader('x-paxinbot-request-id', req[REQUEST_ID]);
+  return req[REQUEST_ID];
+}
+function requestRoute(req) {
+  let pathname = '';
+  try { pathname = new URL(req.url || '/', 'https://paxincpa.store').pathname; } catch {}
+  pathname = pathname.replace(/[^A-Za-z0-9_./-]/g, '').slice(0, 120);
+  return pathname.startsWith('/api/') ? pathname : '/api/unknown';
 }
 function cookies(req) {
   return Object.fromEntries(String(req.headers.cookie || '').split(';').map(value => value.trim().split(/=(.*)/s)).filter(([key]) => key).map(([key, value]) => {
@@ -95,7 +116,9 @@ function trustedRequestHost(req) {
   return allowed.has(received);
 }
 function requireTrustedHost(req, res) {
+  const correlationId = requestId(req, res);
   if (trustedRequestHost(req)) return true;
+  securityDiagnostic('edge.host_rejected', { requestId:correlationId, route:requestRoute(req), outcome:'blocked' });
   json(res, 404, { ok:false, code:'not_found', error:'Recurso não encontrado.' });
   return false;
 }
@@ -132,7 +155,7 @@ async function serviceUpstream(path, options = {}) {
   // As novas chaves sb_secret_ não são JWTs. O Bearer só é necessário para a
   // chave service_role legada; enviar sb_secret_ como Bearer causa Invalid JWT.
   if (!key.startsWith('sb_secret_')) headers.authorization = `Bearer ${key}`;
-  const response = await fetch(`${url}${path}`, { method: options.method || 'GET', headers, body: options.body === undefined ? undefined : JSON.stringify(options.body) });
+  const response = await fetch(`${url}${path}`, { method: options.method || 'GET', headers, body: options.body === undefined ? undefined : JSON.stringify(options.body), signal:options.signal });
   let payload = null; try { payload = await response.json(); } catch {}
   return { response, payload };
 }
@@ -310,10 +333,62 @@ async function requestRateLimit(req, res, options = {}) {
   res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
   res.setHeader('RateLimit', `limit=${limit}, remaining=${Math.min(limit, remaining)}, reset=${resetAfter}`);
   if (allowed) return true;
+  await recordSiteSecurityEvent(req, {
+    eventType:'rate_limit.blocked', severity:35, subject,
+    details:{ scope, outcome:'blocked', status:'429' }
+  });
   json(res, 429, {
     ok:false, code:'rate_limited', retryAfter:resetAfter,
     error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
   }, { 'retry-after':String(resetAfter) });
+  return false;
+}
+function siteSecurityEvent(req, input = {}) {
+  const eventType = String(input.eventType || '');
+  if (!SITE_SECURITY_EVENT_TYPES.has(eventType)) throw new Error('site_security_event_invalid');
+  const severity = Number(input.severity);
+  if (!Number.isInteger(severity) || severity < 0 || severity > 100) throw new Error('site_security_event_invalid');
+  const details = {};
+  for (const [key, raw] of Object.entries(input.details || {})) {
+    if (!SITE_SECURITY_DETAIL_KEYS.has(key)) continue;
+    const value = String(raw ?? '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 80);
+    if (value) details[key] = value;
+  }
+  const actorUserId = isUuid(input.actorUserId) ? String(input.actorUserId).toLowerCase() : null;
+  const subjectHash = input.subject ? serverFingerprint(`site-security:${eventType}`, String(input.subject)) : null;
+  const edgeRay = String(req.headers?.['cf-ray'] || '').split('-')[0];
+  return {
+    eventId:crypto.randomUUID(), requestId:requestId(req), eventType, severity,
+    route:requestRoute(req), actorUserId, subjectHash,
+    edgeTraceHash:/^[a-f0-9]{8,32}$/i.test(edgeRay) ? serverFingerprint('cloudflare-ray', edgeRay) : null,
+    details
+  };
+}
+async function recordSiteSecurityEvent(req, input = {}) {
+  let event;
+  try { event = siteSecurityEvent(req, input); } catch { return false; }
+  try {
+    const { response } = await serviceUpstream('/rest/v1/rpc/paxinbot_record_site_security_event', {
+      method:'POST', body:{
+        p_event_id:event.eventId, p_request_id:event.requestId,
+        p_event_type:event.eventType, p_severity:event.severity,
+        p_route:event.route, p_actor_user_id:event.actorUserId,
+        p_subject_hash:event.subjectHash, p_edge_trace_hash:event.edgeTraceHash,
+        p_details:event.details
+      },
+      // Telemetria nunca pode manter login, checkout ou webhook aguardando.
+      signal:AbortSignal.timeout(1500)
+    });
+    if (response.ok) return true;
+    securityDiagnostic('site_security_event.delivery_failed', {
+      requestId:event.requestId, route:event.route, status:Number(response.status) || 0,
+      reason:'upstream_rejected'
+    });
+  } catch {
+    securityDiagnostic('site_security_event.delivery_failed', {
+      requestId:event.requestId, route:event.route, reason:'upstream_unavailable'
+    });
+  }
   return false;
 }
 function publicOrigin(req) {
@@ -427,4 +502,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, requireTrustedHost, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, requireTrustedHost, json, requestId, requestRoute, siteSecurityEvent, recordSiteSecurityEvent, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

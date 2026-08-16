@@ -1,6 +1,6 @@
 'use strict';
 
-const { config, json, requireTrustedHost, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest } = require('../_paxinbot');
+const { config, json, requireTrustedHost, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, recordSiteSecurityEvent } = require('../_paxinbot');
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
@@ -52,7 +52,10 @@ module.exports = async (req, res) => {
     return json(res, 200, { ok: true, token: issueCsrfToken(req, res) });
   }
   const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code'];
-  if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
+  if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) {
+    await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:45, subject:clientAddress(req), details:{ reasonCode:'origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
+    return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
+  }
 
   if (action === 'login') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
@@ -61,7 +64,10 @@ module.exports = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 1 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe seu e-mail e sua senha.' });
     if (!await authRate(req, res, 'auth_login_ip', 30, 900) || !await authRate(req, res, 'auth_login_pair', 8, 900, email)) return;
     const authenticated = await upstream('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
-    if (!authenticated.response.ok || !authenticated.payload?.access_token || !authenticated.payload?.user?.id) return json(res, 401, { ok: false, error: 'E-mail ou senha incorretos.' });
+    if (!authenticated.response.ok || !authenticated.payload?.access_token || !authenticated.payload?.user?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.login_rejected', severity:35, subject:`${clientAddress(req)}\0${email}`, details:{ reasonCode:'invalid_credentials', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: 'E-mail ou senha incorretos.' });
+    }
     const verifiedEmail = String(authenticated.payload.user.email || email).trim().toLowerCase();
     const sent = await upstream('/auth/v1/otp', { method: 'POST', body: { email: verifiedEmail, create_user: false } });
     if (!sent.response.ok) return json(res, 503, { ok: false, error: friendlyCodeError(sent.payload, 'Não foi possível enviar o código de verificação.') });
@@ -84,7 +90,10 @@ module.exports = async (req, res) => {
       passwordUser = temporaryUser.payload;
     }
     const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { email, token: code, type: purpose === 'signup' ? 'signup' : 'email' } });
-    if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'Não foi possível confirmar o código.') });
+    if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.code_rejected', severity:35, subject:`${clientAddress(req)}\0${email}`, details:{ reasonCode:'invalid_or_expired', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'Não foi possível confirmar o código.') });
+    }
     if (passwordUser && passwordUser.id !== verified.payload.user.id) return json(res, 401, { ok: false, error: 'O código não corresponde à conta confirmada pela senha.' });
     if (purpose === 'signup') {
       const username = normalizeUsername(verified.payload.user.user_metadata?.display_name);
@@ -168,7 +177,10 @@ module.exports = async (req, res) => {
     if (accessToken.length < 80) return json(res, 400, { ok: false, error: 'Sessão de autenticação inválida.' });
     if (!await authRate(req, res, 'auth_session_ip', 30, 600)) return;
     const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${accessToken}` } });
-    if (!response.ok || !payload?.id) return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
+    if (!response.ok || !payload?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.session_rejected', severity:40, subject:clientAddress(req), details:{ reasonCode:'provider_rejected', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
+    }
     const refreshToken = receivedRefreshToken.length >= 20 ? receivedRefreshToken : '';
     res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
     return json(res, 200, { ok: true, renewable: Boolean(refreshToken) });
@@ -182,7 +194,8 @@ module.exports = async (req, res) => {
     const reauthenticated = await upstream('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: session.user.email, password: currentPassword } });
     if (!reauthenticated.response.ok || reauthenticated.payload?.user?.id !== session.user.id) return json(res, 401, { ok: false, error: 'A senha atual está incorreta.' });
     const { response, payload } = await upstream('/auth/v1/user', { method: 'PUT', headers: { authorization: `Bearer ${session.access}` }, body: { password: value } });
-    if (!response.ok) return json(res, 400, { ok: false, error: payload?.msg || 'Não foi possível atualizar a senha.' });
+    if (!response.ok) return json(res, 400, { ok: false, error: 'Não foi possível atualizar a senha.' });
+    await recordSiteSecurityEvent(req, { eventType:'auth.password_changed', severity:25, actorUserId:session.user.id, details:{ outcome:'completed', status:'200' } });
     return json(res, 200, { ok: true });
   }
   if (action === 'config') {

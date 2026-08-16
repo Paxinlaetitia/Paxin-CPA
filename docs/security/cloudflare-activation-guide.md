@@ -12,6 +12,7 @@ produção somente depois que todos os pacotes e o preview estiverem aprovados.
 | 2 | CSRF, limites de corpo e cabeçalhos | manter proxy e HTTPS; ainda sem HSTS |
 | 3 | rate limit distribuído | uma regra de rajada em `/api/auth/` |
 | 4 | CSP bloqueante, host oficial e cache privado | SSL estrito, cache bypass, WAF e HSTS gradual |
+| 5 | correlação, auditoria sanitizada e retenção limitada | alerta HTTP DDoS por e-mail e rotina de revisão |
 
 ## Etapa 0 — pré-requisitos
 
@@ -99,7 +100,29 @@ domínio inacessível pelo período escolhido.
 Não pausar a Cloudflare, trocar nameservers ou remover HTTPS enquanto uma
 política HSTS ainda estiver válida.
 
-## Etapa 7 — verificação final
+## Etapa 7 — monitoramento do Pacote 5
+
+No plano Free, não procurar por `Security Events Alert`: esse alerta de pico de
+WAF está disponível somente no Business e Enterprise. Usar os recursos abaixo:
+
+1. em **Notifications > Add**, criar `Paxinbot - HTTP DDoS`;
+2. selecionar `HTTP DDoS Attack Alert` e entrega por e-mail;
+3. usar o e-mail protegido do proprietário e confirmar o recebimento;
+4. em **Security > Events**, revisar diariamente os eventos amostrados das
+   últimas 24 horas durante a fase de lançamento;
+5. em **Security Analytics**, revisar a tendência de sete dias em janelas de
+   consulta de no máximo 24 horas;
+6. comparar os horários de bloqueio com a aba **Auditoria** do painel Paxinbot,
+   sem copiar IPs ou credenciais para chamados;
+7. nos logs da Vercel, procurar por `site_security_event.delivery_failed`. Esse
+   diagnóstico indica migração ausente ou indisponibilidade do Supabase e não
+   contém o evento sensível original.
+
+Não configurar webhook de notificações: no Cloudflare Free a entrega garantida
+é por e-mail. Não criar regras adicionais em resposta a um único evento
+amostrado; primeiro confirmar repetição, rota e impacto legítimo.
+
+## Etapa 8 — verificação final
 
 - executar login, cadastro, recuperação, checkout e autorização do aplicativo;
 - confirmar respostas `429` em rajadas e funcionamento normal abaixo do limite;
@@ -118,6 +141,7 @@ política HSTS ainda estiver válida.
 | 4 | pendente | — | — |
 | 5 | opcional | — | — |
 | 6 | pendente | — | — |
+| 7 | pendente | — | — |
 
 ## Referências oficiais
 
@@ -126,3 +150,7 @@ política HSTS ainda estiver válida.
 - https://developers.cloudflare.com/waf/rate-limiting-rules/
 - https://developers.cloudflare.com/waf/feature-interoperability/
 - https://developers.cloudflare.com/cache/how-to/cache-rules/settings/
+- https://developers.cloudflare.com/notifications/
+- https://developers.cloudflare.com/ddos-protection/reference/alerts/
+- https://developers.cloudflare.com/waf/analytics/security-events/
+- https://developers.cloudflare.com/waf/analytics/security-analytics/

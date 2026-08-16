@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256, clientAddress, recordSiteSecurityEvent } = require('../_paxinbot');
 function hiddenAdminResponse(res) {
   res.statusCode = 404;
   res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -28,6 +28,7 @@ const queries = {
   promotions: ['paxinbot_owner_list_promotions', () => ({})],
   devices: ['paxinbot_owner_list_device_identities', q => ({ p_query: String(q.q || '') })],
   security: ['paxinbot_owner_list_security_risk', q => ({ p_query: String(q.q || '') })],
+  siteSecurity: ['paxinbot_owner_list_site_security_events', () => ({ p_limit: 200 })],
   orders: ['paxinbot_owner_list_orders', () => ({})],
   audit: ['paxinbot_owner_list_audit', () => ({})],
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
@@ -37,9 +38,15 @@ module.exports = async (req, res) => {
   const view = String(req.query?.view || '');
   if (view === 'hidden') return hiddenAdminResponse(res);
   const session = await browserSession(req, res);
-  if (!session) return view ? hiddenAdminResponse(res) : json(res, 401, { ok: false, error: 'Entre com a conta do proprietário.' });
+  if (!session) {
+    await recordSiteSecurityEvent(req, { eventType:'admin.access_denied', severity:45, subject:clientAddress(req), details:{ reasonCode:'session_missing', outcome:'hidden', status:'404' } });
+    return view ? hiddenAdminResponse(res) : json(res, 401, { ok: false, error: 'Entre com a conta do proprietário.' });
+  }
   const ownerCheck = await upstream('/rest/v1/rpc/paxinbot_is_owner', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
-  if (!ownerCheck.response.ok || ownerCheck.payload !== true) return view ? hiddenAdminResponse(res) : json(res, 403, { ok: false, error: 'Esta conta está autenticada, mas ainda não foi registrada como proprietária no Supabase.' });
+  if (!ownerCheck.response.ok || ownerCheck.payload !== true) {
+    await recordSiteSecurityEvent(req, { eventType:'admin.access_denied', severity:60, actorUserId:session.user.id, details:{ reasonCode:'owner_required', outcome:'hidden', status:'404' } });
+    return view ? hiddenAdminResponse(res) : json(res, 403, { ok: false, error: 'Esta conta está autenticada, mas ainda não foi registrada como proprietária no Supabase.' });
+  }
   if (req.method === 'GET' && view === 'page') return protectedAdminFile(res, 'page.txt', 'text/html; charset=utf-8');
   if (req.method === 'GET' && view === 'asset') {
     if (req.query?.name === 'style') return protectedAdminFile(res, 'style.txt', 'text/css; charset=utf-8');
@@ -54,7 +61,10 @@ module.exports = async (req, res) => {
   }
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!await requestRateLimit(req, res, { scope:'admin_write_user', subject:session.user.id, limit:120, windowSeconds:600 })) return;
-  if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
+  if (!sameOriginRequest(req)) {
+    await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:55, actorUserId:session.user.id, details:{ reasonCode:'admin_origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
+    return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
+  }
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
   if (action === 'product') {
     const code = String(body.code || '').trim().toLowerCase(); const name = String(body.name || '').trim(); const kind = String(body.accessKind || '');
