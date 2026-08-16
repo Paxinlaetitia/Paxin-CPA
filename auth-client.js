@@ -164,6 +164,18 @@ function renderUsageGrants(grants) {
   if (available) { const active=Boolean(currentAccount?.entitlement?.active); document.getElementById('usage-credit-title').textContent = `${formatUsageTime(available.remainingSeconds)}${active ? ' na fila' : ''}`; document.getElementById('usage-credit-copy').textContent=active ? 'Este saldo fica guardado e poderá ser ativado quando o acesso atual terminar.' : 'O tempo só começa a diminuir depois da ativação e enquanto o aplicativo estiver conectado.'; document.getElementById('activate-usage-credit').hidden=active; }
 }
 
+function renderPromotions(promotions) {
+  const card=document.getElementById('portal-promotion-card'); if (!card) return;
+  const promotion=Array.isArray(promotions) ? promotions[0] : null;
+  card.hidden=!promotion; card.dataset.promotionId=promotion?.id || '';
+  if (!promotion) return;
+  document.getElementById('promotion-name').textContent=String(promotion.name || 'Presente Paxinbot').toUpperCase();
+  document.getElementById('promotion-headline').textContent=promotion.headline || 'Você ganhou um presente';
+  document.getElementById('promotion-description').textContent=promotion.description || 'Resgate seu benefício e ative-o quando estiver pronto para usar o aplicativo.';
+  document.getElementById('promotion-duration').textContent=`${formatUsageTime(promotion.rewardSeconds)} de uso · só começa após a ativação`;
+  try { const key=`paxinbot_promotion_seen_${promotion.id}`; if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key,'1'); window.showToast?.(`${promotion.headline || 'Você ganhou um presente'}.`); } } catch {}
+}
+
 function viewFromPath() {
   const path = location.pathname.replace(/\/$/, '') || '/conta';
   if (Object.values(accountSectionRoutes).includes(path) || ['/conta/seguranca','/conta/dispositivos'].includes(path)) return 'account';
@@ -383,17 +395,18 @@ async function loadPortalData(basePayload) {
   try { account = (await PaxinbotAuth.request('/api/account?action=overview')).data; } catch (error) { notice.textContent = error.message; notice.hidden = false; document.getElementById('account-device-list').innerHTML = `<div class="portal-empty">${escapeHtml(error.message)}</div>`; }
   const merged = { ...basePayload, profile: account?.profile || null, account };
   renderClientDashboard(merged);
-  const [devices, orders, products, preferences, activity, tickets, usageGrants] = await Promise.all([
+  const [devices, orders, products, preferences, activity, tickets, usageGrants, promotions] = await Promise.all([
     PaxinbotAuth.request('/api/account?action=devices').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=orders').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=products').then(result => ({ data:result.data, checkoutReady:result.checkoutReady })).catch(error => ({ error:error.message })),
     PaxinbotAuth.request('/api/account?action=preferences').then(result => result.data).catch(() => ({})),
     PaxinbotAuth.request('/api/account?action=activity').then(result => result.data).catch(() => []),
     PaxinbotAuth.request('/api/account?action=tickets').then(result => result.data).catch(() => []),
-    PaxinbotAuth.request('/api/account?action=usageGrants').then(result => result.data).catch(() => [])
+    PaxinbotAuth.request('/api/account?action=usageGrants').then(result => result.data).catch(() => []),
+    PaxinbotAuth.request('/api/account?action=promotions').then(result => result.data).catch(() => [])
   ]);
   renderDevices(devices); renderOrders(orders); renderProducts(products.data, products.error, products.checkoutReady);
-  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderUsageGrants(usageGrants);
+  renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderUsageGrants(usageGrants); renderPromotions(promotions);
 }
 
 async function getPasskeyClient() {
@@ -452,6 +465,7 @@ async function initClientPage() {
   document.querySelectorAll('[data-account-open]').forEach(button => button.addEventListener('click', () => { const section = button.dataset.accountSectionOpen; setAccountView(button.dataset.accountOpen, true, !section); if (section) setAccountSection(section, false, true); }));
   document.getElementById('view-account-products')?.addEventListener('click', () => document.getElementById('account-products-list')?.scrollIntoView({ behavior:'smooth', block:'center' }));
   document.getElementById('activate-usage-credit')?.addEventListener('click', async event => { const card=document.getElementById('usage-credit-card'); const grantId=card?.dataset.grantId; if (!grantId || !confirm('Ativar este saldo agora? Depois da ativação, ele será consumido enquanto o aplicativo estiver conectado.')) return; event.currentTarget.disabled=true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'activateUsage', grantId } }); const current=await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); window.showToast?.('Saldo ativado. Agora você pode autorizar o aplicativo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; } });
+  document.getElementById('claim-promotion')?.addEventListener('click', async event => { const card=document.getElementById('portal-promotion-card'); const promotionId=card?.dataset.promotionId; if (!promotionId) return; event.currentTarget.disabled=true; event.currentTarget.setAttribute('aria-busy','true'); try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'claimPromotion', promotionId } }); const current=await PaxinbotAuth.request('/api/auth/me'); await loadPortalData(current); setAccountView('subscription'); window.showToast?.('Presente resgatado. Seu saldo está guardado até você ativá-lo.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled=false; event.currentTarget.removeAttribute('aria-busy'); } });
   document.getElementById('account-products-list')?.addEventListener('click', event => { const button = event.target.closest('[data-buy-product]'); if (button) openCheckout(button.dataset.buyProduct); });
   document.getElementById('account-order-list')?.addEventListener('click', event => { const button = event.target.closest('[data-order-details]'); if (button) openOrderDetails(button.dataset.orderDetails).catch(error => window.showToast?.(error.message)); });
   document.querySelector('[data-close-order]')?.addEventListener('click', () => document.getElementById('order-dialog').close());

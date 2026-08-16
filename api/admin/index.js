@@ -25,6 +25,7 @@ const queries = {
   users: ['paxinbot_owner_list_users', q => ({ p_query: String(q.q || '') })],
   products: ['paxinbot_owner_list_products', () => ({})],
   coupons: ['paxinbot_owner_list_coupons', () => ({})],
+  promotions: ['paxinbot_owner_list_promotions', () => ({})],
   orders: ['paxinbot_owner_list_orders', () => ({})],
   audit: ['paxinbot_owner_list_audit', () => ({})],
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
@@ -64,6 +65,18 @@ module.exports = async (req, res) => {
     if (!/^[A-Z0-9_-]{3,32}$/.test(body.code)) return json(res, 400, { ok: false, error: 'Use um código de cupom válido, com letras maiúsculas, números, hífen ou sublinhado.' });
     if (!['percent','fixed'].includes(body.discountType) || !Number.isFinite(Number(body.discountValue)) || Number(body.discountValue) <= 0) return json(res, 400, { ok: false, error: 'Informe um desconto válido.' });
   }
+  if (action === 'promotion') {
+    body.code = String(body.code || '').trim().toLowerCase();
+    body.name = String(body.name || '').trim(); body.headline = String(body.headline || '').trim(); body.description = String(body.description || '').trim();
+    body.rewardSeconds = Number(body.rewardSeconds); body.maxClaims = body.maxClaims ? Number(body.maxClaims) : null;
+    if (!/^[a-z0-9_-]{3,40}$/.test(body.code)) return json(res, 400, { ok:false, error:'Use um código interno válido de 3 a 40 caracteres.' });
+    if (body.name.length < 3 || body.name.length > 80 || body.headline.length < 3 || body.headline.length > 120 || body.description.length > 500) return json(res, 400, { ok:false, error:'Revise o nome, o título e a descrição da promoção.' });
+    if (!['new_accounts','all_clients'].includes(String(body.audience || '')) || !Number.isInteger(body.rewardSeconds) || body.rewardSeconds < 60 || body.rewardSeconds > 315360000) return json(res, 400, { ok:false, error:'Informe o público e uma duração válida.' });
+    if (body.maxClaims !== null && (!Number.isInteger(body.maxClaims) || body.maxClaims < 1)) return json(res, 400, { ok:false, error:'O limite de resgates deve ser um número positivo.' });
+    if (body.startsAt && !Number.isFinite(Date.parse(body.startsAt))) return json(res, 400, { ok:false, error:'Data inicial inválida.' });
+    if (body.endsAt && !Number.isFinite(Date.parse(body.endsAt))) return json(res, 400, { ok:false, error:'Data final inválida.' });
+    if (body.startsAt && body.endsAt && Date.parse(body.endsAt) <= Date.parse(body.startsAt)) return json(res, 400, { ok:false, error:'A data final deve ser posterior à inicial.' });
+  }
   if (action === 'access') {
     const email = String(body.email || '').trim().toLowerCase(); const kind = String(body.kind || '');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { ok: false, error: 'Informe o e-mail válido de um cliente cadastrado.' });
@@ -81,6 +94,7 @@ module.exports = async (req, res) => {
   const actions = {
     product: ['paxinbot_owner_save_product', () => ({ p_id: body.id || null, p_code: body.code, p_name: body.name, p_description: body.description || '', p_access_kind: body.accessKind, p_duration_minutes: body.accessKind === 'lifetime' ? null : Number(body.durationMinutes), p_price_cents: Number(body.priceCents), p_active: body.active !== false })],
     coupon: ['paxinbot_owner_save_coupon', () => ({ p_id: body.id || null, p_code: body.code, p_description: body.description || '', p_discount_type: body.discountType, p_discount_value: Number(body.discountValue), p_max_redemptions: body.maxRedemptions ? Number(body.maxRedemptions) : null, p_expires_at: body.expiresAt || null, p_active: body.active !== false })],
+    promotion: ['paxinbot_owner_save_promotion', () => ({ p_id:body.id || null,p_code:body.code,p_name:body.name,p_headline:body.headline,p_description:body.description || '',p_audience:body.audience,p_reward_seconds:body.rewardSeconds,p_starts_at:body.startsAt || null,p_ends_at:body.endsAt || null,p_max_claims:body.maxClaims,p_active:body.active === true })],
     access: body.kind === 'lifetime'
       ? ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: 'lifetime', p_expires_at: null, p_source: 'owner-panel' })]
       : ['paxinbot_owner_grant_usage', () => ({ p_email: body.email, p_total_seconds: body.durationSeconds, p_source: 'owner-panel' })],
