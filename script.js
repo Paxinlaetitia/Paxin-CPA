@@ -65,7 +65,7 @@ document.querySelector('.js-preview')?.addEventListener('click', () => {
 });
 
 document.querySelector('.js-download')?.addEventListener('click', () => {
-  window.location.href = '/conta';
+  window.location.href = '/conta/downloads?mode=signup';
 });
 
 document.querySelector('.js-support')?.addEventListener('click', () => { window.location.href = '/ajuda'; });

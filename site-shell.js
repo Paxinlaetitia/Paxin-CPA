@@ -54,7 +54,7 @@
           </nav>
           <div class="header-actions">
             <a class="button button-ghost ${page === 'cliente' ? 'is-current' : ''}" href="/conta">Área do cliente</a>
-            <a class="button button-primary ${page === 'download' ? 'is-current' : ''}" href="/download">Baixar aplicativo</a>
+            <a class="button button-primary ${page === 'download' ? 'is-current' : ''}" href="/conta/downloads?mode=signup">Baixar aplicativo</a>
           </div>
         </div>
       </header>`;

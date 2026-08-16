@@ -27,6 +27,7 @@
       const parsed = new URL(candidate, location.origin);
       const productId = parsed.searchParams.get('product') || '';
       if (parsed.origin === location.origin && parsed.pathname === '/conta/checkout' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId) && parsed.searchParams.size === 1) safeReturn = `/conta/checkout?product=${encodeURIComponent(productId)}`;
+      else if (parsed.origin === location.origin && parsed.pathname === '/conta/downloads' && parsed.searchParams.size === 0) safeReturn = '/conta/downloads';
     } catch {}
     location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : params.get('flow') === 'passkey' ? '/conta/seguranca' : safeReturn);
   } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }

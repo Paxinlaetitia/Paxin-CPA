@@ -76,3 +76,13 @@ test('client download is account-bound and does not expose a permanent asset URL
   assert.doesNotMatch(page,/storage\/v1\/object\/(?:public|sign)/);
   assert.equal(fs.existsSync(path.join(root,'PaxinbotSetup.exe')),false);
 });
+
+test('public download actions open signup and preserve the protected downloads destination', () => {
+  const client=fs.readFileSync(path.join(root,'auth-client.js'),'utf8');
+  const callback=fs.readFileSync(path.join(root,'auth-callback.js'),'utf8');
+  const publicFiles=['index.html','produto.html','download.html','site-shell.js'].map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n');
+  assert.match(publicFiles,/\/conta\/downloads\?mode=signup/);
+  assert.match(client,/setAuthMode\(requestedAuthMode\(\)\)/);
+  assert.match(client,/paxinbot_auth_return',accountRoutes\.downloads/);
+  assert.match(callback,/parsed\.pathname === '\/conta\/downloads'/);
+});
