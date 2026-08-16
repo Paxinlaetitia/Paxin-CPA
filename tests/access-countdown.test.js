@@ -20,8 +20,10 @@ test('client access counter includes seconds and resynchronizes with the server'
 
 test('server reports whether the metered application session is running without exposing session secrets', () => {
   const handler = read(path.join('api', 'auth', '[action].js'));
-  assert.match(handler, /select: 'last_seen_at,usage_paused_at'/);
+  assert.match(handler, /\/rest\/v1\/rpc\/paxinbot_get_usage_runtime_state/);
+  assert.match(handler, /p_usage_grant_id:\s*entitlement\.grantId/);
   assert.match(handler, /entitlement\.usageRunning/);
   assert.match(handler, /serverNow: new Date\(\)\.toISOString\(\)/);
+  assert.doesNotMatch(handler, /\/rest\/v1\/desktop_sessions/);
   assert.doesNotMatch(handler, /select: '[^']*token_hash/);
 });

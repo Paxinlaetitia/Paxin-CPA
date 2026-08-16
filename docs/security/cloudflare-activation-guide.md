@@ -13,6 +13,7 @@ produção somente depois que todos os pacotes e o preview estiverem aprovados.
 | 3 | rate limit distribuído | uma regra de rajada em `/api/auth/` |
 | 4 | CSP bloqueante, host oficial e cache privado | SSL estrito, cache bypass, WAF e HSTS gradual |
 | 5 | correlação, auditoria sanitizada e retenção limitada | alerta HTTP DDoS por e-mail e rotina de revisão |
+| 6 | RLS, grants opt-in e RPCs mínimos no Supabase | nenhuma regra nova; revisar DNS e segredos de origem |
 
 ## Etapa 0 — pré-requisitos
 
@@ -122,7 +123,25 @@ Não configurar webhook de notificações: no Cloudflare Free a entrega garantid
 é por e-mail. Não criar regras adicionais em resposta a um único evento
 amostrado; primeiro confirmar repetição, rota e impacto legítimo.
 
-## Etapa 8 — verificação final
+## Etapa 8 — banco e origem do Pacote 6
+
+O WAF da Cloudflare protege `paxincpa.store`, mas não substitui RLS ou grants no
+domínio externo do Supabase. Não há nova regra de Cloudflare para ativar neste
+pacote. Faça apenas esta revisão:
+
+1. em **DNS > Records**, confirmar que não existe registro `db`, `postgres`,
+   `pooler` ou `supabase` apontando diretamente para o banco;
+2. manter somente os hosts web da Vercel como **Proxied**;
+3. manter registros SMTP/DKIM/SPF/DMARC do Resend como **DNS only**;
+4. não copiar `SUPABASE_SECRET_KEY`, senha do banco ou connection string para
+   regras, snippets, Zaraz, Workers ou código entregue ao navegador;
+5. aceitar no navegador somente a chave `sb_publishable_`, que continua
+   dependente de RLS e grants mínimos;
+6. depois da migração de teste, executar o Security Advisor do Supabase e
+   revisar individualmente qualquer função `SECURITY DEFINER` exposta. Somente
+   os RPCs enumerados no Pacote 6 são esperados.
+
+## Etapa 9 — verificação final
 
 - executar login, cadastro, recuperação, checkout e autorização do aplicativo;
 - confirmar respostas `429` em rajadas e funcionamento normal abaixo do limite;
@@ -142,6 +161,7 @@ amostrado; primeiro confirmar repetição, rota e impacto legítimo.
 | 5 | opcional | — | — |
 | 6 | pendente | — | — |
 | 7 | pendente | — | — |
+| 8 | revisão | — | — |
 
 ## Referências oficiais
 
