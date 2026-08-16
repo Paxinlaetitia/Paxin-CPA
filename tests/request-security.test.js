@@ -83,14 +83,21 @@ test('browser clients attach CSRF and execute only the vendored Supabase SDK', (
   assert.equal(crypto.createHash('sha256').update(vendor).digest('hex'),'24e8c00dc25da420ee741068b60bcdb5f62cb3598d8834058acf37ec6ee1a724');
 });
 
-test('Vercel applies browser hardening headers globally in report-only CSP mode', () => {
+test('Vercel enforces browser hardening and isolates private routes from cache', () => {
   const config=JSON.parse(fs.readFileSync(path.join(__dirname,'..','vercel.json'),'utf8'));
   const global=config.headers.find(entry=>entry.source==='/(.*)');
   const headers=Object.fromEntries(global.headers.map(item=>[item.key.toLowerCase(),item.value]));
   assert.equal(headers['x-content-type-options'],'nosniff');
   assert.equal(headers['x-frame-options'],'DENY');
   assert.match(headers['permissions-policy'],/camera=\(\)/);
-  assert.match(headers['content-security-policy-report-only'],/object-src 'none'/);
-  assert.doesNotMatch(headers['content-security-policy-report-only'],/script-src[^;]*unsafe-inline/);
-  assert.equal(headers['content-security-policy'],undefined);
+  assert.match(headers['content-security-policy'],/object-src 'none'/);
+  assert.match(headers['content-security-policy'],/upgrade-insecure-requests/);
+  assert.doesNotMatch(headers['content-security-policy'],/script-src[^;]*unsafe-inline/);
+  assert.equal(headers['content-security-policy-report-only'],undefined);
+  assert.equal(headers['cross-origin-opener-policy'],'same-origin-allow-popups');
+  assert.equal(headers['cross-origin-resource-policy'],'same-origin');
+  for (const source of ['/api/:path*','/conta/:path*','/gestao/:path*']) {
+    const rule=config.headers.find(entry=>entry.source===source);
+    assert.match(rule.headers.find(item=>item.key.toLowerCase()==='cache-control').value,/no-store/);
+  }
 });

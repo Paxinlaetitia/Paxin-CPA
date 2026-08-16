@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
 const queries = {
   overview: ['paxinbot_get_my_account', () => ({})],
@@ -15,6 +15,7 @@ const queries = {
 };
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
   if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });

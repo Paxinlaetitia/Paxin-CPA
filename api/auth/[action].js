@@ -1,6 +1,6 @@
 'use strict';
 
-const { config, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest } = require('../_paxinbot');
+const { config, json, requireTrustedHost, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest } = require('../_paxinbot');
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
@@ -45,6 +45,7 @@ async function authRate(req, res, scope, limit, windowSeconds, identity = '') {
 }
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   const action = actionOf(req);
   if (action === 'csrf') {
     if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });

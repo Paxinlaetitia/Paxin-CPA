@@ -47,6 +47,7 @@ function sessionSecret() {
 }
 function validateCoreEnvironment() {
   config();
+  if (process.env.NODE_ENV === 'production') configuredSiteOrigin(true);
   const serviceKey = serviceConfig().key;
   const sessionKey = sessionSecret();
   const configuredSecrets = [
@@ -59,6 +60,44 @@ function validateCoreEnvironment() {
   const unique = new Set(configuredSecrets.map(([, value]) => value));
   if (unique.size !== configuredSecrets.length) throw new Error('Credenciais internas precisam ser exclusivas por finalidade.');
   return true;
+}
+function configuredSiteOrigin(required = false) {
+  const raw = environmentValue('PUBLIC_SITE_URL');
+  if (!raw) {
+    if (required) throw new Error('Origem pública oficial ausente no ambiente da Vercel.');
+    return '';
+  }
+  let parsed;
+  try { parsed = new URL(raw); } catch { throw new Error('Origem pública oficial inválida.'); }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('Origem pública oficial inválida.');
+  }
+  return parsed.origin;
+}
+function normalizedHost(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw || raw.length > 253 || /[\s\\/]/.test(raw)) return '';
+  try { return new URL(`https://${raw}`).hostname.toLowerCase(); } catch { return ''; }
+}
+function trustedRequestHost(req) {
+  if (process.env.NODE_ENV !== 'production') return true;
+  const received = normalizedHost(req.headers.host);
+  if (!received) return false;
+  const allowed = new Set();
+  const official = configuredSiteOrigin(true);
+  const officialHost = new URL(official).hostname.toLowerCase();
+  allowed.add(officialHost);
+  if (officialHost === 'www.paxincpa.store') allowed.add('paxincpa.store');
+  if (process.env.VERCEL_ENV === 'preview') {
+    const previewHost = normalizedHost(process.env.VERCEL_URL);
+    if (previewHost) allowed.add(previewHost);
+  }
+  return allowed.has(received);
+}
+function requireTrustedHost(req, res) {
+  if (trustedRequestHost(req)) return true;
+  json(res, 404, { ok:false, code:'not_found', error:'Recurso não encontrado.' });
+  return false;
 }
 function signSessionDeadline(deadline) {
   const secret = sessionSecret(); if (!secret) return '';
@@ -278,7 +317,10 @@ async function requestRateLimit(req, res, options = {}) {
   return false;
 }
 function publicOrigin(req) {
-  let origin = String(process.env.PUBLIC_SITE_URL || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`).replace(/\/$/, '');
+  let origin = configuredSiteOrigin(process.env.NODE_ENV === 'production') || `${secure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+  const requestHost = normalizedHost(req.headers.host);
+  const previewHost = process.env.VERCEL_ENV === 'preview' ? normalizedHost(process.env.VERCEL_URL) : '';
+  if (previewHost && requestHost === previewHost) origin = `https://${previewHost}`;
   // O domínio configurado na Vercel usa www como host canônico. Retornos OAuth
   // no host secundário causariam redirecionamento de origem e impediriam o
   // navegador de gravar a sessão HttpOnly.
@@ -385,4 +427,4 @@ async function sendTransactionalEmail({ to, subject, html, idempotencyKey }) {
 // depois de uma operação comercial ou autorização de dispositivo.
 if (process.env.NODE_ENV === 'production') validateCoreEnvironment();
 
-module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };
+module.exports = { config, serviceConfig, sessionSecret, validateCoreEnvironment, configuredSiteOrigin, trustedRequestHost, requireTrustedHost, json, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBody, readBodyResult, browserSession, sha256, serverFingerprint, canonicalDeviceProof, verifyDeviceIdentityProof, clientAddress, isUuid, cleanDeviceName, serviceRateLimit, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, safeUpstreamError, safeDeviceAuthError, sendTransactionalEmail };

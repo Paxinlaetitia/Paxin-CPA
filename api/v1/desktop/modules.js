@@ -1,6 +1,6 @@
 'use strict';
 
-const { json, readBodyResult, serviceUpstream, serviceRateLimit, sha256 } = require('../../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream, serviceRateLimit, sha256 } = require('../../_paxinbot');
 const {
   parseReleaseRequest, readReleaseEnvironment, assertOfficialRelease, createAuthorization,
   safeDenialReason
@@ -8,6 +8,7 @@ const {
 const { securityDiagnostic } = require('../../../server/security-log');
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' }, { allow:'POST' });
   const tokenMatch = String(req.headers.authorization || '').match(/^Bearer\s+([a-f0-9]{64})$/i);
   if (!tokenMatch) return json(res, 401, { ok:false, error:'Sessão do aplicativo ausente.' });

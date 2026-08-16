@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { json, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, sameOriginRequest, safeUpstreamError, sendTransactionalEmail, sha256 } = require('../_paxinbot');
 function hiddenAdminResponse(res) {
   res.statusCode = 404;
   res.setHeader('content-type', 'text/html; charset=utf-8');
@@ -33,6 +33,7 @@ const queries = {
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
 };
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   const view = String(req.query?.view || '');
   if (view === 'hidden') return hiddenAdminResponse(res);
   const session = await browserSession(req, res);

@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { json, readBodyResult, serviceUpstream } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream } = require('../_paxinbot');
 const { securityDiagnostic } = require('../../server/security-log');
 
 function safeEqual(left, right) {
@@ -67,6 +67,7 @@ async function sendConfirmation(result) {
 }
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   if (req.method !== 'POST') { webhookDiagnostic('mercadopago_webhook_method_rejected', { method:String(req.method || 'unknown').slice(0,12) }); return json(res, 405, { ok:false, code:'method_not_allowed' }, { allow:'POST' }); }
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   const dataId = String(req.query?.['data.id'] || req.query?.id || body?.data?.id || '');

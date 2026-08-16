@@ -1,5 +1,8 @@
 # Cloudflare — pacote 3 contra abuso
 
+O roteiro cumulativo e a ordem de ativação agora ficam em
+`docs/security/cloudflare-activation-guide.md`.
+
 Este arquivo prepara a configuração de borda. As regras **não devem ser
 ativadas** antes de todos os pacotes estarem prontos e a implantação de teste
 ter sido validada.

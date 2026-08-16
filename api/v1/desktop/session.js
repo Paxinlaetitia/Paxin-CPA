@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBodyResult, serviceUpstream, serviceRateLimit, sha256, isUuid } = require('../../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream, serviceRateLimit, sha256, isUuid } = require('../../_paxinbot');
 
 const SECURITY_EVENT_TYPES = new Set([
   'integrity_failure','release_rollback_blocked','debug_flag_detected',
@@ -21,6 +21,7 @@ function validSecurityEvent(body) {
 }
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const match = String(req.headers.authorization || '').match(/^Bearer\s+([a-f0-9]{64})$/i); if (!match) return json(res, 401, { ok: false, error: 'Sessão do aplicativo ausente.' });
   if (req.method === 'POST' && String(req.query?.action || '') === 'security-event') {

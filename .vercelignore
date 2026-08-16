@@ -1,0 +1,19 @@
+# Metadados locais e credenciais de desenvolvimento
+.git
+.gitignore
+.vercel
+.env
+.env.*
+.env.example
+
+# Material de desenvolvimento que não pertence ao site público
+tests
+docs
+supabase
+coverage
+node_modules
+AUTH_SETUP.md
+PAXIN_CORE_DESIGN.md
+README.md
+SITE_AUDIT.md
+releases/README.md

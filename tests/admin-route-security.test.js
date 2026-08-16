@@ -25,6 +25,7 @@ function loadHandler({ authenticated = false, owner = false } = {}) {
     filename: helperPath,
     loaded: true,
     exports: {
+      requireTrustedHost: () => true,
       browserSession: async () => authenticated ? { user: { id: 'owner' }, access: 'session' } : null,
       upstream: async () => ({ response: { ok: true }, payload: owner }),
       json: (res, status, payload) => { res.statusCode = status; res.end(JSON.stringify(payload)); },

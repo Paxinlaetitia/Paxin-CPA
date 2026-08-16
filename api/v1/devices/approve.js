@@ -1,6 +1,7 @@
 'use strict';
-const { json, readBodyResult, browserSession, serviceUpstream, serviceRateLimit, isUuid, sameOriginRequest, safeDeviceAuthError } = require('../../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, serviceUpstream, serviceRateLimit, isUuid, sameOriginRequest, safeDeviceAuthError } = require('../../_paxinbot');
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   if (!sameOriginRequest(req)) return json(res, 403, { ok:false, error:'Origem da solicitação não autorizada.' });
   const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });

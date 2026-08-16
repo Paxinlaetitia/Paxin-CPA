@@ -1,6 +1,7 @@
 'use strict';
-const { json, readBodyResult, serviceUpstream, serviceRateLimit, clientAddress, isUuid, sha256, safeDeviceAuthError } = require('../../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, serviceUpstream, serviceRateLimit, clientAddress, isUuid, sha256, safeDeviceAuthError } = require('../../_paxinbot');
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
   if (!isUuid(body.requestId) || !/^[A-Za-z0-9_-]{43}$/.test(String(body.secret || ''))) return json(res, 400, { ok: false, error: 'Solicitação inválida.' });

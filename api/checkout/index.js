@@ -1,5 +1,5 @@
 'use strict';
-const { json, readBodyResult, browserSession, upstream, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
+const { json, requireTrustedHost, readBodyResult, browserSession, upstream, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError, sendTransactionalEmail } = require('../_paxinbot');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COUPON = /^[A-Z0-9_-]{3,32}$/;
@@ -66,6 +66,7 @@ async function createPixOrder(access, order) {
 }
 
 module.exports = async (req, res) => {
+  if (!requireTrustedHost(req, res)) return;
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para continuar.' });
 
