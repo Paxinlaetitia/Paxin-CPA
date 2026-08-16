@@ -40,9 +40,18 @@
             </g>
           </g>
         </svg>
-        <span class="paxin-core__label paxin-core__label--instances">Instâncias</span>
-        <span class="paxin-core__label paxin-core__label--flows">Fluxos</span>
-        <span class="paxin-core__label paxin-core__label--records">Registros</span>
+        <span class="paxin-core__label paxin-core__label--instances">
+          <svg class="paxin-core__label-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="4" height="4" rx="0.8"/><rect x="9.5" y="2.5" width="4" height="4" rx="0.8"/><rect x="2.5" y="9.5" width="4" height="4" rx="0.8"/><rect x="9.5" y="9.5" width="4" height="4" rx="0.8"/></svg>
+          <span>Instâncias</span>
+        </span>
+        <span class="paxin-core__label paxin-core__label--flows">
+          <svg class="paxin-core__label-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.5v4a2 2 0 0 0 2 2h7"/><path d="m9.5 6.8 2.8 2.7-2.8 2.7"/><path d="M6 3.5h6"/></svg>
+          <span>Fluxos</span>
+        </span>
+        <span class="paxin-core__label paxin-core__label--records">
+          <svg class="paxin-core__label-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.2"/><path d="M5 6h6M5 8.3h6M5 10.6h3.7"/></svg>
+          <span>Registros</span>
+        </span>
         <span class="paxin-core__caption">Central coordenada</span>
       </div>`;
   }
