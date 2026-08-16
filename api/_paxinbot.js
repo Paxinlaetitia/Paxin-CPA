@@ -30,8 +30,8 @@ function hasMinimumBytes(value, minimum) {
 
 function config() {
   const url = environmentValue('SUPABASE_URL').replace(/\/$/, '');
-  const key = environmentValue('SUPABASE_PUBLISHABLE_KEY');
-  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !key.startsWith('sb_publishable_')) throw new Error('Configuração Supabase ausente no ambiente da Vercel.');
+  const key = environmentValue('SUPABASE_PUBLISHABLE_KEY') || environmentValue('SUPABASE_ANON_KEY') || environmentValue('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || (!key.startsWith('sb_publishable_') && key.split('.').length !== 3)) throw new Error('Configuração Supabase ausente no ambiente da Vercel.');
   return { url, key };
 }
 function serviceConfig() {
