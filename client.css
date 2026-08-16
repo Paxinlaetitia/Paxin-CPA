@@ -215,6 +215,7 @@
 .checkout-terms { color: var(--muted); font-size: 8px; line-height: 1.5; text-align: center; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; }
 .auth-purchase-context { display: grid; gap: 4px; margin: 0 0 14px; padding: 13px 14px; border: 1px solid rgba(240,165,0,.25); border-radius: 11px; background: rgba(240,165,0,.055); }
+.auth-purchase-context[hidden] { display: none !important; }
 .auth-purchase-context > span { color: var(--accent); font-size: 8px; font-weight: 800; letter-spacing: .09em; }
 .auth-purchase-context > b { font-size: 12px; }
 .auth-purchase-context > small { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }

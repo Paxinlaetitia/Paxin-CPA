@@ -25,6 +25,7 @@ test('public catalog preserves the selected existing product through authenticat
 
 test('checkout collects only the approved customer fields and supports PIX plus card', () => {
   const html = read('cliente.html');
+  const css = read('client.css');
   assert.match(html, /id="checkout-payer-name"/);
   assert.match(html, /id="checkout-payer-email"[^>]+readonly/);
   assert.match(html, /name="paymentMethod" value="pix" checked/);
@@ -32,6 +33,7 @@ test('checkout collects only the approved customer fields and supports PIX plus 
   assert.match(html, /id="checkout-pix-qr"/);
   assert.match(html, /id="checkout-pix-code" readonly/);
   assert.doesNotMatch(html, /checkout[^\n]{0,200}(CPF|endereço de cobrança)/i);
+  assert.match(css, /\.auth-purchase-context\[hidden\] \{ display: none !important; \}/);
 });
 
 test('checkout server keeps private credentials server-side and creates idempotent PIX orders', () => {
