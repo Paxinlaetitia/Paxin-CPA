@@ -8,6 +8,7 @@
   <title>Paxinbot — Operações CPA sob controle</title>
   <link rel="icon" href="assets/paxinbot-mark.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="assets/paxin-core.css" />
 </head>
 <body data-page="inicio">
   <div data-site-header></div>
@@ -31,22 +32,8 @@
           </div>
         </div>
 
-        <div class="product-stage reveal reveal-delay">
-          <div class="stage-glow" aria-hidden="true"></div>
-          <div class="app-window">
-            <div class="window-bar"><div class="window-brand"><span class="window-logo"><img src="assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b></div><div class="window-status"><span></span> Operação ativa</div><div class="window-dots"><i></i><i></i><i></i></div></div>
-            <div class="window-body">
-              <aside class="mock-sidebar"><div class="mock-nav active"><svg><use href="#i-grid"></use></svg><span>Início</span></div><div class="mock-nav"><svg><use href="#i-sliders"></use></svg><span>Dados</span></div><div class="mock-nav"><svg><use href="#i-device"></use></svg><span>Telas</span></div><div class="mock-nav"><svg><use href="#i-shield"></use></svg><span>Proxy</span></div><div class="mock-nav"><svg><use href="#i-user"></use></svg><span>Contas</span></div></aside>
-              <div class="mock-main">
-                <div class="mock-heading"><div><span>VISÃO GERAL</span><b>Controle operacional</b></div><small>Sessões prontas</small></div>
-                <div class="mock-search"><span>https://campanha.exemplo/</span><button>ABRIR</button></div>
-                <div class="mock-stats"><article><span>INSTÂNCIAS</span><b>08</b><small>6 ativas</small></article><article><span>FLUXOS</span><b>12</b><small>4 em execução</small></article><article><span>REGISTROS</span><b>48</b><small>Organizados</small></article></div>
-                <div class="mock-grid"><div class="mock-log"><header><span>Log de operações</span><i>AO VIVO</i></header><p><time>14:42:18</time> Painel pronto para operar.</p><p class="ok"><time>14:42:21</time> Instâncias distribuídas.</p><p><time>14:42:24</time> Fluxo enviado às telas.</p></div><div class="mock-control"><header>Performance</header><div class="meter"><span></span></div><div class="mock-control-row"><span>Velocidade</span><b>12x</b></div><div class="mock-control-row"><span>Delay</span><b>5 seg.</b></div></div></div>
-              </div>
-            </div>
-          </div>
-          <div class="floating-card floating-card-a"><svg><use href="#i-bolt"></use></svg><span><small>FLUXOS</small><b>Sequências reutilizáveis</b></span></div>
-          <div class="floating-card floating-card-b"><svg><use href="#i-shield"></use></svg><span><small>CONTROLE</small><b>Sessões selecionadas</b></span></div>
+        <div class="product-stage paxin-core-stage reveal reveal-delay">
+          <div class="paxin-core paxin-core--site" data-paxin-core aria-hidden="true"></div>
         </div>
       </div>
     </section>
@@ -82,5 +69,6 @@
   <div class="toast" role="status" aria-live="polite"><svg><use href="#i-check"></use></svg><span></span></div>
   <script src="site-shell.js"></script>
   <script src="script.js"></script>
+  <script src="assets/paxin-core.js"></script>
 </body>
 </html>
