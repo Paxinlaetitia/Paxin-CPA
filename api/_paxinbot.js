@@ -388,6 +388,11 @@ async function requestRateLimit(req, res, options = {}) {
   const remaining = Number(payload?.remaining);
   const resetAfter = Number(payload?.resetAfter);
   if (!response.ok || !Number.isInteger(remaining) || remaining < 0 || !Number.isInteger(resetAfter) || resetAfter < 1 || resetAfter > windowSeconds) {
+    const upstreamCode = String(payload?.code || '');
+    securityDiagnostic('rate_limit.unavailable', {
+      requestId:requestId(req, res), route:requestRoute(req), upstreamStatus:Number(response.status) || 0,
+      diagnosticCode:/^[A-Z0-9_]{3,24}$/i.test(upstreamCode) ? upstreamCode : response.ok ? 'INVALID_RESPONSE' : 'UPSTREAM_REJECTED'
+    });
     json(res, 503, { ok:false, code:'rate_limit_unavailable', error:'A proteção contra abuso está temporariamente indisponível. Tente novamente em instantes.' }, { 'retry-after':'10' });
     return false;
   }
