@@ -305,10 +305,21 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
     if (!USERNAME_PATTERN.test(username)) return json(res, 400, { ok: false, error: 'Use um nome de usuário de 3 a 24 caracteres, com letras, números, ponto, hífen ou sublinhado.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 10 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 10 caracteres.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 8 caracteres.' });
     if (!await authRate(req, res, 'auth_signup_ip', 10, 3600) || !await authRate(req, res, 'auth_signup_pair', 3, 3600, email)) return;
     const { response, payload } = await upstream('/auth/v1/signup', { method: 'POST', body: { email, password, data: { display_name: username }, email_redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=signup` } });
-    if (!response.ok) return json(res, 400, { ok: false, error: 'Não foi possível criar a conta com esses dados.' });
+    if (!response.ok) {
+      const msg = payload?.msg || payload?.error_description || payload?.error || payload?.message;
+      let friendlyError = 'Não foi possível criar a conta com esses dados.';
+      if (typeof msg === 'string') {
+        if (/already registered|already exists|user already/i.test(msg)) friendlyError = 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.';
+        else if (/password/i.test(msg) && /short|least|characters/i.test(msg)) friendlyError = 'A senha deve ter pelo menos 8 caracteres.';
+        else if (/rate limit|too many/i.test(msg)) friendlyError = 'Muitas tentativas de cadastro. Aguarde alguns instantes.';
+        else if (/domain not allowed|invalid email/i.test(msg)) friendlyError = 'Informe um endereço de e-mail válido.';
+        else if (/error sending|email provider|smtp/i.test(msg)) friendlyError = 'Não foi possível enviar o código por e-mail no momento. Tente novamente.';
+      }
+      return json(res, 400, { ok: false, error: friendlyError });
+    }
     if (payload?.access_token && payload?.user?.email_confirmed_at) {
       await persistSignupUsername(payload.access_token, username).catch(() => false);
       res.setHeader('Set-Cookie', sessionCookies(req, payload.access_token, payload.refresh_token));
