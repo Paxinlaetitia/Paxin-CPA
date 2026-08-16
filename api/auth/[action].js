@@ -71,6 +71,28 @@ function normalizedRegistrationCredential(value) {
     ...(typeof value.authenticatorAttachment === 'string' ? { authenticatorAttachment:value.authenticatorAttachment.slice(0, 32) } : {})
   };
 }
+function normalizedAuthenticationCredential(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const response = value.response;
+  const encoded = input => typeof input === 'string' && input.length >= 1 && input.length <= 24576 && /^[A-Za-z0-9_-]+$/.test(input);
+  const optionalEncoded = input => input === null || input === undefined || input === '' || encoded(input);
+  if (value.type !== 'public-key' || !encoded(value.id) || !encoded(value.rawId) || !response || typeof response !== 'object' ||
+      !encoded(response.authenticatorData) || !encoded(response.clientDataJSON) || !encoded(response.signature) || !optionalEncoded(response.userHandle)) return null;
+  const extensions = value.clientExtensionResults && typeof value.clientExtensionResults === 'object' && !Array.isArray(value.clientExtensionResults)
+    ? value.clientExtensionResults : {};
+  if (Buffer.byteLength(JSON.stringify(extensions), 'utf8') > 4096) return null;
+  return {
+    id:value.id, rawId:value.rawId, type:'public-key',
+    response:{
+      authenticatorData:response.authenticatorData,
+      clientDataJSON:response.clientDataJSON,
+      signature:response.signature,
+      userHandle:response.userHandle || null
+    },
+    clientExtensionResults:extensions,
+    ...(typeof value.authenticatorAttachment === 'string' ? { authenticatorAttachment:value.authenticatorAttachment.slice(0, 32) } : {})
+  };
+}
 function actionOf(req) {
   if (req.query?.action) return String(req.query.action);
   return new URL(req.url || '/', 'http://localhost').pathname.split('/').filter(Boolean).pop() || '';
@@ -97,7 +119,7 @@ module.exports = async (req, res) => {
     if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     return json(res, 200, { ok: true, token: issueCsrfToken(req, res) });
   }
-  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code', 'passkey-register-options', 'passkey-register-verify', 'passkey-delete'];
+  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code', 'passkey-login-options', 'passkey-login-verify', 'passkey-register-options', 'passkey-register-verify', 'passkey-delete'];
   if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) {
     await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:45, subject:clientAddress(req), details:{ reasonCode:'origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
     return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
@@ -170,13 +192,48 @@ module.exports = async (req, res) => {
     return json(res, 200, { ok:true, data:normalizedPasskeys(payload) });
   }
 
+  if (action === 'passkey-login-options') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    if (!await authRate(req, res, 'auth_passkey_login_ip', 20, 600)) return;
+    const origin = publicOrigin(req);
+    const { response, payload } = await upstream('/auth/v1/passkeys/authentication/options', {
+      method:'POST', headers:{ origin }, body:{ gotrue_meta_security:{} }
+    });
+    if (!response.ok || !payload?.challenge_id || !payload?.options) {
+      passkeyDiagnostic(req, action, response, payload);
+      return json(res, response.status === 429 ? 429 : 400, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível iniciar a entrada com passkey.') });
+    }
+    return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
+  }
+
+  if (action === 'passkey-login-verify') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const challengeId = String(parsed.body.challengeId || '');
+    const credential = normalizedAuthenticationCredential(parsed.body.credential);
+    if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !credential) return json(res, 400, { ok:false, error:'A resposta da passkey é inválida.' });
+    if (!await authRate(req, res, 'auth_passkey_verify_ip', 20, 600)) return;
+    const origin = publicOrigin(req);
+    const { response, payload } = await upstream('/auth/v1/passkeys/authentication/verify', {
+      method:'POST', headers:{ origin }, body:{ challenge_id:challengeId, credential }
+    });
+    const session = payload?.session && typeof payload.session === 'object' ? payload.session : payload;
+    if (!response.ok || !session?.access_token || !session?.user?.id) {
+      passkeyDiagnostic(req, action, response, payload);
+      return json(res, response.status === 429 ? 429 : 401, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível validar esta passkey.') });
+    }
+    const refreshToken = String(session.refresh_token || '');
+    res.setHeader('Set-Cookie', sessionCookies(req, session.access_token, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
+    return json(res, 200, { ok:true });
+  }
+
   if (action === 'passkey-register-options') {
     if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
     const session = await browserSession(req, res);
     if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para cadastrar a passkey.' });
     if (!await authRate(req, res, 'auth_passkey_register', 8, 600, session.user.id)) return;
     const { response, payload } = await upstream('/auth/v1/passkeys/registration/options', {
-      method:'POST', headers:{ authorization:`Bearer ${session.access}` }, body:{}
+      method:'POST', headers:{ authorization:`Bearer ${session.access}`, origin:publicOrigin(req) }, body:{}
     });
     if (!response.ok || !payload?.challenge_id || !payload?.options) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }
     return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
@@ -191,7 +248,7 @@ module.exports = async (req, res) => {
     const credential = normalizedRegistrationCredential(parsed.body.credential);
     if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !credential) return json(res, 400, { ok:false, error:'A resposta da passkey é inválida.' });
     const { response, payload } = await upstream('/auth/v1/passkeys/registration/verify', {
-      method:'POST', headers:{ authorization:`Bearer ${session.access}` },
+      method:'POST', headers:{ authorization:`Bearer ${session.access}`, origin:publicOrigin(req) },
       body:{ challenge_id:challengeId, credential }
     });
     if (!response.ok) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }

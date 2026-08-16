@@ -4,7 +4,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 
 process.env.NODE_ENV = 'test';
 process.env.SUPABASE_URL = 'https://example.supabase.co';
@@ -67,7 +66,7 @@ test('CSRF endpoint helper issues a secure, same-site cookie', () => {
   assert.match(String(res.headers['set-cookie']), /; Secure/);
 });
 
-test('browser clients attach CSRF and execute only the vendored Supabase SDK', () => {
+test('browser clients attach CSRF and keep passkey sessions behind the same-origin API', () => {
   const root=path.join(__dirname,'..');
   const client=fs.readFileSync(path.join(root,'auth-client.js'),'utf8');
   const callback=fs.readFileSync(path.join(root,'auth-callback.js'),'utf8');
@@ -78,9 +77,9 @@ test('browser clients attach CSRF and execute only the vendored Supabase SDK', (
   assert.match(callback,/x-paxinbot-csrf/);
   assert.match(admin,/x-paxinbot-csrf/);
   assert.doesNotMatch(`${client}\n${callback}\n${html}`,/cdn\.jsdelivr|unpkg/i);
-  assert.match(html,/assets\/vendor\/supabase-2\.105\.0\.js/);
-  const vendor=fs.readFileSync(path.join(root,'assets','vendor','supabase-2.105.0.js'));
-  assert.equal(crypto.createHash('sha256').update(vendor).digest('hex'),'24e8c00dc25da420ee741068b60bcdb5f62cb3598d8834058acf37ec6ee1a724');
+  assert.doesNotMatch(html,/supabase-2\.105\.0\.js|cdn\.jsdelivr|unpkg/i);
+  assert.match(client,/\/api\/auth\/passkey-login-options/);
+  assert.match(client,/\/api\/auth\/passkey-login-verify/);
 });
 
 test('Vercel enforces browser hardening and isolates private routes from cache', () => {
@@ -111,7 +110,7 @@ test('legal pages are static, hardened and linked from account-sensitive flows',
     assert.equal((html.match(/<form\b/gi) || []).length,1);
     assert.match(html,/<form class="legal-site-search" action="\/ajuda" method="get" role="search">/);
     assert.doesNotMatch(html,/\b(?:SUPABASE_SECRET_KEY|MERCADOPAGO_ACCESS_TOKEN|PAXINBOT_SESSION_SECRET)\b/);
-    assert.match(html,/src="\/site-shell\.js"/);
+    assert.match(html,/src="\/site-shell\.js\?v=20260816-7"/);
     assert.match(html,/Vigência: 16 de agosto de 2026/);
     assert.doesNotMatch(html,/class="legal-document reveal/);
   }

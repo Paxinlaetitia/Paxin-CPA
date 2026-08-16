@@ -30,7 +30,6 @@ const CHECKOUT_INTENT_MAX_AGE=2*60*60*1000;
 
 const accountRoutes = { overview: '/conta', subscription: '/conta/assinatura', checkout:'/conta/checkout', downloads: '/conta/downloads', account: '/conta/configuracoes', support: '/conta/suporte' };
 const accountSectionRoutes = { profile: '/conta/configuracoes', security: '/conta/configuracoes/seguranca', devices: '/conta/configuracoes/dispositivos', preferences:'/conta/configuracoes/notificacoes', activity:'/conta/configuracoes/atividade' };
-let passkeyClient = null;
 let currentAccount = null;
 let availableProducts = [];
 let checkoutProduct = null;
@@ -185,6 +184,13 @@ function passkeyCreationOptions(value) {
   return result;
 }
 
+function passkeyRequestOptions(value) {
+  if (typeof PublicKeyCredential.parseRequestOptionsFromJSON === 'function') return PublicKeyCredential.parseRequestOptionsFromJSON(value);
+  const result = { ...value, challenge:decodeBase64Url(value.challenge) };
+  if (Array.isArray(value.allowCredentials)) result.allowCredentials = value.allowCredentials.map(item => ({ ...item, id:decodeBase64Url(item.id), type:item.type || 'public-key' }));
+  return result;
+}
+
 function encodeBase64Url(value) {
   const bytes = new Uint8Array(value); let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -198,6 +204,22 @@ function serializedRegistrationCredential(credential) {
     response:{
       attestationObject:encodeBase64Url(credential.response.attestationObject),
       clientDataJSON:encodeBase64Url(credential.response.clientDataJSON)
+    },
+    clientExtensionResults:credential.getClientExtensionResults(),
+    ...(credential.authenticatorAttachment ? { authenticatorAttachment:credential.authenticatorAttachment } : {})
+  };
+}
+
+function serializedAuthenticationCredential(credential) {
+  return {
+    id:credential.id,
+    rawId:encodeBase64Url(credential.rawId),
+    type:credential.type,
+    response:{
+      authenticatorData:encodeBase64Url(credential.response.authenticatorData),
+      clientDataJSON:encodeBase64Url(credential.response.clientDataJSON),
+      signature:encodeBase64Url(credential.response.signature),
+      userHandle:credential.response.userHandle ? encodeBase64Url(credential.response.userHandle) : null
     },
     clientExtensionResults:credential.getClientExtensionResults(),
     ...(credential.authenticatorAttachment ? { authenticatorAttachment:credential.authenticatorAttachment } : {})
@@ -490,24 +512,12 @@ async function loadPortalData(basePayload) {
   renderPreferences(preferences); renderActivity(activity); renderTickets(tickets); renderUsageGrants(usageGrants); renderPromotions(promotions); renderPasskeys(passkeys.data, passkeys.error);
 }
 
-async function getPasskeyClient() {
-  if (passkeyClient) return passkeyClient;
-  const config = await PaxinbotAuth.request('/api/auth/config');
-  if (!window.supabase?.createClient) throw new Error('O módulo seguro de autenticação não foi carregado.');
-  passkeyClient = window.supabase.createClient(config.url, config.key, { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, experimental:{ passkey:true } } });
-  return passkeyClient;
-}
-
-async function bridgeSession(session) {
-  if (!session?.access_token || !session?.refresh_token) throw new Error('A autenticação não retornou uma sessão válida.');
-  await PaxinbotAuth.request('/api/auth/session', { method:'POST', body:{ accessToken:session.access_token, refreshToken:session.refresh_token } });
-}
-
 async function loginWithPasskey() {
   const button = document.getElementById('passkey-login'); if (!window.PublicKeyCredential) throw new Error('Este navegador não oferece suporte a passkeys.'); button.disabled = true;
-  try { const client = await getPasskeyClient(); const { data, error } = await client.auth.signInWithPasskey(); if (error) throw new Error(friendlyPasskeyError(error)); await bridgeSession(data.session); const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
+  button.setAttribute('aria-busy', 'true');
+  try { const start = await PaxinbotAuth.request('/api/auth/passkey-login-options', { method:'POST', body:{} }); const credential = await navigator.credentials.get({ publicKey:passkeyRequestOptions(start.options) }); if (!credential) throw new Error('O dispositivo não retornou uma passkey.'); await PaxinbotAuth.request('/api/auth/passkey-login-verify', { method:'POST', body:{ challengeId:start.challengeId, credential:serializedAuthenticationCredential(credential) } }); const current = await PaxinbotAuth.request('/api/auth/me'); if (continueActivationAfterLogin()) return; await loadPortalData(current); await syncOwnerPanelLink(current.user); setAccountView(viewFromPath(),false,false); setClientStatus('Conta conectada com passkey.', true); window.showToast?.('Login concluído.'); }
   catch (error) { throw new Error(friendlyPasskeyError(error)); }
-  finally { button.disabled = false; }
+  finally { button.disabled = false; button.removeAttribute('aria-busy'); }
 }
 
 async function registerPasskey() {
