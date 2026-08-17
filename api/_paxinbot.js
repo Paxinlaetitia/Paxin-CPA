@@ -381,75 +381,81 @@ async function serviceRateLimit(scope, subject, limit, windowSeconds) {
   return response.ok && payload === true;
 }
 async function requestRateLimit(req, res, options = {}) {
-  const scope = String(options.scope || '').slice(0, 40);
-  const subject = String(options.subject || clientAddress(req));
-  const limit = Math.max(1, Math.min(1000, Number(options.limit) || 1));
-  const windowSeconds = Math.max(10, Math.min(86400, Number(options.windowSeconds) || 60));
-  const subjectHash = serverFingerprint(scope, subject);
-  let response = { ok:false, status:404 };
-  let payload = { code:'PGRST202' };
-  if (rateLimitV2State !== 'missing') {
-    ({ response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
-      method:'POST',
-      body:{
-        p_scope:scope,
-        p_subject_hash:subjectHash,
-        p_limit:limit,
-        p_window_seconds:windowSeconds,
-        p_cost:1
+  try {
+    const scope = String(options.scope || '').slice(0, 40);
+    const subject = String(options.subject || clientAddress(req));
+    const limit = Math.max(1, Math.min(1000, Number(options.limit) || 1));
+    const windowSeconds = Math.max(10, Math.min(86400, Number(options.windowSeconds) || 60));
+    const subjectHash = serverFingerprint(scope, subject);
+    let response = { ok:false, status:404 };
+    let payload = { code:'PGRST202' };
+    if (rateLimitV2State !== 'missing') {
+      try {
+        ({ response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit_v2', {
+          method:'POST',
+          body:{
+            p_scope:scope,
+            p_subject_hash:subjectHash,
+            p_limit:limit,
+            p_window_seconds:windowSeconds,
+            p_cost:1
+          }
+        }));
+        if (response.ok) rateLimitV2State = 'available';
+        else if (String(payload?.code || '').toUpperCase() === 'PGRST202') rateLimitV2State = 'missing';
+      } catch {
+        rateLimitV2State = 'missing';
       }
-    }));
-    if (response.ok) rateLimitV2State = 'available';
-    else if (String(payload?.code || '').toUpperCase() === 'PGRST202') rateLimitV2State = 'missing';
-  }
-  if (rateLimitV2State === 'missing') {
-    const legacy = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit', {
-      method:'POST',
-      body:{ p_scope:scope, p_subject_hash:subjectHash, p_limit:limit, p_window_seconds:windowSeconds }
-    });
-    if (legacy.response.ok && typeof legacy.payload === 'boolean') {
-      res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
-      res.setHeader('RateLimit', `limit=${limit}, remaining=${legacy.payload ? Math.max(0, limit - 1) : 0}, reset=${windowSeconds}`);
-      if (legacy.payload) return true;
-      await recordSiteSecurityEvent(req, {
-        eventType:'rate_limit.blocked', severity:35, subject,
-        details:{ scope, outcome:'blocked', status:'429' }
+    }
+    if (rateLimitV2State === 'missing') {
+      try {
+        const legacy = await serviceUpstream('/rest/v1/rpc/paxinbot_service_rate_limit', {
+          method:'POST',
+          body:{ p_scope:scope, p_subject_hash:subjectHash, p_limit:limit, p_window_seconds:windowSeconds }
+        });
+        if (legacy.response.ok && typeof legacy.payload === 'boolean') {
+          res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
+          res.setHeader('RateLimit', `limit=${limit}, remaining=${legacy.payload ? Math.max(0, limit - 1) : 0}, reset=${windowSeconds}`);
+          if (legacy.payload) return true;
+          await recordSiteSecurityEvent(req, {
+            eventType:'rate_limit.blocked', severity:35, subject,
+            details:{ scope, outcome:'blocked', status:'429' }
+          });
+          json(res, 429, {
+            ok:false, code:'rate_limited', retryAfter:windowSeconds,
+            error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
+          }, { 'retry-after':String(windowSeconds) });
+          return false;
+        }
+      } catch {}
+    }
+    const allowed = payload?.allowed === true;
+    const remaining = Number(payload?.remaining);
+    const resetAfter = Number(payload?.resetAfter);
+    if (!response.ok || !Number.isInteger(remaining) || remaining < 0 || !Number.isInteger(resetAfter) || resetAfter < 1 || resetAfter > windowSeconds) {
+      const upstreamCode = String(payload?.code || '');
+      securityDiagnostic('rate_limit.unavailable', {
+        requestId:requestId(req, res), route:requestRoute(req), upstreamStatus:Number(response.status) || 0,
+        diagnosticCode:/^[A-Z0-9_]{3,24}$/i.test(upstreamCode) ? upstreamCode : response.ok ? 'INVALID_RESPONSE' : 'UPSTREAM_REJECTED'
       });
-      json(res, 429, {
-        ok:false, code:'rate_limited', retryAfter:windowSeconds,
-        error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
-      }, { 'retry-after':String(windowSeconds) });
+      json(res, 503, { ok:false, code:'rate_limit_unavailable', error:'A proteção contra abuso está temporariamente indisponível. Tente novamente em instantes.' }, { 'retry-after':'10' });
       return false;
     }
-    // Preserve the actual fallback failure in diagnostics instead of reporting
-    // the already-known v2 schema-cache miss again.
-    response = legacy.response;
-    payload = legacy.payload;
-  }
-  const allowed = payload?.allowed === true;
-  const remaining = Number(payload?.remaining);
-  const resetAfter = Number(payload?.resetAfter);
-  if (!response.ok || !Number.isInteger(remaining) || remaining < 0 || !Number.isInteger(resetAfter) || resetAfter < 1 || resetAfter > windowSeconds) {
-    const upstreamCode = String(payload?.code || '');
-    securityDiagnostic('rate_limit.unavailable', {
-      requestId:requestId(req, res), route:requestRoute(req), upstreamStatus:Number(response.status) || 0,
-      diagnosticCode:/^[A-Z0-9_]{3,24}$/i.test(upstreamCode) ? upstreamCode : response.ok ? 'INVALID_RESPONSE' : 'UPSTREAM_REJECTED'
+    res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
+    res.setHeader('RateLimit', `limit=${limit}, remaining=${Math.min(limit, remaining)}, reset=${resetAfter}`);
+    if (allowed) return true;
+    await recordSiteSecurityEvent(req, {
+      eventType:'rate_limit.blocked', severity:35, subject,
+      details:{ scope, outcome:'blocked', status:'429' }
     });
-    json(res, 503, { ok:false, code:'rate_limit_unavailable', error:'A proteção contra abuso está temporariamente indisponível. Tente novamente em instantes.' }, { 'retry-after':'10' });
+    json(res, 429, {
+      ok:false, code:'rate_limited', retryAfter:resetAfter,
+      error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
+    }, { 'retry-after':String(resetAfter) });
     return false;
+  } catch {
+    return true;
   }
-  res.setHeader('RateLimit-Policy', `${limit};w=${windowSeconds}`);
-  res.setHeader('RateLimit', `limit=${limit}, remaining=${Math.min(limit, remaining)}, reset=${resetAfter}`);
-  if (allowed) return true;
-  await recordSiteSecurityEvent(req, {
-    eventType:'rate_limit.blocked', severity:35, subject,
-    details:{ scope, outcome:'blocked', status:'429' }
-  });
-  json(res, 429, {
-    ok:false, code:'rate_limited', retryAfter:resetAfter,
-    error:String(options.message || 'Muitas solicitações. Aguarde antes de tentar novamente.')
-  }, { 'retry-after':String(resetAfter) });
-  return false;
 }
 function siteSecurityEvent(req, input = {}) {
   const eventType = String(input.eventType || '');

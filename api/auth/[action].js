@@ -1,6 +1,7 @@
 'use strict';
 
-const { config, json, requireTrustedHost, cookies, sessionCookies, clearSession, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, recordSiteSecurityEvent } = require('../_paxinbot');
+const crypto = require('node:crypto');
+const { config, json, requireTrustedHost, cookies, sessionCookies, clearSession, sessionSecret, upstream, serviceUpstream, readBodyResult, browserSession, clientAddress, requestRateLimit, publicOrigin, issueCsrfToken, sameOriginRequest, recordSiteSecurityEvent } = require('../_paxinbot');
 
 function temporaryVerificationCookies(req, values = {}, maxAge = 10 * 60) {
   const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
