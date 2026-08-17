@@ -84,8 +84,9 @@ const Admin = (() => {
     document.getElementById('customer-dialog-devices').textContent = `${Number(user.deviceCount) || 0} vinculado(s)`;
 
     const isBanned = Boolean(user.disabled_at);
-    document.getElementById('customer-dialog-ban-text').textContent = isBanned ? 'Desbanir Cliente da Plataforma' : 'Banir Cliente da Plataforma';
-    document.getElementById('customer-btn-ban').className = isBanned ? 'button button-primary' : 'button danger';
+    document.getElementById('customer-dialog-ban-text').textContent = isBanned ? 'Desbanir Cliente' : 'Banir Cliente';
+    const banBtn = document.getElementById('customer-btn-ban');
+    banBtn.className = isBanned ? 'admin-ban-btn is-banned' : 'admin-ban-btn';
 
     document.getElementById('customer-dialog').showModal();
   }
