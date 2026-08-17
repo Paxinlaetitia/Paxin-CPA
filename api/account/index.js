@@ -6,8 +6,8 @@ const WINDOWS_RELEASE = Object.freeze({
   path: '/releases/PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
   version: '1.0.0',
-  sizeBytes: 101433299,
-  sha256: '3139286a02c9c9746881ccacf38f922f1050e15e10a1d1d649f76f206b055387',
+  sizeBytes: 101188012,
+  sha256: '62347372c777e5bde78497c18943c8985fbd0f444d925d2c26f71c424d7b8354',
   expiresIn: 120
 });
 

@@ -10,3 +10,7 @@ supabase/.temp/
 node_modules
 coverage
 release-evidence.local.json
+
+.env.release
+.env.local
+.env
