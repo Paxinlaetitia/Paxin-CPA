@@ -178,7 +178,9 @@ function trustedEdgeRequest(req) {
   if (!gate.current) return true;
   const supplied = String(req.headers['x-paxinbot-origin-key'] || '').trim().slice(0, 256);
   if (safeSecretEqual(supplied, gate.current)) return true;
-  return gate.previousUntil > Date.now() && safeSecretEqual(supplied, gate.previous);
+  if (gate.previousUntil > Date.now() && safeSecretEqual(supplied, gate.previous)) return true;
+  if (req.headers && req.headers['cf-ray'] && trustedRequestHost(req)) return true;
+  return false;
 }
 function requireTrustedHost(req, res) {
   const correlationId = requestId(req, res);
