@@ -33,7 +33,8 @@ function friendlyPasskeyError(payload, fallback = 'Não foi possível concluir a
   if (code === 'webauthn_credential_exists' || /credential.*exists|already.*registered/i.test(message)) return 'Esta passkey já está cadastrada para a conta.';
   if (code === 'webauthn_challenge_expired') return 'A confirmação da passkey expirou. Tente novamente.';
   if (code === 'webauthn_verification_failed') return 'A passkey não pôde ser validada por este dispositivo.';
-  if (/origin|relying.?party|rp.?id/i.test(`${code} ${message}`)) return 'O domínio da passkey não corresponde ao site aberto. Use https://www.paxincpa.store e tente novamente.';
+  if (/origin|relying.?party|rp.?id/i.test(`${code} ${message}`)) return 'O domínio da passkey não corresponde ao site aberto. Verifique a URL do site no Supabase (Site URL deve ser https://www.paxincpa.store).';
+  if (message) return message;
   return fallback;
 }
 function passkeyDiagnostic(req, action, response, payload) {
@@ -64,9 +65,16 @@ function normalizedRegistrationCredential(value) {
   const extensions = value.clientExtensionResults && typeof value.clientExtensionResults === 'object' && !Array.isArray(value.clientExtensionResults)
     ? value.clientExtensionResults : {};
   if (Buffer.byteLength(JSON.stringify(extensions), 'utf8') > 4096) return null;
+  const normalizedResponse = {
+    attestationObject: response.attestationObject,
+    clientDataJSON: response.clientDataJSON
+  };
+  if (Array.isArray(response.transports)) {
+    normalizedResponse.transports = response.transports.filter(t => typeof t === 'string' && /^[a-z0-9_-]{1,32}$/i.test(t));
+  }
   return {
     id:value.id, rawId:value.rawId, type:'public-key',
-    response:{ attestationObject:response.attestationObject, clientDataJSON:response.clientDataJSON },
+    response: normalizedResponse,
     clientExtensionResults:extensions,
     ...(typeof value.authenticatorAttachment === 'string' ? { authenticatorAttachment:value.authenticatorAttachment.slice(0, 32) } : {})
   };
