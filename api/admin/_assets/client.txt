@@ -168,9 +168,22 @@ const Admin = (() => {
   }
 
   async function loadAll() {
-    const [overview, users, products, coupons, promotions, devices] = await Promise.all([call('?action=overview'), call('?action=users'), call('?action=products'), call('?action=coupons'), call('?action=promotions').catch(() => []),call('?action=devices').catch(() => [])]);
+    const [overview, users, products, coupons, promotions, devices] = await Promise.all([
+      call('?action=overview').catch(() => ({})),
+      call('?action=users').catch(() => []),
+      call('?action=products').catch(() => []),
+      call('?action=coupons').catch(() => []),
+      call('?action=promotions').catch(() => []),
+      call('?action=devices').catch(() => [])
+    ]);
     renderOverview(overview); renderUsers(users); renderProducts(products); renderCoupons(coupons); renderPromotions(promotions); renderDevices(devices);
-    const [security, orders, tickets, audit, siteSecurity] = await Promise.all([call('?action=security').catch(() => []), call('?action=orders').catch(() => []), call('?action=tickets').catch(() => []), call('?action=audit').catch(() => []), call('?action=siteSecurity').catch(() => [])]);
+    const [security, orders, tickets, audit, siteSecurity] = await Promise.all([
+      call('?action=security').catch(() => []),
+      call('?action=orders').catch(() => []),
+      call('?action=tickets').catch(() => []),
+      call('?action=audit').catch(() => []),
+      call('?action=siteSecurity').catch(() => [])
+    ]);
     const combinedAudit = [...audit, ...siteSecurity].sort((left,right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)).slice(0,400);
     renderSecurity(security); renderOrders(orders); renderTickets(tickets); renderAudit(combinedAudit);
   }

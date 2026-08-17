@@ -21,14 +21,14 @@ function protectedAdminFile(res, name, contentType) {
 }
 const queries = {
   overview: ['paxinbot_owner_overview', () => ({})],
-  users: ['paxinbot_owner_list_users', q => ({ p_query: String(q.q || '') })],
+  users: ['paxinbot_owner_list_users', q => (q.q ? { p_query: String(q.q) } : {})],
   products: ['paxinbot_owner_list_products', () => ({})],
   coupons: ['paxinbot_owner_list_coupons', () => ({})],
   promotions: ['paxinbot_owner_list_promotions', () => ({})],
-  devices: ['paxinbot_owner_list_device_identities', q => ({ p_query: String(q.q || '') })],
-  security: ['paxinbot_owner_list_security_risk', q => ({ p_query: String(q.q || '') })],
+  devices: ['paxinbot_owner_list_device_identities', q => (q.q ? { p_query: String(q.q) } : {})],
+  security: ['paxinbot_owner_list_security_risk', q => (q.q ? { p_query: String(q.q) } : {})],
   siteSecurity: ['paxinbot_owner_list_site_security_events', () => ({ p_limit: 200 })],
-  orders: ['paxinbot_owner_list_orders', q => ({ p_query: String(q.q || '') })],
+  orders: ['paxinbot_owner_list_orders', q => (q.q ? { p_query: String(q.q) } : {})],
   audit: ['paxinbot_owner_list_audit', () => ({})],
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
 };
