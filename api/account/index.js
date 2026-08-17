@@ -2,7 +2,7 @@
 const crypto = require('node:crypto');
 const { json, requireTrustedHost, readBodyResult, browserSession, upstream, usageRuntimeState, downloadSigningSecret, requestRateLimit, publicOrigin, sameOriginRequest, safeUpstreamError } = require('../_paxinbot');
 
-const WINDOWS_RELEASE = Object.freeze({
+const DEFAULT_WINDOWS_RELEASE = Object.freeze({
   path: '/releases/PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
   version: '1.0.0',
@@ -11,13 +11,29 @@ const WINDOWS_RELEASE = Object.freeze({
   expiresIn: 120
 });
 
+function getWindowsRelease() {
+  const version = process.env.PAXINBOT_RELEASE_VERSION || DEFAULT_WINDOWS_RELEASE.version;
+  const sizeBytes = Number(process.env.PAXINBOT_RELEASE_SIZE_BYTES) || DEFAULT_WINDOWS_RELEASE.sizeBytes;
+  const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',');
+  return {
+    path: DEFAULT_WINDOWS_RELEASE.path,
+    fileName: DEFAULT_WINDOWS_RELEASE.fileName,
+    version,
+    sizeBytes,
+    sizeFormatted: process.env.PAXINBOT_RELEASE_SIZE_FORMATTED || `${sizeMB} MB`,
+    sha256: process.env.PAXINBOT_RELEASE_SHA256 || DEFAULT_WINDOWS_RELEASE.sha256,
+    expiresIn: DEFAULT_WINDOWS_RELEASE.expiresIn
+  };
+}
+
 async function signedWindowsRelease(req, res) {
   try {
-    const expires=Math.floor(Date.now()/1000)+WINDOWS_RELEASE.expiresIn;
+    const release = getWindowsRelease();
+    const expires=Math.floor(Date.now()/1000)+release.expiresIn;
     const nonce=crypto.randomBytes(18).toString('base64url');
-    const canonical=`GET\n${WINDOWS_RELEASE.path}\n${expires}\n${nonce}`;
+    const canonical=`GET\n${release.path}\n${expires}\n${nonce}`;
     const signature=crypto.createHmac('sha256',downloadSigningSecret()).update(canonical).digest('base64url');
-    const url=new URL(WINDOWS_RELEASE.path,publicOrigin(req));
+    const url=new URL(release.path,publicOrigin(req));
     url.searchParams.set('expires',String(expires)); url.searchParams.set('nonce',nonce); url.searchParams.set('signature',signature);
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     if (String(req.query?.redirect || '') === '1') {
@@ -27,7 +43,7 @@ async function signedWindowsRelease(req, res) {
       res.setHeader('X-Content-Type-Options','nosniff');
       return res.end();
     }
-    return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:WINDOWS_RELEASE.fileName, version:WINDOWS_RELEASE.version, sizeBytes:WINDOWS_RELEASE.sizeBytes, sha256:WINDOWS_RELEASE.sha256, expiresIn:WINDOWS_RELEASE.expiresIn } });
+    return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:release.fileName, version:release.version, sizeBytes:release.sizeBytes, sizeFormatted:release.sizeFormatted, sha256:release.sha256, expiresIn:release.expiresIn } });
   } catch {
     return json(res, 503, { ok:false, error:'O instalador está temporariamente indisponível.' });
   }
@@ -59,19 +75,25 @@ const bootstrapQueries = Object.freeze({
 });
 
 const bootstrapDefaults = Object.freeze({
-  account:null, devices:[], orders:[], products:[], preferences:{}, activity:[], tickets:[], usageGrants:[], promotions:[], passkeys:[]
+  account:{ profile:{ id:'', role:'customer', display_name:'', disabled_at:null }, email:'', created_at:'' },
+  devices:[],
+  orders:[],
+  products:[],
+  preferences:{ product_updates:false, support_updates:true },
+  activity:[],
+  tickets:[],
+  usageGrants:[],
+  promotions:[]
 });
 
 async function portalBootstrap(req, res, session) {
   const started=Date.now();
-  const authorization={ authorization:`Bearer ${session.access}` };
   const entries=Object.entries(bootstrapQueries);
-  const [accessResult, passkeyResult, ...queryResults]=await Promise.all([
-    upstream('/rest/v1/rpc/paxinbot_get_my_access', { method:'POST', headers:authorization, body:{} }),
-    upstream('/auth/v1/passkeys', { headers:authorization }),
-    ...entries.map(([, item]) => upstream(`/rest/v1/rpc/${item[0]}`, { method:'POST', headers:authorization, body:item[1]({}) }))
+  const [accessResult, passkeyResult, ...queryResults] = await Promise.all([
+    upstream('/rest/v1/rpc/paxinbot_get_my_access', { method:'POST', headers:{ authorization:`Bearer ${session.access}` }, body:{} }),
+    upstream('/auth/v1/passkeys', { headers:{ authorization:`Bearer ${session.access}` } }),
+    ...entries.map(([,item]) => upstream(`/rest/v1/rpc/${item[0]}`, { method:'POST', headers:{ authorization:`Bearer ${session.access}` }, body:item[1]({}) }))
   ]);
-  if (!accessResult.response.ok) return json(res, 503, { ok:false, error:safeUpstreamError(accessResult.payload, 'Não foi possível carregar sua conta agora.') });
 
   const entitlement=accessResult.payload && typeof accessResult.payload === 'object' ? { ...accessResult.payload } : { active:false };
   if (entitlement.kind === 'usage' && /^[0-9a-f-]{36}$/i.test(String(entitlement.grantId || ''))) {
@@ -80,7 +102,7 @@ async function portalBootstrap(req, res, session) {
     } catch { entitlement.usageRunning=false; }
   }
 
-  const data={ ...bootstrapDefaults };
+  const data={ ...bootstrapDefaults, release: getWindowsRelease() };
   const errors={};
   queryResults.forEach((result, index) => {
     const key=entries[index][0];
@@ -112,6 +134,7 @@ module.exports = async (req, res) => {
   if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const queryAction = String(req.query?.action || 'overview');
   if (req.method === 'GET' && queryAction === 'download') return signedWindowsRelease(req, res);
+  if (req.method === 'GET' && queryAction === 'release') return json(res, 200, { ok: true, data: getWindowsRelease() });
   const session = await browserSession(req, res);
   if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
   if (!await requestRateLimit(req, res, {

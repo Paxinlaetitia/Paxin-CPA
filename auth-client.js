@@ -254,7 +254,7 @@ function renderClientDashboard(payload) {
   document.getElementById('dashboard-devices-state').textContent = user ? 'Sessões ativas do aplicativo' : 'Autorize depois do login';
   document.getElementById('client-logout').hidden = !user;
   document.getElementById('account-email').value = email;
-  document.getElementById('account-display-name').value = displayName;
+    document.getElementById('account-display-name').value = displayName;
   const providers = user?.providers || [];
   document.getElementById('account-providers').textContent = providers.length ? providers.map(item => item === 'google' ? 'Google' : item === 'email' ? 'E-mail e senha' : item).join(' e ') : 'E-mail e senha';
   document.getElementById('passkey-state').textContent = 'VERIFICANDO';
@@ -278,6 +278,16 @@ function renderPromotions(promotions) {
   document.getElementById('promotion-description').textContent=promotion.description || 'Resgate seu benefício e ative-o quando estiver pronto para usar o aplicativo.';
   document.getElementById('promotion-duration').textContent=`${formatUsageTime(promotion.rewardSeconds)} de uso · só começa após a ativação`;
   try { const key=`paxinbot_promotion_seen_${promotion.id}`; if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key,'1'); window.showToast?.(`${promotion.headline || 'Você ganhou um presente'}.`); } } catch {}
+}
+
+function renderRelease(release) {
+  if (!release) return;
+  const version = release.version ? (release.version.startsWith('v') ? release.version : `v${release.version}`) : 'v1.0';
+  const sizeText = release.sizeFormatted || (release.sizeBytes ? `${(release.sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : '96,7 MB');
+  const titleElem = document.getElementById('account-download-version');
+  if (titleElem) titleElem.textContent = `Paxinbot ${version.replace(/^v/i, '')}`;
+  const sizeElem = document.getElementById('account-download-size');
+  if (sizeElem) sizeElem.textContent = `Instalador oficial · ${sizeText}`;
 }
 
 function viewFromPath() {
@@ -504,7 +514,7 @@ async function loadPortalData() {
   const merged={ ...(result.current || {}), profile:account?.profile || null, account };
   renderClientDashboard(merged);
   renderDevices(data.devices || []); renderOrders(data.orders || []); renderProducts(data.products || [], result.errors?.products, result.checkoutReady);
-  renderPreferences(data.preferences || {}); renderActivity(data.activity || []); renderTickets(data.tickets || []); renderUsageGrants(data.usageGrants || []); renderPromotions(data.promotions || []); renderPasskeys(data.passkeys || [], result.errors?.passkeys);
+  renderPreferences(data.preferences || {}); renderActivity(data.activity || []); renderTickets(data.tickets || []); renderUsageGrants(data.usageGrants || []); renderPromotions(data.promotions || []); renderPasskeys(data.passkeys || [], result.errors?.passkeys); renderRelease(data.release);
   const messages=Object.values(result.errors || {}).filter(Boolean);
   if (messages.length) { notice.textContent='Parte das informações será atualizada automaticamente em instantes.'; notice.hidden=false; }
   return merged;

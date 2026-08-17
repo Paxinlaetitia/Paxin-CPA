@@ -50,6 +50,37 @@ async function serveRelease(request, env, url) {
   return new Response(object.body,{ status,headers });
 }
 
+async function serveReleaseMetadata(request, env) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return plain(405, 'Método não permitido.', { allow: 'GET, HEAD' });
+  if (!env.PAXINBOT_RELEASES || typeof env.PAXINBOT_RELEASES.head !== 'function') {
+    return new Response(JSON.stringify({ ok: true, data: { version: env.PAXINBOT_RELEASE_VERSION || '1.0.0', sizeBytes: 101188012, sizeFormatted: '96,5 MB', fileName: 'PaxinbotSetup.exe' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=60', 'x-content-type-options': 'nosniff' }
+    });
+  }
+  try {
+    const head = await env.PAXINBOT_RELEASES.head(RELEASE_OBJECT);
+    if (!head) return plain(404, 'Instalador não encontrado.');
+    const version = head.customMetadata?.version || env.PAXINBOT_RELEASE_VERSION || '1.0.0';
+    const sizeBytes = head.size || 101188012;
+    const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',');
+    const data = {
+      version,
+      sizeBytes,
+      sizeFormatted: `${sizeMB} MB`,
+      fileName: 'PaxinbotSetup.exe',
+      sha256: head.customMetadata?.sha256 || head.httpEtag || '',
+      uploadedAt: head.uploaded ? new Date(head.uploaded).toISOString() : new Date().toISOString()
+    };
+    return new Response(JSON.stringify({ ok: true, data }), {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=60', 'x-content-type-options': 'nosniff' }
+    });
+  } catch {
+    return plain(500, 'Erro ao consultar metadados da release.');
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url=new URL(request.url);
@@ -62,7 +93,11 @@ export default {
         });
       }
     }
-    if (url.pathname.startsWith('/releases/')) return url.pathname===RELEASE_PATH ? serveRelease(request,env,url) : plain(404,'Arquivo não encontrado.');
+    if (url.pathname.startsWith('/releases/')) {
+      if (url.pathname === RELEASE_PATH) return serveRelease(request, env, url);
+      if (url.pathname === '/releases/latest.json' || url.pathname === '/releases/metadata.json') return serveReleaseMetadata(request, env);
+      return plain(404, 'Arquivo não encontrado.');
+    }
     if (url.pathname.startsWith('/auth/v1/')) {
       const supabaseHost = 'drkyjgnctbxmupbfarnj.supabase.co';
       const targetUrl = new URL(url.pathname + url.search, `https://${supabaseHost}`);

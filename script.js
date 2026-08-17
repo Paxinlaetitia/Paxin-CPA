@@ -164,6 +164,29 @@ document.querySelectorAll('a[href="/conta"]').forEach(link => link.addEventListe
 
 document.querySelectorAll('a[href="#"]').forEach(link => link.addEventListener('click', event => event.preventDefault()));
 
+async function loadPublicReleaseInfo() {
+  if (document.body?.dataset?.page !== 'download') return;
+  try {
+    const res = await fetch('/releases/latest.json').catch(() => null);
+    const payload = res && res.ok ? await res.json().catch(() => null) : null;
+    const data = payload?.data;
+    if (!data) return;
+    const versionText = data.version ? (data.version.startsWith('v') ? data.version : `v${data.version}`) : 'v1.0';
+    const sizeText = data.sizeFormatted || `${(data.sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+    const vElem = document.getElementById('public-download-version');
+    if (vElem) vElem.textContent = versionText;
+    const mvElem = document.getElementById('public-download-meta-version');
+    if (mvElem) mvElem.textContent = versionText;
+    const msElem = document.getElementById('public-download-meta-size');
+    if (msElem) msElem.textContent = sizeText;
+    const reqSizeElem = document.getElementById('public-download-req-size');
+    if (reqSizeElem) reqSizeElem.textContent = `~${sizeText}`;
+    const notesVElem = document.getElementById('public-download-notes-version');
+    if (notesVElem) notesVElem.textContent = versionText;
+  } catch {}
+}
+loadPublicReleaseInfo();
+
 const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
