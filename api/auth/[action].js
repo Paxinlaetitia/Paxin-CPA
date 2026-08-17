@@ -351,6 +351,201 @@ module.exports = async (req, res) => {
     const refreshToken = receivedRefreshToken.length >= 20 ? receivedRefreshToken : '';
     res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
     return json(res, 200, { ok: true, renewable: Boolean(refreshToken) });
+    const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || ''); const temporaryAccess = String(jar.paxinbot_verify_access || '');
+    if (!/^[0-9]{6}$/.test(code)) return json(res, 400, { ok: false, error: 'Informe o código de seis dígitos enviado ao seu e-mail.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
+    if (!await authRate(req, res, 'auth_verify_pair', 10, 600, email)) return;
+    let passwordUser = null;
+    if (purpose !== 'signup') {
+      if (!temporaryAccess) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
+      const temporaryUser = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${temporaryAccess}` } });
+      if (!temporaryUser.response.ok || !temporaryUser.payload?.id) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
+      passwordUser = temporaryUser.payload;
+    }
+    const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { email, token: code, type: purpose === 'signup' ? 'signup' : 'email' } });
+    if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.code_rejected', severity:35, subject:`${clientAddress(req)}\0${email}`, details:{ reasonCode:'invalid_or_expired', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'Não foi possível confirmar o código.') });
+    }
+    if (passwordUser && passwordUser.id !== verified.payload.user.id) return json(res, 401, { ok: false, error: 'O código não corresponde à conta confirmada pela senha.' });
+    if (purpose === 'signup') {
+      const username = normalizeUsername(verified.payload.user.user_metadata?.display_name);
+      if (USERNAME_PATTERN.test(username)) await persistSignupUsername(verified.payload.access_token, username).catch(() => false);
+    }
+    res.setHeader('Set-Cookie', [...sessionCookies(req, verified.payload.access_token, verified.payload.refresh_token), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]);
+    const result = { ok: true, confirmed: true, flow: purpose === 'signup' ? 'signup' : 'login' };
+    return json(res, 200, result);
+  }
+
+  if (action === 'resend-email-code') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const jar = cookies(req); const email = String(jar.paxinbot_verify_email || '').trim().toLowerCase(); const purpose = String(jar.paxinbot_verify_purpose || '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['login', 'signup'].includes(purpose)) return json(res, 401, { ok: false, error: 'A confirmação expirou. Inicie novamente.' });
+    if (purpose !== 'signup' && !jar.paxinbot_verify_access) return json(res, 401, { ok: false, error: 'A confirmação expirou. Entre novamente com sua senha.' });
+    if (!await authRate(req, res, 'auth_resend_pair', 3, 600, email)) return;
+    const sent = purpose === 'signup' ? await upstream('/auth/v1/resend', { method: 'POST', body: { type: 'signup', email } }) : await upstream('/auth/v1/otp', { method: 'POST', body: { email, create_user: false } });
+    if (!sent.response.ok) return json(res, 429, { ok: false, error: friendlyCodeError(sent.payload, 'Não foi possível reenviar o código agora.') });
+    return json(res, 200, { ok: true, message: 'Um novo código foi enviado ao seu e-mail.' });
+  }
+
+  if (action === 'passkeys') {
+    if (req.method !== 'GET') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Entre na sua conta para gerenciar passkeys.' });
+    const { response, payload } = await upstream('/auth/v1/passkeys', { headers:{ authorization:`Bearer ${session.access}` } });
+    if (!response.ok) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 503, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível consultar as passkeys agora.') }); }
+    return json(res, 200, { ok:true, data:normalizedPasskeys(payload) });
+  }
+
+  if (action === 'passkey-login-options') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    if (!await authRate(req, res, 'auth_passkey_login_ip', 20, 600)) return;
+    const origin = publicOrigin(req);
+    const { response, payload } = await upstream('/auth/v1/passkeys/authentication/options', {
+      method:'POST', headers:{ origin }, body:{ gotrue_meta_security:{} }
+    });
+    if (!response.ok || !payload?.challenge_id || !payload?.options) {
+      passkeyDiagnostic(req, action, response, payload);
+      return json(res, response.status === 429 ? 429 : 400, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível iniciar a entrada com passkey.') });
+    }
+    return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
+  }
+
+  if (action === 'passkey-login-verify') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const challengeId = String(parsed.body.challengeId || '');
+    const credential = normalizedAuthenticationCredential(parsed.body.credential);
+    if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !credential) return json(res, 400, { ok:false, error:'A resposta da passkey é inválida.' });
+    if (!await authRate(req, res, 'auth_passkey_verify_ip', 20, 600)) return;
+    const origin = publicOrigin(req);
+    const { response, payload } = await upstream('/auth/v1/passkeys/authentication/verify', {
+      method:'POST', headers:{ origin }, body:{ challenge_id:challengeId, credential }
+    });
+    const session = payload?.session && typeof payload.session === 'object' ? payload.session : payload;
+    if (!response.ok || !session?.access_token || !session?.user?.id) {
+      passkeyDiagnostic(req, action, response, payload);
+      return json(res, response.status === 429 ? 429 : 401, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível validar esta passkey.') });
+    }
+    const refreshToken = String(session.refresh_token || '');
+    res.setHeader('Set-Cookie', sessionCookies(req, session.access_token, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
+    return json(res, 200, { ok:true });
+  }
+
+  if (action === 'passkey-register-options') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para cadastrar a passkey.' });
+    if (!await authRate(req, res, 'auth_passkey_register', 8, 600, session.user.id)) return;
+    const { response, payload } = await upstream('/auth/v1/passkeys/registration/options', {
+      method:'POST', headers:{ authorization:`Bearer ${session.access}`, origin:publicOrigin(req) }, body:{}
+    });
+    if (!response.ok || !payload?.challenge_id || !payload?.options) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }
+    return json(res, 200, { ok:true, challengeId:String(payload.challenge_id), options:payload.options });
+  }
+
+  if (action === 'passkey-register-verify') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para cadastrar a passkey.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const challengeId = String(parsed.body.challengeId || '');
+    const credential = normalizedRegistrationCredential(parsed.body.credential);
+    if (!/^[0-9a-f-]{36}$/i.test(challengeId) || !credential) return json(res, 400, { ok:false, error:'A resposta da passkey é inválida.' });
+    const { response, payload } = await upstream('/auth/v1/passkeys/registration/verify', {
+      method:'POST', headers:{ authorization:`Bearer ${session.access}`, origin:publicOrigin(req) },
+      body:{ challenge_id:challengeId, credential }
+    });
+    if (!response.ok) { passkeyDiagnostic(req, action, response, payload); return json(res, response.status === 401 ? 401 : 400, { ok:false, error:friendlyPasskeyError(payload) }); }
+    return json(res, 200, { ok:true, data:normalizedPasskeys([payload])[0] || null });
+  }
+
+  if (action === 'passkey-delete') {
+    if (req.method !== 'POST') return json(res, 405, { ok:false, error:'Método não permitido.' });
+    const session = await browserSession(req, res);
+    if (!session) return json(res, 401, { ok:false, error:'Sua sessão expirou. Entre novamente para remover a passkey.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return;
+    const passkeyId = String(parsed.body.passkeyId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(passkeyId)) return json(res, 400, { ok:false, error:'A passkey informada é inválida.' });
+    if (!await authRate(req, res, 'auth_passkey_delete', 12, 600, session.user.id)) return;
+    const { response, payload } = await upstream(`/auth/v1/passkeys/${encodeURIComponent(passkeyId)}`, {
+      method:'DELETE', headers:{ authorization:`Bearer ${session.access}` }
+    });
+    if (!response.ok) return json(res, response.status === 404 ? 404 : 400, { ok:false, error:friendlyPasskeyError(payload, 'Não foi possível remover esta passkey.') });
+    return json(res, 200, { ok:true });
+  }
+
+  if (action === 'logout') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const access = cookies(req).paxinbot_access; if (access) await upstream('/auth/v1/logout', { method: 'POST', headers: { authorization: `Bearer ${access}` } });
+    res.setHeader('Set-Cookie', [...clearSession(req), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]); return json(res, 200, { ok: true });
+  }
+  if (action === 'me') {
+    if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const session = await browserSession(req, res); if (!session) return json(res, 401, { ok: false, error: 'Entre na sua conta para continuar.' });
+    const { response, payload } = await upstream('/rest/v1/rpc/paxinbot_get_my_access', { method: 'POST', headers: { authorization: `Bearer ${session.access}` }, body: {} });
+    const providers = [...new Set((session.user.identities || []).map(identity => identity.provider).filter(Boolean))];
+    const entitlement = response.ok && payload && typeof payload === 'object' ? { ...payload } : { active: false };
+    if (response.ok && entitlement.kind === 'usage' && /^[0-9a-f-]{36}$/i.test(String(entitlement.grantId || ''))) {
+      try {
+        const runtime = await serviceUpstream('/rest/v1/rpc/paxinbot_get_usage_runtime_state', {
+          method:'POST', body:{ p_user_id:session.user.id, p_usage_grant_id:entitlement.grantId }
+        });
+        entitlement.usageRunning = Boolean(runtime.response.ok && runtime.payload?.running === true);
+      } catch { entitlement.usageRunning = false; }
+    }
+    return json(res, response.ok ? 200 : 503, { ok: response.ok, serverNow: new Date().toISOString(), user: { id: session.user.id, email: session.user.email, providers }, entitlement });
+  }
+  if (action === 'recover') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const email = String(parsed.body.email || '').trim().toLowerCase();
+    if (!await authRate(req, res, 'auth_recover_ip', 10, 3600)) return;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!await authRate(req, res, 'auth_recover_pair', 3, 3600, email)) return;
+      await upstream('/auth/v1/recover', { method: 'POST', body: { email, redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=recovery` } });
+    }
+    return json(res, 200, { ok: true, message: 'Se existir uma conta para este e-mail, enviaremos as instruções.' });
+  }
+  if (action === 'signup') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    if (!USERNAME_PATTERN.test(username)) return json(res, 400, { ok: false, error: 'Use um nome de usuário de 3 a 24 caracteres, com letras, números, ponto, hífen ou sublinhado.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 8 caracteres.' });
+    if (!await authRate(req, res, 'auth_signup_ip', 10, 3600) || !await authRate(req, res, 'auth_signup_pair', 3, 3600, email)) return;
+    const { response, payload } = await upstream('/auth/v1/signup', { method: 'POST', body: { email, password, data: { display_name: username }, email_redirect_to: `${publicOrigin(req)}/auth-callback.html?flow=signup` } });
+    if (!response.ok) {
+      const msg = payload?.msg || payload?.error_description || payload?.error || payload?.message;
+      let friendlyError = 'Não foi possível criar a conta com esses dados.';
+      if (typeof msg === 'string') {
+        if (/already registered|already exists|user already/i.test(msg)) friendlyError = 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.';
+        else if (/password/i.test(msg) && /short|least|characters/i.test(msg)) friendlyError = 'A senha deve ter pelo menos 8 caracteres.';
+        else if (/rate limit|too many/i.test(msg)) friendlyError = 'Muitas tentativas de cadastro. Aguarde alguns instantes.';
+        else if (/domain not allowed|invalid email/i.test(msg)) friendlyError = 'Informe um endereço de e-mail válido.';
+        else if (/error sending|email provider|smtp/i.test(msg)) friendlyError = 'Não foi possível enviar o código por e-mail no momento. Tente novamente.';
+      }
+      return json(res, 400, { ok: false, error: friendlyError });
+    }
+    if (payload?.access_token && payload?.user?.email_confirmed_at) {
+      await persistSignupUsername(payload.access_token, username).catch(() => false);
+      res.setHeader('Set-Cookie', sessionCookies(req, payload.access_token, payload.refresh_token));
+      return json(res, 200, { ok: true, confirmed: true, message: 'Conta criada e confirmada.' });
+    }
+    res.setHeader('Set-Cookie', temporaryVerificationCookies(req, { email, purpose: 'signup' }));
+    return json(res, 200, { ok: true, verificationRequired: true, flow: 'signup', emailMasked: maskedEmail(email), message: 'Enviamos um código de seis dígitos para confirmar seu e-mail.' });
+  }
+  if (action === 'session') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const accessToken = String(body.accessToken || ''); const receivedRefreshToken = String(body.refreshToken || '');
+    if (accessToken.length < 80) return json(res, 400, { ok: false, error: 'Sessão de autenticação inválida.' });
+    if (!await authRate(req, res, 'auth_session_ip', 30, 600)) return;
+    const { response, payload } = await upstream('/auth/v1/user', { headers: { authorization: `Bearer ${accessToken}` } });
+    if (!response.ok || !payload?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.session_rejected', severity:40, subject:clientAddress(req), details:{ reasonCode:'provider_rejected', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: 'Não foi possível validar a sessão.' });
+    }
+    const refreshToken = receivedRefreshToken.length >= 20 ? receivedRefreshToken : '';
+    res.setHeader('Set-Cookie', sessionCookies(req, accessToken, refreshToken, refreshToken ? 60 * 60 * 24 * 7 : 60 * 60));
+    return json(res, 200, { ok: true, renewable: Boolean(refreshToken) });
   }
   if (action === 'password') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
@@ -366,19 +561,142 @@ module.exports = async (req, res) => {
     return json(res, 200, { ok: true });
   }
   if (action === 'config') {
-    if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const { url, key } = config(); return json(res, 200, { ok: true, url, key });
   }
   if (action === 'google') {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     if (!await authRate(req, res, 'auth_google_ip', 30, 600)) return;
-    const { url } = config();
-    const target = new URL(`${url}/auth/v1/authorize`);
-    target.searchParams.set('provider', 'google');
-    target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=google`);
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    if (!clientId) return json(res, 500, { ok: false, error: 'Google OAuth não configurado no servidor.' });
+    const origin = publicOrigin(req);
+    const redirectUri = `${origin}/api/auth/google-callback`;
+
+    const now = Math.floor(Date.now() / 1000);
+    const expires = now + 600;
+    const nonce = crypto.randomBytes(16).toString('base64url');
+    const statePayload = `${nonce}.${expires}`;
+    const hmac = crypto.createHmac('sha256', sessionSecret()).update(statePayload).digest('base64url');
+    const state = `${statePayload}.${hmac}`;
+
+    const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
+    res.setHeader('Set-Cookie', `paxinbot_google_state=${encodeURIComponent(state)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${isSecure ? '; Secure' : ''}`);
+
+    const target = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    target.searchParams.set('client_id', clientId);
+    target.searchParams.set('redirect_uri', redirectUri);
+    target.searchParams.set('response_type', 'code');
+    target.searchParams.set('scope', 'openid email profile');
+    target.searchParams.set('state', state);
+    target.searchParams.set('prompt', 'select_account');
+
     res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' });
     res.end();
     return;
+  }
+  if (action === 'google-callback') {
+    if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
+    const origin = publicOrigin(req);
+    const query = new URL(req.url, origin).searchParams;
+    const code = String(query.get('code') || '');
+    const receivedState = String(query.get('state') || '');
+    const cookieState = String(cookies(req).paxinbot_google_state || '');
+
+    if (!receivedState || receivedState !== cookieState) {
+      res.writeHead(302, { Location: `${origin}/cliente?error=google_state_invalid`, 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
+    const [nonce, expiresText, receivedHmac] = receivedState.split('.');
+    const expires = Number(expiresText);
+    const expectedHmac = crypto.createHmac('sha256', sessionSecret()).update(`${nonce}.${expiresText}`).digest('base64url');
+    if (!expires || expires < Math.floor(Date.now() / 1000) || receivedHmac !== expectedHmac) {
+      res.writeHead(302, { Location: `${origin}/cliente?error=google_state_expired`, 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
+    if (!code) {
+      res.writeHead(302, { Location: `${origin}/cliente?error=google_cancelled`, 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
+
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    const redirectUri = `${origin}/api/auth/google-callback`;
+
+    try {
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code'
+        }).toString()
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.id_token) {
+        console.error('Google token exchange error:', tokenData);
+        res.writeHead(302, { Location: `${origin}/cliente?error=google_token_exchange_failed`, 'cache-control': 'no-store' });
+        res.end();
+        return;
+      }
+
+      let authResult = await upstream('/auth/v1/token?grant_type=id_token', {
+        method: 'POST',
+        body: {
+          provider: 'google',
+          id_token: tokenData.id_token,
+          access_token: tokenData.access_token
+        }
+      });
+
+      if (!authResult?.response?.ok || !authResult?.payload?.access_token) {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const googleUser = await userInfoRes.json();
+        if (googleUser?.email && googleUser.verified_email) {
+          const email = String(googleUser.email).toLowerCase().trim();
+          const name = String(googleUser.name || email.split('@')[0]);
+          await serviceUpstream('/auth/v1/admin/users', {
+            method: 'POST',
+            body: {
+              email,
+              email_confirm: true,
+              user_metadata: { full_name: name, display_name: name, provider: 'google' }
+            }
+          });
+          const linkRes = await serviceUpstream('/auth/v1/admin/generate_link', {
+            method: 'POST',
+            body: { type: 'magiclink', email }
+          });
+          if (linkRes?.payload?.hashed_token) {
+            authResult = await upstream(`/auth/v1/verify?type=magiclink&token_hash=${linkRes.payload.hashed_token}`);
+          }
+        }
+      }
+
+      if (authResult?.payload?.access_token) {
+        const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
+        const clearState = `paxinbot_google_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isSecure ? '; Secure' : ''}`;
+        const setSession = sessionCookies(req, authResult.payload.access_token, authResult.payload.refresh_token);
+        res.setHeader('Set-Cookie', [clearState, ...setSession]);
+        res.writeHead(302, { Location: `${origin}/conta`, 'cache-control': 'no-store' });
+        res.end();
+        return;
+      }
+      res.writeHead(302, { Location: `${origin}/cliente?error=google_login_failed`, 'cache-control': 'no-store' });
+      res.end();
+      return;
+    } catch (e) {
+      console.error('Google OAuth callback error:', e);
+      res.writeHead(302, { Location: `${origin}/cliente?error=google_internal_error`, 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
   }
   return json(res, 404, { ok: false, error: 'Rota não encontrada.' });
 };
