@@ -53,6 +53,15 @@ async function serveRelease(request, env, url) {
 export default {
   async fetch(request, env) {
     const url=new URL(request.url);
+    const cf = request.cf || {};
+    if (url.pathname.startsWith('/api/auth/')) {
+      if (cf.isTor === true || (typeof cf.threatScore === 'number' && cf.threatScore > 85)) {
+        return new Response('Acesso bloqueado por segurança (Proxy/Tor detectado).', {
+          status: 403,
+          headers: { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' }
+        });
+      }
+    }
     if (url.pathname.startsWith('/releases/')) return url.pathname===RELEASE_PATH ? serveRelease(request,env,url) : plain(404,'Arquivo não encontrado.');
     if (url.pathname.startsWith('/auth/v1/')) {
       const supabaseHost = 'drkyjgnctbxmupbfarnj.supabase.co';

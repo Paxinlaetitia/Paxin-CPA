@@ -540,18 +540,84 @@ async function completeClientLogin(result, message = 'Login realizado.') {
   const targetView=viewFromPath(); const returningFromPayment=new URLSearchParams(location.search).has('checkout'); clearAuthModeQuery(); setAccountView(returningFromPayment ? 'subscription' : targetView, false, false);
   setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-email-code-form').reset(); void handleCheckoutReturn();
 }
+let turnstileLoginWidgetId = null;
+let turnstileSignupWidgetId = null;
+
+function renderTurnstile() {
+  if (typeof window.turnstile === 'undefined') return;
+  const siteKey = '0x4AAAAAAETAovvO1estkl2J';
+  const loginSlot = document.getElementById('turnstile-login-container');
+  if (loginSlot && turnstileLoginWidgetId === null) {
+    try {
+      turnstileLoginWidgetId = window.turnstile.render(loginSlot, { sitekey: siteKey, theme: 'dark' });
+    } catch {}
+  }
+  const signupSlot = document.getElementById('turnstile-signup-container');
+  if (signupSlot && turnstileSignupWidgetId === null) {
+    try {
+      turnstileSignupWidgetId = window.turnstile.render(signupSlot, { sitekey: siteKey, theme: 'dark' });
+    } catch {}
+  }
+}
+window.turnstileCallback = renderTurnstile;
 
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]');
   void renderAuthPurchaseContext();
   startAccessClock();
+  renderTurnstile();
   try { const current=await loadPortalData(); if (continueActivationAfterLogin()) return; await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
-  form.addEventListener('submit', async event => { event.preventDefault(); submit.disabled = true; try { const data = new FormData(form); const result = await PaxinbotAuth.request('/api/auth/login', { method:'POST', body:{ email:data.get('email'), password:data.get('password') } }); if (result.verificationRequired) return setEmailCodeStep(result, 'login'); await completeClientLogin(result); } catch (error) { setClientStatus(error.message || 'Não foi possível entrar.'); window.showToast?.(error.message || 'Não foi possível entrar.'); } finally { submit.disabled = false; } });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    submit.disabled = true;
+    try {
+      const data = new FormData(form);
+      const turnstileToken = window.turnstile && turnstileLoginWidgetId !== null ? window.turnstile.getResponse(turnstileLoginWidgetId) : '';
+      const result = await PaxinbotAuth.request('/api/auth/login', {
+        method:'POST',
+        body:{ email:data.get('email'), password:data.get('password'), turnstileToken }
+      });
+      if (result.verificationRequired) return setEmailCodeStep(result, 'login');
+      await completeClientLogin(result);
+    } catch (error) {
+      if (window.turnstile && turnstileLoginWidgetId !== null) window.turnstile.reset(turnstileLoginWidgetId);
+      setClientStatus(error.message || 'Não foi possível entrar.');
+      window.showToast?.(error.message || 'Não foi possível entrar.');
+    } finally {
+      submit.disabled = false;
+    }
+  });
   document.getElementById('client-email-code-form')?.addEventListener('submit', async event => { event.preventDefault(); if (!pendingEmailCode) return cancelEmailCode(); const codeForm = event.currentTarget; const button = codeForm.querySelector('[type="submit"]'); const status = document.getElementById('client-email-code-status'); const code = new FormData(codeForm).get('code'); button.disabled = true; status.textContent = ''; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/verify-email-code', { method:'POST', body:{ code } }); await completeClientLogin(result, pendingEmailCode?.purpose === 'signup' ? 'E-mail confirmado e conta criada.' : 'Verificação concluída.'); } catch (error) { status.textContent = error.message || 'Não foi possível confirmar o código.'; status.classList.add('is-error'); setClientStatus(error.message || 'Não foi possível confirmar o código.'); } finally { button.disabled = false; } });
   document.getElementById('client-email-code-resend')?.addEventListener('click', async event => { const button = event.currentTarget; const status = document.getElementById('client-email-code-status'); button.disabled = true; status.classList.remove('is-error'); try { const result = await PaxinbotAuth.request('/api/auth/resend-email-code', { method:'POST' }); status.textContent = result.message; } catch (error) { status.textContent = error.message; status.classList.add('is-error'); } finally { button.disabled = false; } });
   document.getElementById('client-email-code-cancel')?.addEventListener('click', cancelEmailCode);
-  document.getElementById('client-signup-form')?.addEventListener('submit', async event => { event.preventDefault(); const signup = event.currentTarget; const submitButton = signup.querySelector('[type="submit"]'); const data = new FormData(signup); submitButton.disabled = true; try { const result = await PaxinbotAuth.request('/api/auth/signup', { method:'POST', body:{ username:data.get('username'), email:data.get('email'), password:data.get('password') } }); setClientStatus(result.message, true); signup.reset(); if (result.verificationRequired) return setEmailCodeStep(result, 'signup'); await completeClientLogin(result, 'Conta criada.'); } catch (error) { setClientStatus(error.message || 'Não foi possível criar a conta.'); window.showToast?.(error.message || 'Não foi possível criar a conta.'); } finally { submitButton.disabled = false; } });
-  document.getElementById('auth-switch')?.addEventListener('click', () => setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup'));
+  document.getElementById('client-signup-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const signup = event.currentTarget;
+    const submitButton = signup.querySelector('[type="submit"]');
+    const data = new FormData(signup);
+    submitButton.disabled = true;
+    try {
+      const turnstileToken = window.turnstile && turnstileSignupWidgetId !== null ? window.turnstile.getResponse(turnstileSignupWidgetId) : '';
+      const result = await PaxinbotAuth.request('/api/auth/signup', {
+        method:'POST',
+        body:{ username:data.get('username'), email:data.get('email'), password:data.get('password'), turnstileToken }
+      });
+      setClientStatus(result.message, true);
+      signup.reset();
+      if (result.verificationRequired) return setEmailCodeStep(result, 'signup');
+      await completeClientLogin(result, 'Conta criada.');
+    } catch (error) {
+      if (window.turnstile && turnstileSignupWidgetId !== null) window.turnstile.reset(turnstileSignupWidgetId);
+      setClientStatus(error.message || 'Não foi possível criar a conta.');
+      window.showToast?.(error.message || 'Não foi possível criar a conta.');
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+  document.getElementById('auth-switch')?.addEventListener('click', () => {
+    setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup');
+    renderTurnstile();
+  });
   document.querySelectorAll('.google-button').forEach(link=>link.addEventListener('click',event=>{
     if (link.dataset.opening === 'true') { event.preventDefault(); return; }
     const view=viewFromPath();

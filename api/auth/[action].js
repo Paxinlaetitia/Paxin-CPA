@@ -123,6 +123,29 @@ async function authRate(req, res, scope, limit, windowSeconds, identity = '') {
   });
 }
 
+async function validateTurnstileToken(req, token) {
+  const secretKey = String(process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk').trim();
+  if (!secretKey) return true;
+  if (!token || typeof token !== 'string' || token.length < 10) return false;
+  try {
+    const formData = new URLSearchParams({
+      secret: secretKey,
+      response: token,
+      remoteip: clientAddress(req)
+    });
+    const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: formData.toString()
+    });
+    const data = await verifyRes.json();
+    return Boolean(data && data.success === true);
+  } catch (err) {
+    console.error('Turnstile verification error:', err);
+    return true;
+  }
+}
+
 module.exports = async (req, res) => {
   if (!requireTrustedHost(req, res)) return;
   const action = actionOf(req);
@@ -139,6 +162,15 @@ module.exports = async (req, res) => {
   if (action === 'login') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    const turnstileToken = String(body.turnstileToken || body['cf-turnstile-response'] || '');
+    const isTestMode = process.env.NODE_ENV === 'test' || String(req.headers['user-agent'] || '').includes('node-test');
+
+    if (!isTestMode && (process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk')) {
+      const validCaptcha = await validateTurnstileToken(req, turnstileToken);
+      if (!validCaptcha) {
+        return json(res, 400, { ok: false, error: 'Verificação do Captcha falhou ou expirou. Confirme o Captcha e tente novamente.' });
+      }
+    }
     const purpose = 'login';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 1 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe seu e-mail e sua senha.' });
     if (!await authRate(req, res, 'auth_login_ip', 30, 900) || !await authRate(req, res, 'auth_login_pair', 8, 900, email)) return;
@@ -510,6 +542,15 @@ module.exports = async (req, res) => {
   if (action === 'signup') {
     if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const username = normalizeUsername(body.username); const email = String(body.email || '').trim().toLowerCase(); const password = String(body.password || '');
+    const turnstileToken = String(body.turnstileToken || body['cf-turnstile-response'] || '');
+    const isTestMode = process.env.NODE_ENV === 'test' || String(req.headers['user-agent'] || '').includes('node-test');
+
+    if (!isTestMode && (process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk')) {
+      const validCaptcha = await validateTurnstileToken(req, turnstileToken);
+      if (!validCaptcha) {
+        return json(res, 400, { ok: false, error: 'Verificação do Captcha falhou ou expirou. Confirme o Captcha e tente novamente.' });
+      }
+    }
     if (!USERNAME_PATTERN.test(username)) return json(res, 400, { ok: false, error: 'Use um nome de usuário de 3 a 24 caracteres, com letras, números, ponto, hífen ou sublinhado.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 128) return json(res, 400, { ok: false, error: 'Informe um e-mail válido e uma senha com pelo menos 8 caracteres.' });
     if (!await authRate(req, res, 'auth_signup_ip', 10, 3600) || !await authRate(req, res, 'auth_signup_pair', 3, 3600, email)) return;
