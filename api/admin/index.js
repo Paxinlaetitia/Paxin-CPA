@@ -99,8 +99,14 @@ module.exports = async (req, res) => {
     body.email = email;
     body.durationSeconds = durationSeconds;
   }
-  if (action === 'revokeAccess' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) {
+  if (['revokeAccess','kickUser','resetUserDevices'].includes(action) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) {
     return json(res, 400, { ok: false, error: 'Identificador de cliente inválido.' });
+  }
+  if (action === 'userBan') {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) return json(res, 400, { ok:false, error:'Identificador de cliente inválido.' });
+    body.banned = body.banned === true;
+    body.reason = String(body.reason || '').trim();
+    if (body.banned && (body.reason.length < 3 || body.reason.length > 200)) return json(res, 400, { ok:false, error:'Informe um motivo de bloqueio entre 3 e 200 caracteres.' });
   }
   if (['approveOrder','refundOrder'].includes(action) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.orderId || ''))) {
     return json(res, 400, { ok: false, error: 'Identificador de pedido inválido.' });
@@ -125,6 +131,9 @@ module.exports = async (req, res) => {
       ? ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: 'lifetime', p_expires_at: null, p_source: 'owner-panel' })]
       : ['paxinbot_owner_grant_usage', () => ({ p_email: body.email, p_total_seconds: body.durationSeconds, p_source: 'owner-panel' })],
     revokeAccess: ['paxinbot_owner_revoke_access', () => ({ p_user_id: body.userId })],
+    kickUser: ['paxinbot_owner_kick_user', () => ({ p_user_id: body.userId })],
+    userBan: ['paxinbot_owner_set_user_ban', () => ({ p_user_id: body.userId, p_banned: body.banned, p_reason: body.banned ? body.reason : null })],
+    resetUserDevices: ['paxinbot_owner_reset_user_devices', () => ({ p_user_id: body.userId })],
     approveOrder: ['paxinbot_owner_approve_order', () => ({ p_order_id: body.orderId })],
     refundOrder: ['paxinbot_owner_refund_order', () => ({ p_order_id: body.orderId })],
     deviceBan: ['paxinbot_owner_set_device_ban', () => ({ p_device_identity_id:body.deviceIdentityId,p_banned:body.banned,p_reason:body.banned ? body.reason : null })],

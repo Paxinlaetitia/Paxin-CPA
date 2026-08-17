@@ -32,7 +32,62 @@ const Admin = (() => {
 
   function renderUsers(users) {
     state.users = users || [];
-    rows('#admin-users-list', state.users.map(user => { const available = Number(user.availableCreditSeconds) || 0; const kind = user.access?.kind; const accessLabel = kind === 'lifetime' ? 'Vitalício' : kind === 'usage' ? 'Saldo em uso' : kind ? 'Por tempo (antigo)' : available > 0 ? 'Aguardando ativação' : 'Sem acesso'; const legacyRemaining = user.access?.expiresAt ? Math.max(0, Math.ceil((new Date(user.access.expiresAt).valueOf() - Date.now()) / 1000)) : 0; const detail = kind === 'usage' ? formatDuration(user.access.remainingSeconds) : kind === 'lifetime' ? 'Não expira' : user.access?.expiresAt ? formatDuration(legacyRemaining) : available > 0 ? `${formatDuration(available)} disponível` : '—'; return `<tr><td>${escape(user.email)}</td><td>${date(user.created_at)}</td><td>${escape(accessLabel)}</td><td>${escape(detail)}</td><td><div class="admin-row-actions">${user.access || available > 0 ? `<button class="danger" type="button" data-revoke-access="${escape(user.id)}">Revogar acesso</button>` : `<button type="button" data-grant-email="${escape(user.email)}">Liberar acesso</button>`}</div></td></tr>`; }).join(''), 'Nenhum cliente encontrado.', 5);
+    rows('#admin-users-list', state.users.map(user => {
+      const isBanned = Boolean(user.disabled_at);
+      const isConnected = Number(user.activeSessions) > 0;
+      let statusTag = '';
+      if (isBanned) {
+        statusTag = '<span class="admin-status paused">Banido</span>';
+      } else if (isConnected) {
+        statusTag = '<span class="admin-status active">Conectado</span>';
+      } else if (user.access || Number(user.availableCreditSeconds) > 0) {
+        statusTag = '<span class="admin-status active">Ativo</span>';
+      } else {
+        statusTag = '<span class="admin-status">Sem acesso</span>';
+      }
+
+      const available = Number(user.availableCreditSeconds) || 0;
+      const kind = user.access?.kind;
+      const accessLabel = kind === 'lifetime' ? 'Vitalício' : kind === 'usage' ? 'Saldo em uso' : kind ? 'Por tempo' : available > 0 ? 'Saldo disponível' : 'Nenhum';
+      const detail = kind === 'usage' ? formatDuration(user.access.remainingSeconds) : kind === 'lifetime' ? 'Vitalício' : available > 0 ? formatDuration(available) : '—';
+
+      return `<tr>
+        <td><b>${escape(user.email)}</b><div style="display:flex;gap:4px;margin-top:2px;">${statusTag}</div></td>
+        <td>${date(user.created_at)}</td>
+        <td>${escape(accessLabel)}</td>
+        <td>${escape(detail)}</td>
+        <td>
+          <div class="admin-row-actions">
+            <button type="button" data-manage-user="${escape(user.id)}">Gerenciar</button>
+            <button type="button" class="admin-btn-approve" data-grant-email="${escape(user.email)}">Liberar</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join(''), 'Nenhum cliente encontrado.', 5);
+  }
+
+  function openCustomerManage(user) {
+    if (!user) return;
+    state.currentUser = user;
+    document.getElementById('customer-dialog-email').textContent = user.email;
+    document.getElementById('customer-dialog-created').textContent = `Cadastrado em ${date(user.created_at)}`;
+    const isConnected = Number(user.activeSessions) > 0;
+    const sessionElem = document.getElementById('customer-dialog-session');
+    sessionElem.textContent = isConnected ? `${user.activeSessions} conectado(s) agora` : 'Desconectado';
+    sessionElem.style.color = isConnected ? '#55b685' : '#888';
+
+    let accessText = 'Nenhum';
+    if (user.access?.kind === 'lifetime') accessText = 'Vitalício';
+    else if (user.access?.kind === 'usage') accessText = `${formatDuration(user.access.remainingSeconds)} em uso`;
+    else if (Number(user.availableCreditSeconds) > 0) accessText = `${formatDuration(user.availableCreditSeconds)} disponível`;
+    document.getElementById('customer-dialog-access').textContent = accessText;
+    document.getElementById('customer-dialog-devices').textContent = `${Number(user.deviceCount) || 0} vinculado(s)`;
+
+    const isBanned = Boolean(user.disabled_at);
+    document.getElementById('customer-dialog-ban-text').textContent = isBanned ? 'Desbanir Cliente da Plataforma' : 'Banir Cliente da Plataforma';
+    document.getElementById('customer-btn-ban').className = isBanned ? 'button button-primary' : 'button danger';
+
+    document.getElementById('customer-dialog').showModal();
   }
 
   function renderProducts(products) {
@@ -176,7 +231,81 @@ const Admin = (() => {
     document.getElementById('admin-products-list').addEventListener('click', async event => { const edit = event.target.closest('[data-edit-product]'); const toggle = event.target.closest('[data-toggle-product]'); if (edit) configureProductForm(state.products.find(item => item.id === edit.dataset.editProduct)); if (toggle) { const product = state.products.find(item => item.id === toggle.dataset.toggleProduct); if (!product) return; toggle.disabled = true; try { await call('', { method:'POST', body:{ action:'product', id:product.id, code:product.code, name:product.name, description:product.description, accessKind:product.access_kind, durationMinutes:product.duration_minutes, priceCents:product.price_cents, active:!product.active } }); renderProducts(await call('?action=products')); renderOverview(await call('?action=overview')); } catch (error) { toggle.disabled = false; window.showToast?.(error.message); } } });
     document.getElementById('admin-coupons-list').addEventListener('click', async event => { const edit = event.target.closest('[data-edit-coupon]'); const toggle = event.target.closest('[data-toggle-coupon]'); if (edit) configureCouponForm(state.coupons.find(item => item.id === edit.dataset.editCoupon)); if (toggle) { const coupon = state.coupons.find(item => item.id === toggle.dataset.toggleCoupon); if (!coupon) return; toggle.disabled = true; try { await call('', { method:'POST', body:{ action:'coupon', id:coupon.id, code:coupon.code, description:coupon.description, discountType:coupon.discount_type, discountValue:coupon.discount_value, maxRedemptions:coupon.max_redemptions, expiresAt:coupon.expires_at, active:!coupon.active } }); renderCoupons(await call('?action=coupons')); } catch (error) { toggle.disabled = false; window.showToast?.(error.message); } } });
     document.getElementById('admin-promotions-list').addEventListener('click', async event => { const edit=event.target.closest('[data-edit-promotion]'); const toggle=event.target.closest('[data-toggle-promotion]'); if (edit) configurePromotionForm(state.promotions.find(item=>item.id===edit.dataset.editPromotion)); if (toggle) { const promotion=state.promotions.find(item=>item.id===toggle.dataset.togglePromotion); if (!promotion) return; toggle.disabled=true; try { await call('',{ method:'POST',body:{ action:'promotion',id:promotion.id,code:promotion.code,name:promotion.name,headline:promotion.headline,description:promotion.description,audience:promotion.audience,rewardSeconds:promotion.reward_seconds,maxClaims:promotion.max_claims,startsAt:promotion.starts_at,endsAt:promotion.ends_at,active:!promotion.active } }); renderPromotions(await call('?action=promotions')); } catch (error) { toggle.disabled=false; window.showToast?.(error.message); } } });
-    document.getElementById('admin-users-list').addEventListener('click', async event => { const grant = event.target.closest('[data-grant-email]'); const revoke = event.target.closest('[data-revoke-access]'); if (grant) { setView('access'); document.getElementById('admin-access-form').elements.email.value = grant.dataset.grantEmail; } if (revoke && confirm('Revogar o acesso e as sessões deste cliente?')) { revoke.disabled = true; try { await call('', { method:'POST', body:{ action:'revokeAccess', userId:revoke.dataset.revokeAccess } }); renderUsers(await call('?action=users')); renderOverview(await call('?action=overview')); window.showToast?.('Acesso revogado.'); } catch (error) { revoke.disabled = false; window.showToast?.(error.message); } } });
+    document.getElementById('admin-users-list').addEventListener('click', async event => {
+      const grant = event.target.closest('[data-grant-email]');
+      const manage = event.target.closest('[data-manage-user]');
+      if (grant) {
+        setView('access');
+        document.getElementById('admin-access-form').elements.email.value = grant.dataset.grantEmail;
+      }
+      if (manage) {
+        openCustomerManage(state.users.find(item => item.id === manage.dataset.manageUser));
+      }
+    });
+    document.getElementById('customer-btn-kick')?.addEventListener('click', async () => {
+      if (!state.currentUser) return;
+      if (!confirm(`Desconectar imediatamente as sessões ativas de ${state.currentUser.email}?`)) return;
+      try {
+        await call('', { method:'POST', body:{ action:'kickUser', userId:state.currentUser.id } });
+        renderUsers(await call('?action=users'));
+        renderOverview(await call('?action=overview'));
+        document.getElementById('customer-dialog').close();
+        window.showToast?.('Sessões do cliente encerradas.');
+      } catch (error) { window.showToast?.(error.message); }
+    });
+    document.getElementById('customer-btn-reset-hwid')?.addEventListener('click', async () => {
+      if (!state.currentUser) return;
+      if (!confirm(`Desvincular os computadores da conta ${state.currentUser.email}?`)) return;
+      try {
+        await call('', { method:'POST', body:{ action:'resetUserDevices', userId:state.currentUser.id } });
+        renderUsers(await call('?action=users'));
+        renderDevices(await call('?action=devices').catch(() => []));
+        document.getElementById('customer-dialog').close();
+        window.showToast?.('Computadores desvinculados.');
+      } catch (error) { window.showToast?.(error.message); }
+    });
+    document.getElementById('customer-btn-grant')?.addEventListener('click', () => {
+      if (!state.currentUser) return;
+      const email = state.currentUser.email;
+      document.getElementById('customer-dialog').close();
+      setView('access');
+      document.getElementById('admin-access-form').elements.email.value = email;
+    });
+    document.getElementById('customer-btn-revoke')?.addEventListener('click', async () => {
+      if (!state.currentUser) return;
+      if (!confirm(`Revogar o acesso e zerar o saldo ativo de ${state.currentUser.email}?`)) return;
+      try {
+        await call('', { method:'POST', body:{ action:'revokeAccess', userId:state.currentUser.id } });
+        renderUsers(await call('?action=users'));
+        renderOverview(await call('?action=overview'));
+        document.getElementById('customer-dialog').close();
+        window.showToast?.('Acesso revogado.');
+      } catch (error) { window.showToast?.(error.message); }
+    });
+    document.getElementById('customer-btn-ban')?.addEventListener('click', async () => {
+      if (!state.currentUser) return;
+      const isBanned = Boolean(state.currentUser.disabled_at);
+      if (!isBanned) {
+        const reason = prompt('Motivo do banimento do cliente:', 'Violação dos termos de uso') || '';
+        if (!reason) return;
+        try {
+          await call('', { method:'POST', body:{ action:'userBan', userId:state.currentUser.id, banned:true, reason } });
+          renderUsers(await call('?action=users'));
+          renderOverview(await call('?action=overview'));
+          document.getElementById('customer-dialog').close();
+          window.showToast?.('Cliente banido e acessos revogados.');
+        } catch (error) { window.showToast?.(error.message); }
+      } else {
+        if (!confirm(`Desbanir a conta de ${state.currentUser.email}?`)) return;
+        try {
+          await call('', { method:'POST', body:{ action:'userBan', userId:state.currentUser.id, banned:false } });
+          renderUsers(await call('?action=users'));
+          renderOverview(await call('?action=overview'));
+          document.getElementById('customer-dialog').close();
+          window.showToast?.('Cliente desbanido com sucesso.');
+        } catch (error) { window.showToast?.(error.message); }
+      }
+    });
     document.getElementById('admin-devices-list').addEventListener('click', async event => { const button=event.target.closest('[data-device-ban]'); if (!button) return; const currentlyBanned=button.dataset.banned === 'true'; let reason=''; if (!currentlyBanned) { reason=prompt('Informe o motivo do bloqueio deste computador:','Violação dos termos de uso') || ''; if (!reason) return; } else if (!confirm('Desbloquear este computador e todas as identidades vinculadas à mesma máquina?')) return; button.disabled=true; try { await call('',{ method:'POST',body:{ action:'deviceBan',deviceIdentityId:button.dataset.deviceBan,banned:!currentlyBanned,reason } }); renderDevices(await call('?action=devices')); window.showToast?.(currentlyBanned ? 'Computador desbloqueado.' : 'Computador bloqueado e sessões revogadas.'); } catch(error) { button.disabled=false; window.showToast?.(error.message); } });
     document.getElementById('admin-risk-list').addEventListener('click', async event => { const button=event.target.closest('[data-risk-reset]'); if (!button || !confirm('Marcar estes sinais como revisados e zerar a pontuação temporária?')) return; button.disabled=true; try { await call('',{ method:'POST',body:{ action:'riskReset',deviceIdentityId:button.dataset.riskReset } }); renderSecurity(await call('?action=security')); window.showToast?.('Risco revisado e pontuação zerada.'); } catch(error) { button.disabled=false; window.showToast?.(error.message); } });
     document.getElementById('admin-export-orders').addEventListener('click', exportOrders);

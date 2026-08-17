@@ -175,7 +175,7 @@ end;
 $$;
 
 create or replace function public.paxinbot_owner_list_users(p_query text default '')
-returns jsonb language plpgsql security definer set search_path = public as $$
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
 begin
   perform public.paxinbot_require_owner();
   return coalesce((select jsonb_agg(row_to_json(x)) from (
@@ -186,7 +186,9 @@ begin
         when a.kind is not null then jsonb_build_object('kind',a.kind,'expiresAt',a.expires_at,'source',a.source)
         else null
       end as access,
-      coalesce((select sum(ug.remaining_seconds) from public.usage_grants ug where ug.user_id=u.id and ug.status='available'),0) as "availableCreditSeconds"
+      coalesce((select sum(ug.remaining_seconds) from public.usage_grants ug where ug.user_id=u.id and ug.status='available'),0) as "availableCreditSeconds",
+      (select count(*) from public.desktop_sessions s where s.user_id=u.id and s.revoked_at is null and s.last_seen_at > now() - interval '30 seconds')::int as "activeSessions",
+      (select count(*) from public.device_account_bindings dab where dab.user_id=u.id)::int as "deviceCount"
     from auth.users u join public.profiles p on p.id=u.id
     left join lateral (select * from public.paxinbot_active_entitlement(u.id)) a on true
     left join lateral (select ug.* from public.usage_grants ug where ug.id=case
@@ -199,9 +201,15 @@ end;
 $$;
 
 create or replace function public.paxinbot_owner_overview()
-returns jsonb language plpgsql security definer set search_path = public as $$
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
 begin
   perform public.paxinbot_require_owner();
+
+  -- Atualiza pedidos pendentes antigos para expirados
+  update public.orders
+  set status = 'expired', provider_status = 'expired', updated_at = now()
+  where status = 'pending' and created_at < now() - interval '1 hour';
+
   return jsonb_build_object(
     'customers',(select count(*) from public.profiles where role='customer' and disabled_at is null),
     'activeAccesses',(select count(*) from public.entitlements where status='active' and starts_at<=now() and (expires_at is null or expires_at>now()))
@@ -210,11 +218,59 @@ begin
     'activeProducts',(select count(*) from public.products where active),
     'activeCoupons',(select count(*) from public.coupons where active and (expires_at is null or expires_at>now())),
     'paidOrders',(select count(*) from public.orders where status='paid'),
-    'pendingOrders',(select count(*) from public.orders where status='pending'),
+    'pendingOrders',(select count(*) from public.orders where status='pending' and created_at >= now() - interval '1 hour'),
     'revenueCents',(select coalesce(sum(amount_cents),0) from public.orders where status='paid'),
     'openTickets',(select count(*) from public.support_tickets where status in ('open','in_progress')),
     'lastPaymentEventAt',(select max(created_at) from public.audit_events where event_type like 'payment.%')
   );
+end;
+$$;
+
+create or replace function public.paxinbot_owner_kick_user(p_user_id uuid)
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
+begin
+  perform public.paxinbot_require_owner();
+  if p_user_id is null then raise exception 'invalid_user'; end if;
+  update public.desktop_sessions
+  set revoked_at = now()
+  where user_id = p_user_id and revoked_at is null;
+  insert into public.audit_events (user_id, event_type, metadata)
+  values (auth.uid(), 'owner.user_kicked', jsonb_build_object('targetUserId', p_user_id));
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.paxinbot_owner_set_user_ban(p_user_id uuid, p_banned boolean, p_reason text default null)
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
+begin
+  perform public.paxinbot_require_owner();
+  if p_user_id is null then raise exception 'invalid_user'; end if;
+  if p_banned then
+    update public.profiles set disabled_at = coalesce(disabled_at, now()) where id = p_user_id;
+    update public.entitlements set status = 'revoked', revoked_at = now() where user_id = p_user_id and status = 'active';
+    update public.usage_grants set status = 'revoked', revoked_at = now() where user_id = p_user_id and status in ('available', 'active');
+    update public.desktop_sessions set revoked_at = now() where user_id = p_user_id and revoked_at is null;
+    insert into public.audit_events (user_id, event_type, metadata)
+    values (auth.uid(), 'owner.user_banned', jsonb_build_object('targetUserId', p_user_id, 'reason', p_reason));
+  else
+    update public.profiles set disabled_at = null where id = p_user_id;
+    insert into public.audit_events (user_id, event_type, metadata)
+    values (auth.uid(), 'owner.user_unbanned', jsonb_build_object('targetUserId', p_user_id));
+  end if;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.paxinbot_owner_reset_user_devices(p_user_id uuid)
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
+begin
+  perform public.paxinbot_require_owner();
+  if p_user_id is null then raise exception 'invalid_user'; end if;
+  delete from public.device_account_bindings where user_id = p_user_id;
+  update public.desktop_sessions set revoked_at = now() where user_id = p_user_id and revoked_at is null;
+  insert into public.audit_events (user_id, event_type, metadata)
+  values (auth.uid(), 'owner.user_devices_reset', jsonb_build_object('targetUserId', p_user_id));
+  return jsonb_build_object('ok', true);
 end;
 $$;
 
