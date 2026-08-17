@@ -540,39 +540,17 @@ async function completeClientLogin(result, message = 'Login realizado.') {
   const targetView=viewFromPath(); const returningFromPayment=new URLSearchParams(location.search).has('checkout'); clearAuthModeQuery(); setAccountView(returningFromPayment ? 'subscription' : targetView, false, false);
   setClientStatus('Conta conectada ao serviço seguro.', true); window.showToast?.(message); document.getElementById('client-password').value = ''; document.getElementById('client-email-code-form').reset(); void handleCheckoutReturn();
 }
-let turnstileLoginWidgetId = null;
-let turnstileSignupWidgetId = null;
-
-function renderTurnstile() {
-  if (typeof window.turnstile === 'undefined') return;
-  const siteKey = '0x4AAAAAAETAovvO1estkl2J';
-  const loginSlot = document.getElementById('turnstile-login-container');
-  if (loginSlot && turnstileLoginWidgetId === null) {
-    try {
-      turnstileLoginWidgetId = window.turnstile.render(loginSlot, { sitekey: siteKey, theme: 'dark' });
-    } catch {}
-  }
-  const signupSlot = document.getElementById('turnstile-signup-container');
-  if (signupSlot && turnstileSignupWidgetId === null) {
-    try {
-      turnstileSignupWidgetId = window.turnstile.render(signupSlot, { sitekey: siteKey, theme: 'dark' });
-    } catch {}
-  }
-}
-window.turnstileCallback = renderTurnstile;
-
 async function initClientPage() {
   const form = document.getElementById('client-login-form'); if (!form) return; const submit = form.querySelector('[type="submit"]');
   void renderAuthPurchaseContext();
   startAccessClock();
-  renderTurnstile();
   try { const current=await loadPortalData(); if (continueActivationAfterLogin()) return; await syncOwnerPanelLink(current.user); clearAuthModeQuery(); setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); setClientStatus('Conta conectada ao serviço seguro.', true); } catch { renderClientDashboard(null); await syncOwnerPanelLink(null); setAuthMode(requestedAuthMode()); setClientStatus('Entre com sua conta Paxinbot para continuar.'); }
   form.addEventListener('submit', async event => {
     event.preventDefault();
     submit.disabled = true;
     try {
       const data = new FormData(form);
-      const turnstileToken = window.turnstile && turnstileLoginWidgetId !== null ? window.turnstile.getResponse(turnstileLoginWidgetId) : '';
+      const turnstileToken = String(data.get('cf-turnstile-response') || (window.turnstile ? window.turnstile.getResponse() : '') || '');
       const result = await PaxinbotAuth.request('/api/auth/login', {
         method:'POST',
         body:{ email:data.get('email'), password:data.get('password'), turnstileToken }
@@ -580,7 +558,7 @@ async function initClientPage() {
       if (result.verificationRequired) return setEmailCodeStep(result, 'login');
       await completeClientLogin(result);
     } catch (error) {
-      if (window.turnstile && turnstileLoginWidgetId !== null) window.turnstile.reset(turnstileLoginWidgetId);
+      if (window.turnstile) { try { window.turnstile.reset(); } catch {} }
       setClientStatus(error.message || 'Não foi possível entrar.');
       window.showToast?.(error.message || 'Não foi possível entrar.');
     } finally {
@@ -597,7 +575,7 @@ async function initClientPage() {
     const data = new FormData(signup);
     submitButton.disabled = true;
     try {
-      const turnstileToken = window.turnstile && turnstileSignupWidgetId !== null ? window.turnstile.getResponse(turnstileSignupWidgetId) : '';
+      const turnstileToken = String(data.get('cf-turnstile-response') || (window.turnstile ? window.turnstile.getResponse() : '') || '');
       const result = await PaxinbotAuth.request('/api/auth/signup', {
         method:'POST',
         body:{ username:data.get('username'), email:data.get('email'), password:data.get('password'), turnstileToken }
@@ -607,7 +585,7 @@ async function initClientPage() {
       if (result.verificationRequired) return setEmailCodeStep(result, 'signup');
       await completeClientLogin(result, 'Conta criada.');
     } catch (error) {
-      if (window.turnstile && turnstileSignupWidgetId !== null) window.turnstile.reset(turnstileSignupWidgetId);
+      if (window.turnstile) { try { window.turnstile.reset(); } catch {} }
       setClientStatus(error.message || 'Não foi possível criar a conta.');
       window.showToast?.(error.message || 'Não foi possível criar a conta.');
     } finally {
@@ -616,7 +594,6 @@ async function initClientPage() {
   });
   document.getElementById('auth-switch')?.addEventListener('click', () => {
     setAuthMode(document.getElementById('client-login-form').hidden ? 'login' : 'signup');
-    renderTurnstile();
   });
   document.querySelectorAll('.google-button').forEach(link=>link.addEventListener('click',event=>{
     if (link.dataset.opening === 'true') { event.preventDefault(); return; }
