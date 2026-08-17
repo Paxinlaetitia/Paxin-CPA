@@ -129,7 +129,7 @@ function setAuthMode(mode) {
   document.getElementById('client-login-form').hidden = creating;
   document.getElementById('client-signup-form').hidden = !creating;
   document.getElementById('client-email-code-form').hidden = true;
-  document.querySelectorAll('.google-button, .passkey-button, .auth-divider, .auth-alt-grid').forEach(item => { item.hidden = creating; });
+  document.querySelectorAll('.google-button, .passkey-button, .auth-divider').forEach(item => { item.hidden = creating; });
   document.querySelector('.auth-head h2').textContent = creating ? 'Crie sua conta' : 'Entre na sua conta';
   document.getElementById('auth-mode-copy').textContent = creating ? 'Crie uma conta para acompanhar acessos, dispositivos e compras.' : 'Use seu e-mail, Google ou uma passkey já cadastrada.';
   document.getElementById('auth-switch').textContent = creating ? 'Já tem conta? Entrar' : 'Não tem conta? Criar agora';
@@ -151,7 +151,7 @@ function setEmailCodeStep(result, purpose = result?.flow || 'login') {
   document.getElementById('client-login-form').hidden = true;
   document.getElementById('client-signup-form').hidden = true;
   document.getElementById('client-email-code-form').hidden = false;
-  document.querySelectorAll('.google-button, .passkey-button, .auth-divider, .auth-alt-grid').forEach(item => { item.hidden = true; });
+  document.querySelectorAll('.google-button, .passkey-button, .auth-divider').forEach(item => { item.hidden = true; });
   document.getElementById('auth-switch').hidden = true;
   document.querySelector('.auth-head h2').textContent = purpose === 'signup' ? 'Confirme seu e-mail' : 'Verificação em duas etapas';
   document.getElementById('auth-mode-copy').textContent = purpose === 'signup' ? 'Confirme que este e-mail pertence a você para concluir o cadastro.' : 'Sua senha foi confirmada. Falta apenas o código enviado por e-mail.';
