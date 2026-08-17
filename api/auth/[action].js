@@ -372,9 +372,13 @@ module.exports = async (req, res) => {
   if (action === 'google') {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     if (!await authRate(req, res, 'auth_google_ip', 30, 600)) return;
-    const { url } = config(); const target = new URL(`${url}/auth/v1/authorize`);
-    target.searchParams.set('provider', 'google'); target.searchParams.set('redirect_to', `${publicOrigin(req)}/auth-callback.html?flow=google`);
-    res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' }); res.end(); return;
+    const origin = publicOrigin(req);
+    const target = new URL(`${origin}/auth/v1/authorize`);
+    target.searchParams.set('provider', 'google');
+    target.searchParams.set('redirect_to', `${origin}/auth-callback.html?flow=google`);
+    res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' });
+    res.end();
+    return;
   }
   return json(res, 404, { ok: false, error: 'Rota não encontrada.' });
 };

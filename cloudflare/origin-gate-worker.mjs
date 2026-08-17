@@ -54,6 +54,33 @@ export default {
   async fetch(request, env) {
     const url=new URL(request.url);
     if (url.pathname.startsWith('/releases/')) return url.pathname===RELEASE_PATH ? serveRelease(request,env,url) : plain(404,'Arquivo não encontrado.');
+    if (url.pathname.startsWith('/auth/v1/')) {
+      const supabaseHost = 'drkyjgnctbxmupbfarnj.supabase.co';
+      const targetUrl = new URL(url.pathname + url.search, `https://${supabaseHost}`);
+      const headers = new Headers(request.headers);
+      headers.set('host', supabaseHost);
+      headers.set('x-forwarded-host', url.host);
+      headers.set('x-forwarded-proto', 'https');
+      const response = await fetch(new Request(targetUrl.toString(), {
+        method: request.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
+        redirect: 'manual'
+      }));
+      const resHeaders = new Headers(response.headers);
+      const location = resHeaders.get('location');
+      if (location) {
+        try {
+          const locUrl = new URL(location, targetUrl);
+          if (locUrl.host === supabaseHost) {
+            locUrl.host = url.host;
+            locUrl.protocol = url.protocol;
+            resHeaders.set('location', locUrl.toString());
+          }
+        } catch {}
+      }
+      return new Response(response.body, { status: response.status, headers: resHeaders });
+    }
     const secret = String(env.PAXINBOT_ORIGIN_GATE_SECRET || '');
     const secretBytes = new TextEncoder().encode(secret).byteLength;
     if (secretBytes < 32 || secretBytes > 128) {
