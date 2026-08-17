@@ -39,11 +39,13 @@ function friendlyPasskeyError(payload, fallback = 'Não foi possível concluir a
 }
 function passkeyDiagnostic(req, action, response, payload) {
   const code = String(payload?.code || '').toUpperCase();
+  const rawMsg = String(payload?.msg || payload?.message || payload?.error_description || payload?.error || '').slice(0, 200);
   console.warn(JSON.stringify({
     event:'auth.passkey_failure',
     route:`/api/auth/${action}`,
     status:Number(response?.status) || 0,
     diagnosticCode:/^[A-Z0-9_]{3,48}$/.test(code) ? code : 'UPSTREAM_REJECTED',
+    upstreamMessage:rawMsg,
     requestId:String(req.headers['x-vercel-id'] || '').split(':')[0].replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64)
   }));
 }
