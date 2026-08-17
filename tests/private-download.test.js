@@ -54,7 +54,7 @@ test('public visitor receives only a short-lived signed installer URL', async ()
   assert.equal(res.statusCode,200);
   assert.equal(payload.data.expiresIn,120);
   assert.equal(payload.data.fileName,'PaxinbotSetup.exe');
-  assert.equal(payload.data.sha256,'3139286a02c9c9746881ccacf38f922f1050e15e10a1d1d649f76f206b055387');
+  assert.equal(payload.data.sha256,'62347372c777e5bde78497c18943c8985fbd0f444d925d2c26f71c424d7b8354');
   const signed=new URL(payload.data.url);
   assert.equal(signed.origin,'https://www.paxincpa.store');
   assert.equal(signed.pathname,'/releases/PaxinbotSetup.exe');

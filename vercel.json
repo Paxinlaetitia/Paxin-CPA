@@ -40,7 +40,6 @@
     { "source": "/conta/dispositivos", "destination": "/conta/configuracoes/dispositivos", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/auth/v1/:path*", "destination": "/api/auth/proxy" },
     { "source": "/conta", "destination": "/cliente" },
     { "source": "/conta/:path*", "destination": "/cliente" },
     { "source": "/gestao/e7fc8a8f64e6e0aed8e92b6a", "destination": "/api/admin?view=page" },
