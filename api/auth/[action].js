@@ -124,7 +124,7 @@ async function authRate(req, res, scope, limit, windowSeconds, identity = '') {
 }
 
 async function validateTurnstileToken(req, token) {
-  const secretKey = String(process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk').trim();
+  const secretKey = String(process.env.TURNSTILE_SECRET_KEY || '').trim();
   if (!secretKey) return true;
   if (!token || typeof token !== 'string' || token.length < 10) return false;
   try {
@@ -165,7 +165,7 @@ module.exports = async (req, res) => {
     const turnstileToken = String(body.turnstileToken || body['cf-turnstile-response'] || '');
     const isTestMode = process.env.NODE_ENV === 'test' || String(req.headers['user-agent'] || '').includes('node-test');
 
-    if (!isTestMode && (process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk')) {
+    if (!isTestMode && process.env.TURNSTILE_SECRET_KEY) {
       const validCaptcha = await validateTurnstileToken(req, turnstileToken);
       if (!validCaptcha) {
         return json(res, 400, { ok: false, error: 'Verificação do Captcha falhou ou expirou. Confirme o Captcha e tente novamente.' });
@@ -545,7 +545,7 @@ module.exports = async (req, res) => {
     const turnstileToken = String(body.turnstileToken || body['cf-turnstile-response'] || '');
     const isTestMode = process.env.NODE_ENV === 'test' || String(req.headers['user-agent'] || '').includes('node-test');
 
-    if (!isTestMode && (process.env.TURNSTILE_SECRET_KEY || '0x4AAAAAAETAohjlbPhiz2OL5HDd4Z9BvRk')) {
+    if (!isTestMode && process.env.TURNSTILE_SECRET_KEY) {
       const validCaptcha = await validateTurnstileToken(req, turnstileToken);
       if (!validCaptcha) {
         return json(res, 400, { ok: false, error: 'Verificação do Captcha falhou ou expirou. Confirme o Captcha e tente novamente.' });
