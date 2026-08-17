@@ -567,28 +567,40 @@ module.exports = async (req, res) => {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     if (!await authRate(req, res, 'auth_google_ip', 30, 600)) return;
     const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
-    if (!clientId) return json(res, 500, { ok: false, error: 'Google OAuth não configurado no servidor.' });
+    const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
     const origin = publicOrigin(req);
-    const redirectUri = `${origin}/api/auth/google-callback`;
 
-    const now = Math.floor(Date.now() / 1000);
-    const expires = now + 600;
-    const nonce = crypto.randomBytes(16).toString('base64url');
-    const statePayload = `${nonce}.${expires}`;
-    const hmac = crypto.createHmac('sha256', sessionSecret()).update(statePayload).digest('base64url');
-    const state = `${statePayload}.${hmac}`;
+    // Se as credenciais diretas estiverem configuradas na Vercel, use o fluxo direto sob paxincpa.store
+    if (clientId && clientSecret) {
+      const redirectUri = `${origin}/api/auth/google-callback`;
+      const now = Math.floor(Date.now() / 1000);
+      const expires = now + 600;
+      const nonce = crypto.randomBytes(16).toString('base64url');
+      const statePayload = `${nonce}.${expires}`;
+      const hmac = crypto.createHmac('sha256', sessionSecret()).update(statePayload).digest('base64url');
+      const state = `${statePayload}.${hmac}`;
 
-    const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
-    res.setHeader('Set-Cookie', `paxinbot_google_state=${encodeURIComponent(state)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${isSecure ? '; Secure' : ''}`);
+      const isSecure = process.env.NODE_ENV === 'production' || String(req.headers['x-forwarded-proto'] || '').includes('https');
+      res.setHeader('Set-Cookie', `paxinbot_google_state=${encodeURIComponent(state)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${isSecure ? '; Secure' : ''}`);
 
-    const target = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    target.searchParams.set('client_id', clientId);
-    target.searchParams.set('redirect_uri', redirectUri);
-    target.searchParams.set('response_type', 'code');
-    target.searchParams.set('scope', 'openid email profile');
-    target.searchParams.set('state', state);
-    target.searchParams.set('prompt', 'select_account');
+      const target = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      target.searchParams.set('client_id', clientId);
+      target.searchParams.set('redirect_uri', redirectUri);
+      target.searchParams.set('response_type', 'code');
+      target.searchParams.set('scope', 'openid email profile');
+      target.searchParams.set('state', state);
+      target.searchParams.set('prompt', 'select_account');
 
+      res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' });
+      res.end();
+      return;
+    }
+
+    // Fallback: redireciona via Supabase GoTrue
+    const { url } = config();
+    const target = new URL(`${url}/auth/v1/authorize`);
+    target.searchParams.set('provider', 'google');
+    target.searchParams.set('redirect_to', `${origin}/auth-callback.html?flow=google`);
     res.writeHead(302, { Location: target.toString(), 'cache-control': 'no-store' });
     res.end();
     return;
