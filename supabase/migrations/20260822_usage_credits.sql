@@ -205,9 +205,9 @@ returns jsonb language plpgsql security definer set search_path = public, auth, 
 begin
   perform public.paxinbot_require_owner();
 
-  -- Atualiza pedidos pendentes antigos para expirados
+  -- Atualiza pedidos pendentes antigos para cancelados/expirados
   update public.orders
-  set status = 'expired', provider_status = 'expired', updated_at = now()
+  set status = 'cancelled', provider_status = 'expired', updated_at = now()
   where status = 'pending' and created_at < now() - interval '1 hour';
 
   return jsonb_build_object(
