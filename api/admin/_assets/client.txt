@@ -21,13 +21,20 @@ const Admin = (() => {
   }
 
   function renderOverview(data) {
-    document.getElementById('admin-customers').textContent = data.customers ?? 0;
-    document.getElementById('admin-accesses').textContent = data.activeAccesses ?? 0;
-    document.getElementById('admin-products').textContent = data.activeProducts ?? 0;
-    document.getElementById('admin-paid-orders').textContent = data.paidOrders ?? 0;
-    document.getElementById('admin-revenue').textContent = money(data.revenueCents);
-    document.getElementById('admin-pending-orders').textContent = data.pendingOrders ?? 0;
-    document.getElementById('admin-open-tickets').textContent = data.openTickets ?? 0;
+    if (data) state.overview = data;
+    const overviewData = state.overview || {};
+    document.getElementById('admin-customers').textContent = overviewData.customers ?? 0;
+    document.getElementById('admin-accesses').textContent = overviewData.activeAccesses ?? 0;
+    document.getElementById('admin-products').textContent = overviewData.activeProducts ?? 0;
+    document.getElementById('admin-paid-orders').textContent = overviewData.paidOrders ?? 0;
+    document.getElementById('admin-revenue').textContent = money(overviewData.revenueCents);
+
+    let pendingCount = overviewData.pendingOrders ?? 0;
+    if (state.orders && state.orders.length) {
+      pendingCount = state.orders.filter(o => o.status === 'pending' && (Date.now() - new Date(o.createdAt || 0).getTime()) < 3600000).length;
+    }
+    document.getElementById('admin-pending-orders').textContent = pendingCount;
+    document.getElementById('admin-open-tickets').textContent = overviewData.openTickets ?? 0;
   }
 
   function renderUsers(users) {
@@ -187,6 +194,7 @@ const Admin = (() => {
     ]);
     const combinedAudit = [...audit, ...siteSecurity].sort((left,right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)).slice(0,400);
     renderSecurity(security); renderOrders(orders); renderTickets(tickets); renderAudit(combinedAudit);
+    renderOverview(overview);
   }
 
   function configureProductForm(product = null) {

@@ -49,7 +49,7 @@ test('unauthenticated visitors are redirected home without admin markup', async 
   await handler({ method: 'GET', query: { view: 'page' }, headers: {}, socket: {} }, res);
   assert.equal(res.statusCode, 302);
   assert.equal(res.headers.location, '/');
-  assert.doesNotMatch(res.body, /Administração|GESTÃO PAXINBOT|admin-client/i);
+  assert.doesNotMatch(res.body, /Administração|admin-client/i);
   assert.equal(res.headers['cache-control'], 'private, no-store, max-age=0');
 });
 
@@ -58,7 +58,7 @@ test('only an authenticated owner receives the protected page and assets', async
   const page = response();
   await handler({ method: 'GET', query: { view: 'page' }, headers: {}, socket: {} }, page);
   assert.equal(page.statusCode, 200);
-  assert.match(page.body, /GESTÃO PAXINBOT/);
+  assert.match(page.body, /Administração Paxinbot/);
   assert.match(page.headers['content-security-policy'], /frame-ancestors 'none'/);
 
   const asset = response();

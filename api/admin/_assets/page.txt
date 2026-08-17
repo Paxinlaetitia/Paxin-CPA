@@ -6,7 +6,7 @@
   <main class="admin-main" id="admin-content" aria-live="polite">
     <header class="admin-topbar"><div class="container"><a class="admin-brand" href="/gestao/e7fc8a8f64e6e0aed8e92b6a"><span><img src="/assets/paxinbot-mark.svg" alt="" /></span><b>Paxinbot</b><small>Administração</small></a><div><span>ACESSO DO PROPRIETÁRIO</span><a class="button button-secondary" href="/conta">Área do Cliente</a></div></div></header>
     <div class="container admin-shell">
-      <section class="admin-head"><div><span>GESTÃO PAXINBOT</span><h1>Operação em um só lugar.</h1><p>Clientes, acessos, catálogo e atividade administrativa com validação no servidor.</p></div></section>
+      <section class="admin-head"><div><span>PAINEL DE CONTROLE</span><h1>Administração Paxinbot</h1><p>Gerenciamento de clientes, licenças, faturamento e métricas do sistema.</p></div></section>
       <nav class="admin-tabs" aria-label="Seções administrativas" role="tablist">
         <button class="is-active" type="button" role="tab" data-admin-view="overview" aria-selected="true"><svg><use href="#i-grid"></use></svg>Visão geral</button>
         <button type="button" role="tab" data-admin-view="customers" aria-selected="false"><svg><use href="#i-user"></use></svg>Clientes</button>
