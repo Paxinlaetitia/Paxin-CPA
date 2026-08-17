@@ -70,20 +70,20 @@
                     </div>
                   </div>
                   <div class="admin-duration-presets">
-                    <button type="button" data-duration-seconds="3600">⚡ 1 hora</button>
-                    <button type="button" data-duration-seconds="36000">⚡ 10 horas</button>
-                    <button type="button" data-duration-seconds="86400">📅 1 dia</button>
-                    <button type="button" data-duration-seconds="604800">📅 7 dias</button>
-                    <button type="button" data-duration-seconds="2592000">⭐ 30 dias</button>
+                    <button type="button" data-duration-seconds="3600">1 hora</button>
+                    <button type="button" data-duration-seconds="36000">10 horas</button>
+                    <button type="button" data-duration-seconds="86400">1 dia</button>
+                    <button type="button" data-duration-seconds="604800">7 dias</button>
+                    <button type="button" data-duration-seconds="2592000">30 dias</button>
                   </div>
                 </div>
                 <div class="admin-info-banner">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                   <span class="admin-note" data-access-note>O cliente decide quando ativar. O saldo diminui apenas enquanto o aplicativo estiver conectado.</span>
                 </div>
                 <button class="button button-primary admin-submit-btn" type="submit">
                   <span>Conceder Acesso</span>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                 </button>
               </form>
             </article>
@@ -96,11 +96,11 @@
 
         <section class="admin-page-panel" data-admin-panel="promotions" hidden><div class="admin-panel-toolbar"><button class="button button-primary" id="new-promotion" type="button">Nova promoção</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Campanha</th><th>Público</th><th>Benefício</th><th>Resgates</th><th>Período</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-promotions-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
 
-        <section class="admin-page-panel" data-admin-panel="devices" hidden><div class="admin-panel-toolbar"><form class="admin-search" id="admin-device-search"><svg><use href="#i-shield"></use></svg><input name="query" type="search" placeholder="Pesquisar por computador ou e-mail" /><button type="submit">Pesquisar</button></form></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Computador</th><th>Contas vinculadas</th><th>Proteção</th><th>Primeiro acesso</th><th>Última atividade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-devices-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
+        <section class="admin-page-panel" data-admin-panel="devices" hidden><div class="admin-panel-toolbar"><form class="admin-search" id="admin-device-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input name="query" type="search" placeholder="Pesquisar por computador ou e-mail" /><button type="submit">Pesquisar</button></form></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Computador</th><th>Contas vinculadas</th><th>Proteção</th><th>Primeiro acesso</th><th>Última atividade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-devices-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
 
-        <section class="admin-page-panel" data-admin-panel="security" hidden><div class="admin-panel-toolbar"><form class="admin-search" id="admin-risk-search"><svg><use href="#i-lock"></use></svg><input name="query" type="search" placeholder="Pesquisar risco por computador ou e-mail" /><button type="submit">Pesquisar</button></form><p class="admin-privacy-note">Somente eventos técnicos enumerados. Sem histórico, texto digitado, URLs ou capturas.</p></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Computador</th><th>Contas</th><th>Pontuação</th><th>Nível</th><th>Último evento</th><th>Restrição</th><th>Ações</th></tr></thead><tbody id="admin-risk-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
+        <section class="admin-page-panel" data-admin-panel="security" hidden><div class="admin-panel-toolbar"><form class="admin-search" id="admin-risk-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input name="query" type="search" placeholder="Pesquisar risco por computador ou e-mail" /><button type="submit">Pesquisar</button></form><p class="admin-privacy-note">Somente eventos técnicos enumerados. Sem histórico, texto digitado, URLs ou capturas.</p></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Computador</th><th>Contas</th><th>Pontuação</th><th>Nível</th><th>Último evento</th><th>Restrição</th><th>Ações</th></tr></thead><tbody id="admin-risk-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
 
-        <section class="admin-page-panel" data-admin-panel="orders" hidden><div class="admin-panel-toolbar"><button class="button button-secondary" id="admin-export-orders" type="button">Exportar CSV</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Cliente</th><th>Produto</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Data</th></tr></thead><tbody id="admin-orders-list"><tr><td colspan="6">Carregando…</td></tr></tbody></table></div></div></section>
+        <section class="admin-page-panel" data-admin-panel="orders" hidden><div class="admin-panel-toolbar" style="gap:10px;justify-content:space-between;"><form class="admin-search" id="admin-order-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input name="query" type="search" placeholder="Pesquisar por e-mail, pedido ou status" /><button type="submit">Pesquisar</button></form><button class="button button-secondary" id="admin-export-orders" type="button">Exportar CSV</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Cliente</th><th>Produto</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody id="admin-orders-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div></section>
 
         <section class="admin-page-panel" data-admin-panel="tickets" hidden><div class="admin-ticket-list" id="admin-ticket-list"><div class="admin-empty">Nenhum chamado encontrado.</div></div></section>
 

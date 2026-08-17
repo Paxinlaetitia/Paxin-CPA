@@ -68,8 +68,19 @@ const Admin = (() => {
 
   function renderOrders(orders) {
     state.orders = orders || [];
-    const labels = { pending:'Aguardando', paid:'Pago', refunded:'Reembolsado', cancelled:'Cancelado', chargeback:'Contestado' };
-    rows('#admin-orders-list', state.orders.map(order => `<tr><td>${escape(order.email)}</td><td>${escape(order.productName || '—')}</td><td><b>${money(order.amountCents, order.currency)}</b>${Number(order.discountCents) > 0 ? `<small class="admin-cell-note">Desconto ${money(order.discountCents, order.currency)}</small>` : ''}</td><td>${order.paymentProvider === 'mercado_pago' ? 'Mercado Pago' : escape(order.paymentProvider || '—')}<small class="admin-cell-note">${escape(order.providerStatus || 'Sem retorno')}</small></td><td><span class="admin-status ${escape(order.status)}">${escape(labels[order.status] || order.status)}</span></td><td>${date(order.createdAt)}</td></tr>`).join(''), 'Nenhum pedido registrado.', 6);
+    const labels = { pending:'Pendente', paid:'Aprovado', refunded:'Reembolsado', cancelled:'Cancelado', expired:'Expirado', chargeback:'Contestado' };
+    rows('#admin-orders-list', state.orders.map(order => {
+      const status = order.status;
+      let actions = '';
+      if (status === 'pending') {
+        actions = `<div class="admin-row-actions"><button type="button" class="admin-btn-approve" data-approve-order="${escape(order.id)}">Aprovar</button><button type="button" class="danger" data-refund-order="${escape(order.id)}">Cancelar</button></div>`;
+      } else if (status === 'paid') {
+        actions = `<div class="admin-row-actions"><button type="button" class="danger" data-refund-order="${escape(order.id)}">Reembolsar</button></div>`;
+      } else {
+        actions = `<span class="admin-cell-note">Concluído</span>`;
+      }
+      return `<tr><td><b>${escape(order.email)}</b><small class="admin-cell-note">${escape(String(order.id).slice(0, 8))}...</small></td><td>${escape(order.productName || 'Produto')}</td><td><b>${money(order.amountCents, order.currency)}</b>${Number(order.discountCents) > 0 ? `<small class="admin-cell-note">Desc. ${money(order.discountCents, order.currency)}</small>` : ''}</td><td>${order.paymentProvider === 'mercado_pago' ? 'Mercado Pago' : escape(order.paymentProvider || 'Manual')}<small class="admin-cell-note">${escape(order.providerStatus || 'Sem retorno')}</small></td><td><span class="admin-status ${status === 'paid' ? 'active' : status === 'pending' ? 'open' : 'paused'}">${escape(labels[status] || status)}</span></td><td>${date(order.createdAt)}</td><td>${actions}</td></tr>`;
+    }).join(''), 'Nenhum pedido registrado.', 7);
   }
 
   function renderAudit(events) {
@@ -169,6 +180,37 @@ const Admin = (() => {
     document.getElementById('admin-devices-list').addEventListener('click', async event => { const button=event.target.closest('[data-device-ban]'); if (!button) return; const currentlyBanned=button.dataset.banned === 'true'; let reason=''; if (!currentlyBanned) { reason=prompt('Informe o motivo do bloqueio deste computador:','Violação dos termos de uso') || ''; if (!reason) return; } else if (!confirm('Desbloquear este computador e todas as identidades vinculadas à mesma máquina?')) return; button.disabled=true; try { await call('',{ method:'POST',body:{ action:'deviceBan',deviceIdentityId:button.dataset.deviceBan,banned:!currentlyBanned,reason } }); renderDevices(await call('?action=devices')); window.showToast?.(currentlyBanned ? 'Computador desbloqueado.' : 'Computador bloqueado e sessões revogadas.'); } catch(error) { button.disabled=false; window.showToast?.(error.message); } });
     document.getElementById('admin-risk-list').addEventListener('click', async event => { const button=event.target.closest('[data-risk-reset]'); if (!button || !confirm('Marcar estes sinais como revisados e zerar a pontuação temporária?')) return; button.disabled=true; try { await call('',{ method:'POST',body:{ action:'riskReset',deviceIdentityId:button.dataset.riskReset } }); renderSecurity(await call('?action=security')); window.showToast?.('Risco revisado e pontuação zerada.'); } catch(error) { button.disabled=false; window.showToast?.(error.message); } });
     document.getElementById('admin-export-orders').addEventListener('click', exportOrders);
+    document.getElementById('admin-order-search')?.addEventListener('submit', async event => { event.preventDefault(); try { renderOrders(await call(`?action=orders&q=${encodeURIComponent(new FormData(event.currentTarget).get('query') || '')}`)); } catch (error) { window.showToast?.(error.message); } });
+    document.getElementById('admin-orders-list')?.addEventListener('click', async event => {
+      const approve = event.target.closest('[data-approve-order]');
+      const refund = event.target.closest('[data-refund-order]');
+      if (approve) {
+        if (!confirm('Aprovar este pedido e liberar o acesso do cliente?')) return;
+        approve.disabled = true;
+        try {
+          await call('', { method:'POST', body:{ action:'approveOrder', orderId:approve.dataset.approveOrder } });
+          renderOrders(await call('?action=orders'));
+          renderOverview(await call('?action=overview'));
+          window.showToast?.('Pedido aprovado e acesso liberado.');
+        } catch (error) {
+          approve.disabled = false;
+          window.showToast?.(error.message);
+        }
+      }
+      if (refund) {
+        if (!confirm('Reembolsar ou cancelar este pedido e revogar o acesso do cliente?')) return;
+        refund.disabled = true;
+        try {
+          await call('', { method:'POST', body:{ action:'refundOrder', orderId:refund.dataset.refundOrder } });
+          renderOrders(await call('?action=orders'));
+          renderOverview(await call('?action=overview'));
+          window.showToast?.('Pedido reembolsado e acesso revogado.');
+        } catch (error) {
+          refund.disabled = false;
+          window.showToast?.(error.message);
+        }
+      }
+    });
     document.getElementById('admin-ticket-list').addEventListener('click', event => { const button = event.target.closest('[data-open-ticket]'); if (button) openTicket(state.tickets.find(ticket => ticket.id === button.dataset.openTicket)); });
     document.getElementById('admin-ticket-status').addEventListener('change', async event => { if (!state.currentTicket) return; event.currentTarget.disabled = true; try { await call('', { method:'POST', body:{ action:'ticketStatus', ticketId:state.currentTicket.id, status:event.currentTarget.value } }); renderTickets(await call('?action=tickets')); renderOverview(await call('?action=overview')); document.getElementById('admin-ticket-dialog').close(); window.showToast?.('Status atualizado.'); } catch (error) { event.currentTarget.disabled = false; window.showToast?.(error.message); } });
     document.getElementById('admin-ticket-reply-form').addEventListener('submit', async event => { event.preventDefault(); if (!state.currentTicket) return; const form = event.currentTarget; const button = form.querySelector('[type="submit"]'); const message = new FormData(form).get('message'); button.disabled = true; try { await call('', { method:'POST', body:{ action:'ticketReply', ticketId:state.currentTicket.id, message } }); form.reset(); const id = state.currentTicket.id; renderTickets(await call('?action=tickets')); renderOverview(await call('?action=overview')); openTicket(state.tickets.find(ticket => ticket.id === id)); window.showToast?.('Resposta enviada.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });

@@ -245,17 +245,113 @@ begin
 end;
 $$;
 
-create or replace function public.paxinbot_owner_list_orders()
-returns jsonb language plpgsql stable security definer set search_path = public as $$
+create or replace function public.paxinbot_owner_approve_order(p_order_id uuid)
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
+declare
+  v_order public.orders%rowtype;
+  v_product public.products%rowtype;
+  v_entitlement_id uuid;
+  v_base timestamptz;
+  v_expires timestamptz;
 begin
   perform public.paxinbot_require_owner();
-  return coalesce((select jsonb_agg(row_to_json(x)) from (
-    select o.id, u.email, p.name as "productName", o.subtotal_cents as "subtotalCents",
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order_not_found'; end if;
+  if v_order.status = 'paid' then raise exception 'order_already_paid'; end if;
+
+  select * into v_product from public.products where id = v_order.product_id;
+
+  v_entitlement_id := v_order.entitlement_id;
+  if v_entitlement_id is null and v_product.id is not null then
+    if v_product.access_kind = 'lifetime' then
+      insert into public.entitlements (user_id, kind, expires_at, source)
+      values (v_order.user_id, 'lifetime', null, 'owner-approve:' || v_order.id::text)
+      returning id into v_entitlement_id;
+    else
+      select greatest(now(), coalesce(max(e.expires_at), now())) into v_base
+      from public.entitlements e
+      where e.user_id = v_order.user_id and e.kind = 'duration' and e.status = 'active' and e.expires_at > now();
+      v_expires := coalesce(v_base, now()) + make_interval(mins => coalesce(v_product.duration_minutes, 60));
+      insert into public.entitlements (user_id, kind, expires_at, source)
+      values (v_order.user_id, 'duration', v_expires, 'owner-approve:' || v_order.id::text)
+      returning id into v_entitlement_id;
+    end if;
+  end if;
+
+  update public.orders
+  set status = 'paid',
+      paid_at = coalesce(paid_at, now()),
+      provider_status = 'manual_approved',
+      entitlement_id = coalesce(entitlement_id, v_entitlement_id),
+      updated_at = now()
+  where id = v_order.id;
+
+  insert into public.audit_events (user_id, event_type, metadata)
+  values (auth.uid(), 'owner.order_approved', jsonb_build_object('orderId', p_order_id, 'targetUserId', v_order.user_id));
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.paxinbot_owner_refund_order(p_order_id uuid)
+returns jsonb language plpgsql security definer set search_path = public, auth, pg_temp as $$
+declare
+  v_order public.orders%rowtype;
+begin
+  perform public.paxinbot_require_owner();
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order_not_found'; end if;
+  if v_order.status = 'refunded' then raise exception 'order_already_refunded'; end if;
+
+  if v_order.entitlement_id is not null then
+    update public.entitlements
+    set status = 'revoked', revoked_at = now()
+    where id = v_order.entitlement_id and status = 'active';
+  end if;
+
+  update public.entitlements
+  set status = 'revoked', revoked_at = now()
+  where user_id = v_order.user_id and source like '%' || v_order.id::text || '%' and status = 'active';
+
+  update public.desktop_sessions
+  set revoked_at = now()
+  where user_id = v_order.user_id and revoked_at is null;
+
+  update public.orders
+  set status = 'refunded',
+      provider_status = 'manual_refunded',
+      updated_at = now()
+  where id = v_order.id;
+
+  insert into public.audit_events (user_id, event_type, metadata)
+  values (auth.uid(), 'owner.order_refunded', jsonb_build_object('orderId', p_order_id, 'targetUserId', v_order.user_id));
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+create or replace function public.paxinbot_owner_list_orders(p_query text default '')
+returns jsonb language plpgsql stable security definer set search_path = public, auth, pg_temp as $$
+declare
+  v_query text := lower(trim(coalesce(p_query, '')));
+begin
+  perform public.paxinbot_require_owner();
+  return coalesce((select jsonb_agg(row_to_json(x) order by x."createdAt" desc) from (
+    select o.id, u.email, coalesce(p.name, 'Produto Paxinbot') as "productName", o.subtotal_cents as "subtotalCents",
       o.discount_cents as "discountCents", o.amount_cents as "amountCents", o.currency,
-      o.status, o.payment_provider as "paymentProvider", o.provider_status as "providerStatus",
+      case
+        when o.status = 'pending' and o.created_at < now() - interval '24 hours' then 'expired'
+        else o.status
+      end as status,
+      o.payment_provider as "paymentProvider", coalesce(o.provider_status, '') as "providerStatus",
       o.created_at as "createdAt", o.paid_at as "paidAt"
     from public.orders o join auth.users u on u.id = o.user_id
     left join public.products p on p.id = o.product_id
+    where v_query = ''
+      or lower(u.email) like '%' || v_query || '%'
+      or lower(o.id::text) like '%' || v_query || '%'
+      or lower(coalesce(p.name, '')) like '%' || v_query || '%'
+      or lower(o.status) like '%' || v_query || '%'
     order by o.created_at desc limit 200
   ) x), '[]'::jsonb);
 end;

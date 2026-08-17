@@ -88,6 +88,7 @@ begin
       'paxinbot_owner_save_coupon','paxinbot_owner_list_promotions',
       'paxinbot_owner_save_promotion','paxinbot_owner_grant_access',
       'paxinbot_owner_grant_usage','paxinbot_owner_revoke_access',
+      'paxinbot_owner_approve_order','paxinbot_owner_refund_order',
       'paxinbot_owner_list_orders','paxinbot_owner_list_audit',
       'paxinbot_owner_list_support_tickets','paxinbot_owner_reply_support_ticket',
       'paxinbot_owner_update_support_status',

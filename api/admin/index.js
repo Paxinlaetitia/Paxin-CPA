@@ -28,7 +28,7 @@ const queries = {
   devices: ['paxinbot_owner_list_device_identities', q => ({ p_query: String(q.q || '') })],
   security: ['paxinbot_owner_list_security_risk', q => ({ p_query: String(q.q || '') })],
   siteSecurity: ['paxinbot_owner_list_site_security_events', () => ({ p_limit: 200 })],
-  orders: ['paxinbot_owner_list_orders', () => ({})],
+  orders: ['paxinbot_owner_list_orders', q => ({ p_query: String(q.q || '') })],
   audit: ['paxinbot_owner_list_audit', () => ({})],
   tickets: ['paxinbot_owner_list_support_tickets', () => ({})]
 };
@@ -102,6 +102,9 @@ module.exports = async (req, res) => {
   if (action === 'revokeAccess' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.userId || ''))) {
     return json(res, 400, { ok: false, error: 'Identificador de cliente inválido.' });
   }
+  if (['approveOrder','refundOrder'].includes(action) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.orderId || ''))) {
+    return json(res, 400, { ok: false, error: 'Identificador de pedido inválido.' });
+  }
   if (action === 'deviceBan') {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.deviceIdentityId || ''))) return json(res, 400, { ok:false, error:'Identificador de dispositivo inválido.' });
     body.banned = body.banned === true;
@@ -122,6 +125,8 @@ module.exports = async (req, res) => {
       ? ['paxinbot_owner_grant_access', () => ({ p_email: body.email, p_kind: 'lifetime', p_expires_at: null, p_source: 'owner-panel' })]
       : ['paxinbot_owner_grant_usage', () => ({ p_email: body.email, p_total_seconds: body.durationSeconds, p_source: 'owner-panel' })],
     revokeAccess: ['paxinbot_owner_revoke_access', () => ({ p_user_id: body.userId })],
+    approveOrder: ['paxinbot_owner_approve_order', () => ({ p_order_id: body.orderId })],
+    refundOrder: ['paxinbot_owner_refund_order', () => ({ p_order_id: body.orderId })],
     deviceBan: ['paxinbot_owner_set_device_ban', () => ({ p_device_identity_id:body.deviceIdentityId,p_banned:body.banned,p_reason:body.banned ? body.reason : null })],
     riskReset: ['paxinbot_owner_reset_security_risk', () => ({ p_device_identity_id:body.deviceIdentityId })],
     ticketReply: ['paxinbot_owner_reply_support_ticket', () => ({ p_ticket_id:body.ticketId, p_message:String(body.message || '').trim() })],
