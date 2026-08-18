@@ -617,6 +617,16 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .auth-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 1px 0; font-size: 11px; color: var(--muted); }
 .auth-options label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
 .auth-options input { accent-color: var(--accent); }
+.cf-turnstile {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2px auto;
+  min-height: 52px;
+  height: 52px;
+  transform: scale(0.85);
+  transform-origin: center center;
+}
 .auth-submit {
   min-height: 40px;
   height: 40px;
