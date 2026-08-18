@@ -562,74 +562,77 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .client-benefits small { color: var(--muted); font-size: 7px; line-height: 1.3; }
 .client-trust { display: flex; align-items: center; gap: 7px; margin-top: 8px; color: var(--text-2); }
 .client-trust > svg { width: 13px; height: 13px; color: var(--green); flex-shrink: 0; }
-.client-trust span { display: flex; flex-direction: column; gap: 1px; }
-.client-trust b { font-size: 8px; }
-.client-trust small { color: var(--muted); font-size: 6.5px; }
+.client-trust span { display: flex; flex-direction: column; gap: 2px; }
+.client-trust b { font-size: 13px; }
+.client-trust small { color: var(--muted); font-size: 11px; }
 
 .auth-card {
-  padding: 12px 14px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 26px 20px;
   border: 1px solid var(--line-strong);
-  border-radius: 11px;
-  background: linear-gradient(145deg,rgba(255,255,255,.025),transparent 50%),#090909;
-  box-shadow: 0 12px 35px rgba(0,0,0,.45);
+  border-radius: 16px;
+  background: linear-gradient(145deg,rgba(255,255,255,.025),transparent 50%),#0b0b0b;
+  box-shadow: 0 18px 45px rgba(0,0,0,.55);
 }
-.auth-head { display: flex; align-items: center; gap: 7px; }
+.auth-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .auth-logo {
-  width: 26px;
-  height: 26px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(240,165,0,.25);
-  border-radius: 6px;
+  border: 1px solid rgba(240,165,0,.3);
+  border-radius: 10px;
   background: var(--accent-soft);
   flex-shrink: 0;
 }
 .auth-logo img {
-  width: 14px;
+  width: 22px;
+  height: 22px;
   filter: invert(69%) sepia(98%) saturate(1593%) hue-rotate(358deg) brightness(99%) contrast(105%);
 }
-.auth-head span { color: var(--accent); font-size: 6px; font-weight: 850; letter-spacing: .12em; }
-.auth-head h2 { margin: 0; font-size: 15px; letter-spacing: -.03em; }
-.auth-copy { margin: 1px 0 3px; color: var(--text-2); font-size: 8px; line-height: 1.25; }
-.auth-form { display: grid; gap: 3px; }
-.auth-form > label { display: grid; gap: 1px; color: var(--text-2); font-size: 7.5px; font-weight: 700; }
+.auth-head span { color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: .08em; }
+.auth-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
+.auth-copy { margin: 4px 0 12px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+.auth-form { display: grid; gap: 10px; }
+.auth-form > label { display: grid; gap: 5px; color: var(--text-2); font-size: 12px; font-weight: 700; }
 .auth-input {
-  min-height: 28px;
-  height: 28px;
+  min-height: 40px;
+  height: 40px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 5px;
-  padding: 0 7px;
+  gap: 8px;
+  padding: 0 12px;
   border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: #050505;
+  border-radius: 9px;
+  background: #060606;
   transition: .2s;
 }
 .auth-input:focus-within { border-color: rgba(240,165,0,.5); box-shadow: 0 0 0 2px rgba(240,165,0,.07); }
-.auth-input > svg { width: 11px; height: 11px; color: var(--muted); }
-.auth-input input { min-width: 0; height: 26px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 9.5px; }
-.auth-eye, .link-button { border: 0; background: transparent; color: var(--accent); font-size: 7px; cursor: pointer; }
-.auth-options { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 0; }
-.auth-options label { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 6.8px; }
+.auth-input > svg { width: 16px; height: 16px; color: var(--muted); }
+.auth-input input { min-width: 0; height: 38px; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13.5px; }
+.auth-eye, .link-button { border: 0; background: transparent; color: var(--accent); font-size: 11px; cursor: pointer; }
+.auth-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0; font-size: 11.5px; color: var(--muted); }
+.auth-options label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; }
 .auth-options input { accent-color: var(--accent); }
 .auth-submit {
-  min-height: 28px;
-  height: 28px;
-  margin-top: 1px;
-  font-size: 9.5px;
-  font-weight: 700;
-  border-radius: 5px;
+  min-height: 40px;
+  height: 40px;
+  margin-top: 2px;
+  font-size: 13.5px;
+  font-weight: 750;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 8px;
 }
-.auth-divider { height: 11px; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 6px; margin: 1px 0; }
+.auth-divider { height: 18px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 9.5px; margin: 6px 0; }
 .auth-divider::before,.auth-divider::after { content:""; height:1px; flex:1; background:var(--line); }
-.auth-legal { display: block; margin: 2px auto 0; max-width: 340px; color: #5e5e5e; font-size: 6.5px; line-height: 1.25; text-align: center; }
-.prototype-notice { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 3px -14px -12px; padding: 3px; border-top: 1px solid var(--line); color: #696969; font-size: 6px; }
-.prototype-notice i { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+.auth-legal { display: block; margin: 8px auto 0; max-width: 380px; color: var(--muted); font-size: 10.5px; line-height: 1.45; text-align: center; }
+.prototype-notice { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px -26px -20px; padding: 6px 12px; border-top: 1px solid var(--line); border-radius: 0 0 16px 16px; color: var(--muted); font-size: 10.5px; }
+.prototype-notice i { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
 .client-dashboard-preview { background: #070707; }
 .dashboard-shell { display: grid; grid-template-columns: 230px 1fr; overflow: hidden; min-height: 560px; border: 1px solid var(--line); border-radius: 20px; background: #050505; box-shadow: 0 30px 70px rgba(0,0,0,.4); }
 .dashboard-nav { padding: 20px 14px; border-right: 1px solid var(--line); background: #080808; }
