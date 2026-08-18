@@ -153,10 +153,30 @@ module.exports = async (req, res) => {
     if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'Método não permitido.' });
     return json(res, 200, { ok: true, token: issueCsrfToken(req, res) });
   }
-  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'resend-email-code', 'passkey-login-options', 'passkey-login-verify', 'passkey-register-options', 'passkey-register-verify', 'passkey-delete'];
+  const protectedPosts = ['login', 'logout', 'recover', 'signup', 'session', 'password', 'verify-email-code', 'verify-token-hash', 'resend-email-code', 'passkey-login-options', 'passkey-login-verify', 'passkey-register-options', 'passkey-register-verify', 'passkey-delete'];
   if (req.method === 'POST' && protectedPosts.includes(action) && !sameOriginRequest(req)) {
     await recordSiteSecurityEvent(req, { eventType:'csrf.rejected', severity:45, subject:clientAddress(req), details:{ reasonCode:'origin_or_token', outcome:'blocked', method:'POST', status:'403' } });
     return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
+  }
+
+  if (action === 'verify-token-hash') {
+    if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'Método não permitido.' });
+    const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body;
+    const tokenHash = String(body.tokenHash || body.token_hash || '').trim();
+    const type = String(body.type || 'signup').trim();
+    if (!tokenHash || tokenHash.length < 10) return json(res, 400, { ok: false, error: 'Token de confirmação inválido.' });
+    if (!await authRate(req, res, 'auth_verify_token_ip', 20, 600)) return;
+    const verified = await upstream('/auth/v1/verify', { method: 'POST', body: { token_hash: tokenHash, type } });
+    if (!verified.response.ok || !verified.payload?.access_token || !verified.payload?.user?.id) {
+      await recordSiteSecurityEvent(req, { eventType:'auth.token_hash_rejected', severity:35, subject:clientAddress(req), details:{ reasonCode:'invalid_or_expired', outcome:'rejected', status:'401' } });
+      return json(res, 401, { ok: false, error: friendlyCodeError(verified.payload, 'O link de confirmação expirou ou é inválido. Solicite um novo cadastro.') });
+    }
+    if (type === 'signup') {
+      const username = normalizeUsername(verified.payload.user.user_metadata?.display_name);
+      if (USERNAME_PATTERN.test(username)) await persistSignupUsername(verified.payload.access_token, username).catch(() => false);
+    }
+    res.setHeader('Set-Cookie', [...sessionCookies(req, verified.payload.access_token, verified.payload.refresh_token), ...clearTemporaryVerification(req), ...clearLegacyMfa(req)]);
+    return json(res, 200, { ok: true, confirmed: true, flow: type });
   }
 
   if (action === 'login') {

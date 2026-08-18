@@ -6,31 +6,65 @@
   const params = new URLSearchParams(location.search);
   const error = hash.get('error_description') || params.get('error_description') || hash.get('error');
   if (error) { status.textContent = `Não foi possível concluir: ${error}.`; return; }
+
+  const tokenHash = params.get('token_hash') || hash.get('token_hash');
+  const type = params.get('type') || hash.get('type') || params.get('flow') || 'signup';
   const accessToken = hash.get('access_token');
   const refreshToken = hash.get('refresh_token');
-  if (!accessToken) { status.textContent = 'A confirmação foi concluída. Entre na sua conta para continuar.'; return; }
+
+  let safeReturn = '/conta';
   try {
-    const csrfResponse = await fetch('/api/auth/csrf', { credentials:'include', headers:{ accept:'application/json' } });
-    const csrfPayload = await csrfResponse.json().catch(() => null);
-    if (!csrfResponse.ok || !csrfPayload?.token) throw new Error('csrf_unavailable');
-    const response = await fetch('/api/auth/session', {
-      method:'POST', credentials:'include',
-      headers:{ 'content-type':'application/json', 'x-paxinbot-csrf':csrfPayload.token },
-      body:JSON.stringify({ accessToken, refreshToken:refreshToken || '' })
-    });
-    if (!response.ok) throw new Error('session_unavailable');
-    let safeReturn = '/conta';
+    const candidate = sessionStorage.getItem('paxinbot_auth_return') || '';
+    sessionStorage.removeItem('paxinbot_auth_return');
+    const parsed = new URL(candidate, location.origin);
+    const productId = parsed.searchParams.get('product') || '';
+    const requestId = parsed.searchParams.get('request') || '';
+    const userCode = String(parsed.searchParams.get('code') || '').toUpperCase();
+    if (parsed.origin === location.origin && parsed.pathname === '/conta/checkout' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId) && parsed.searchParams.size === 1) safeReturn = `/conta/checkout?product=${encodeURIComponent(productId)}`;
+    else if (parsed.origin === location.origin && parsed.pathname === '/conta/downloads' && parsed.searchParams.size === 0) safeReturn = '/conta/downloads';
+    else if (parsed.origin === location.origin && parsed.pathname === '/activate' && !parsed.hash && parsed.searchParams.size === 2 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) && /^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/.test(userCode)) safeReturn = `/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`;
+  } catch {}
+
+  // 1. Link direto do domínio Paxinbot com token_hash (Oculta 100% o Supabase)
+  if (tokenHash) {
     try {
-      const candidate = sessionStorage.getItem('paxinbot_auth_return') || '';
-      sessionStorage.removeItem('paxinbot_auth_return');
-      const parsed = new URL(candidate, location.origin);
-      const productId = parsed.searchParams.get('product') || '';
-      const requestId = parsed.searchParams.get('request') || '';
-      const userCode = String(parsed.searchParams.get('code') || '').toUpperCase();
-      if (parsed.origin === location.origin && parsed.pathname === '/conta/checkout' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(productId) && parsed.searchParams.size === 1) safeReturn = `/conta/checkout?product=${encodeURIComponent(productId)}`;
-      else if (parsed.origin === location.origin && parsed.pathname === '/conta/downloads' && parsed.searchParams.size === 0) safeReturn = '/conta/downloads';
-      else if (parsed.origin === location.origin && parsed.pathname === '/activate' && !parsed.hash && parsed.searchParams.size === 2 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) && /^[A-HJ-NP-Z2-9]{4}(?:-[A-HJ-NP-Z2-9]{4}){2}$/.test(userCode)) safeReturn = `/activate?request=${encodeURIComponent(requestId)}&code=${encodeURIComponent(userCode)}`;
-    } catch {}
-    location.replace(params.get('flow') === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : safeReturn);
-  } catch { status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.'; }
+      const csrfResponse = await fetch('/api/auth/csrf', { credentials:'include', headers:{ accept:'application/json' } });
+      const csrfPayload = await csrfResponse.json().catch(() => null);
+      if (!csrfResponse.ok || !csrfPayload?.token) throw new Error('csrf_unavailable');
+      const response = await fetch('/api/auth/verify-token-hash', {
+        method:'POST', credentials:'include',
+        headers:{ 'content-type':'application/json', 'x-paxinbot-csrf':csrfPayload.token },
+        body:JSON.stringify({ tokenHash, type })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || 'Falha ao validar o token de confirmação.');
+      location.replace(type === 'recovery' ? '/redefinir-senha' : safeReturn);
+      return;
+    } catch (err) {
+      status.textContent = err.message || 'Não foi possível confirmar seu e-mail. Solicite um novo código.';
+      return;
+    }
+  }
+
+  // 2. Link do Supabase ou retorno de OAuth com access_token
+  if (accessToken) {
+    try {
+      const csrfResponse = await fetch('/api/auth/csrf', { credentials:'include', headers:{ accept:'application/json' } });
+      const csrfPayload = await csrfResponse.json().catch(() => null);
+      if (!csrfResponse.ok || !csrfPayload?.token) throw new Error('csrf_unavailable');
+      const response = await fetch('/api/auth/session', {
+        method:'POST', credentials:'include',
+        headers:{ 'content-type':'application/json', 'x-paxinbot-csrf':csrfPayload.token },
+        body:JSON.stringify({ accessToken, refreshToken:refreshToken || '' })
+      });
+      if (!response.ok) throw new Error('session_unavailable');
+      location.replace(type === 'recovery' || hash.get('type') === 'recovery' ? '/redefinir-senha' : safeReturn);
+      return;
+    } catch {
+      status.textContent = 'Não foi possível salvar sua sessão. Volte e entre novamente.';
+      return;
+    }
+  }
+
+  status.textContent = 'A confirmação foi concluída. Entre na sua conta para continuar.';
 })();
