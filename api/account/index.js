@@ -5,15 +5,23 @@ const { json, requireTrustedHost, readBodyResult, browserSession, upstream, usag
 const DEFAULT_WINDOWS_RELEASE = Object.freeze({
   path: '/releases/PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
-  version: '1.0.0',
-  sizeBytes: 101188012,
-  sha256: '62347372c777e5bde78497c18943c8985fbd0f444d925d2c26f71c424d7b8354',
+  version: '1.0.3',
+  sizeBytes: 101188455,
+  sha256: 'ab333e9a21189ea0faf0351ee0a4ec27bbea20e906641e06c09d4e1c373d3bf9',
   expiresIn: 120
 });
 
 function getWindowsRelease() {
-  const version = process.env.PAXINBOT_RELEASE_VERSION || DEFAULT_WINDOWS_RELEASE.version;
-  const sizeBytes = Number(process.env.PAXINBOT_RELEASE_SIZE_BYTES) || DEFAULT_WINDOWS_RELEASE.sizeBytes;
+  let manifest = null;
+  try {
+    manifest = require('../releases/stable-win32-x64.json');
+  } catch {
+    try {
+      manifest = require('../../releases/stable-win32-x64.json');
+    } catch {}
+  }
+  const version = process.env.PAXINBOT_RELEASE_VERSION || manifest?.version || DEFAULT_WINDOWS_RELEASE.version;
+  const sizeBytes = Number(process.env.PAXINBOT_RELEASE_SIZE_BYTES) || Number(manifest?.size) || DEFAULT_WINDOWS_RELEASE.sizeBytes;
   const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',');
   return {
     path: DEFAULT_WINDOWS_RELEASE.path,
@@ -21,7 +29,7 @@ function getWindowsRelease() {
     version,
     sizeBytes,
     sizeFormatted: process.env.PAXINBOT_RELEASE_SIZE_FORMATTED || `${sizeMB} MB`,
-    sha256: process.env.PAXINBOT_RELEASE_SHA256 || DEFAULT_WINDOWS_RELEASE.sha256,
+    sha256: process.env.PAXINBOT_RELEASE_SHA256 || manifest?.sha256 || DEFAULT_WINDOWS_RELEASE.sha256,
     expiresIn: DEFAULT_WINDOWS_RELEASE.expiresIn
   };
 }

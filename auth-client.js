@@ -282,10 +282,10 @@ function renderPromotions(promotions) {
 
 function renderRelease(release) {
   if (!release) return;
-  const version = release.version ? (release.version.startsWith('v') ? release.version : `v${release.version}`) : 'v1.0';
-  const sizeText = release.sizeFormatted || (release.sizeBytes ? `${(release.sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : '96,7 MB');
+  const version = release.version ? (release.version.startsWith('v') ? release.version : `v${release.version}`) : 'v1.0.3';
+  const sizeText = release.sizeFormatted || (release.sizeBytes ? `${(release.sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB` : '96,5 MB');
   const titleElem = document.getElementById('account-download-version');
-  if (titleElem) titleElem.textContent = `Paxinbot ${version.replace(/^v/i, '')}`;
+  if (titleElem) titleElem.textContent = `Paxinbot ${version}`;
   const sizeElem = document.getElementById('account-download-size');
   if (sizeElem) sizeElem.textContent = `Instalador oficial · ${sizeText}`;
 }
