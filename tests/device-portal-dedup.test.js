@@ -31,7 +31,8 @@ test('portal sends the stable device identity instead of treating it as a sessio
   const account = read('api/account/index.js');
 
   assert.match(client, /action:'revokeDevice',\s*deviceIdentityId:button\.dataset\.revokeDevice/);
-  assert.match(account, /p_session_id:\s*String\(body\.deviceIdentityId\s*\|\|\s*''\)/);
+  assert.match(account, /requestedDeviceId\s*=\s*String\(body\.deviceIdentityId\s*\|\|\s*body\.sessionId\s*\|\|\s*''\)/);
+  assert.match(account, /p_session_id:\s*requestedDeviceId/);
   assert.match(account, /action === 'revokeDevice'[\s\S]*?Dispositivo inválido/);
 });
 

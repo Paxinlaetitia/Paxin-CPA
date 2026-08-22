@@ -160,9 +160,10 @@ module.exports = async (req, res) => {
   }
   if (!sameOriginRequest(req)) return json(res, 403, { ok: false, error: 'Origem da solicitação não autorizada.' });
   const parsed = await readBodyResult(req, res); if (!parsed.ok) return; const body = parsed.body; const action = String(body.action || '');
+  const requestedDeviceId = String(body.deviceIdentityId || body.sessionId || '');
   const actions = {
     profile: ['paxinbot_update_my_profile', () => ({ p_display_name: String(body.displayName || '').trim() })],
-    revokeDevice: ['paxinbot_revoke_my_device', () => ({ p_session_id: String(body.deviceIdentityId || '') })],
+    revokeDevice: ['paxinbot_revoke_my_device', () => ({ p_session_id: requestedDeviceId })],
     revokeAllDevices: ['paxinbot_revoke_all_my_devices', () => ({})],
     preferences: ['paxinbot_update_my_preferences', () => ({ p_product_updates:body.productUpdates === true, p_support_updates:body.supportUpdates !== false })],
     createTicket: ['paxinbot_create_support_ticket', () => ({ p_category:String(body.category || ''), p_subject:String(body.subject || '').trim(), p_message:String(body.message || '').trim() })],
@@ -173,7 +174,7 @@ module.exports = async (req, res) => {
   const item = actions[action];
   if (!item) return json(res, 400, { ok: false, error: 'Ação inválida.' });
   if (action === 'profile' && (String(body.displayName || '').trim().length < 2 || String(body.displayName || '').trim().length > 80)) return json(res, 400, { ok: false, error: 'O nome deve ter entre 2 e 80 caracteres.' });
-  if (action === 'revokeDevice' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.deviceIdentityId || ''))) return json(res, 400, { ok:false, error:'Dispositivo inválido.' });
+  if (action === 'revokeDevice' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedDeviceId)) return json(res, 400, { ok:false, error:'Dispositivo inválido.' });
   if (action === 'createTicket' && (!['technical','payment','access','other'].includes(String(body.category || '')) || String(body.subject || '').trim().length < 5 || String(body.subject || '').trim().length > 120 || String(body.message || '').trim().length < 10 || String(body.message || '').trim().length > 3000)) return json(res, 400, { ok:false, error:'Preencha a categoria, um assunto de 5 a 120 caracteres e uma mensagem de 10 a 3000 caracteres.' });
   if (action === 'replyTicket' && (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.ticketId || '')) || String(body.message || '').trim().length < 2 || String(body.message || '').trim().length > 3000)) return json(res, 400, { ok:false, error:'Resposta inválida.' });
   if (action === 'activateUsage' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(body.grantId || ''))) return json(res, 400, { ok:false, error:'Crédito de uso inválido.' });
