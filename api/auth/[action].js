@@ -142,7 +142,7 @@ async function validateTurnstileToken(req, token) {
     return Boolean(data && data.success === true);
   } catch (err) {
     console.error('Turnstile verification error:', err);
-    return true;
+    return false;
   }
 }
 

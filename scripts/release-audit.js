@@ -57,10 +57,17 @@ if (new Set(migrationNames).size !== migrationNames.length) fail('nomes de migra
 const leastPrivilegeName = '20260831_database_least_privilege.sql';
 const leastPrivilegeIndex = migrationNames.indexOf(leastPrivilegeName);
 if (leastPrivilegeIndex < 0) fail('migração de menor privilégio ausente');
+const reviewedRpcReplacements = new Map([
+  ['20260902_device_portal_identity_dedup.sql', new Set(['paxinbot_list_my_devices','paxinbot_revoke_my_device'])]
+]);
 for (const file of migrations.slice(leastPrivilegeIndex + 1)) {
   const source = read(file);
   if (/\b(?:create\s+(?:or\s+replace\s+)?function|create\s+table|alter\s+default\s+privileges|grant\s|revoke\s)/i.test(source)) {
-    fail(`migração posterior ao fechamento de privilégios amplia a superfície: ${file}`);
+    const allowed = reviewedRpcReplacements.get(path.posix.basename(file));
+    const declared = [...source.matchAll(/create\s+or\s+replace\s+function\s+public\.([a-z0-9_]+)\s*\(/gi)].map(match => match[1]);
+    const broadening = /\b(?:create\s+table|alter\s+default\s+privileges|grant\s|revoke\s)/i.test(source)
+      || !allowed || declared.length !== allowed.size || declared.some(name => !allowed.has(name));
+    if (broadening) fail(`migração posterior ao fechamento de privilégios amplia a superfície: ${file}`);
   }
 }
 

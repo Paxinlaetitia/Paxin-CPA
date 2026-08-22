@@ -79,3 +79,13 @@ test('sensitive web flows use separate scopes and Cloudflare stays staged',()=>{
   const cloudflare=fs.readFileSync(path.join(root,'docs','security','cloudflare-package-3.md'),'utf8');
   assert.match(cloudflare,/20/); assert.match(cloudflare,/10 segundos/); assert.match(cloudflare,/não devem ser\s+ativadas/i);
 });
+
+test('Turnstile fails closed when Cloudflare verification is unavailable',()=>{
+  const authSource=fs.readFileSync(path.join(__dirname,'..','api','auth','[action].js'),'utf8');
+  const functionSource=authSource.slice(
+    authSource.indexOf('async function validateTurnstileToken'),
+    authSource.indexOf('\nmodule.exports = async',authSource.indexOf('async function validateTurnstileToken'))
+  );
+  assert.match(functionSource,/catch\s*\([^)]*\)\s*\{[\s\S]*?return false;/);
+  assert.doesNotMatch(functionSource,/catch\s*\([^)]*\)\s*\{[\s\S]*?return true;/);
+});
