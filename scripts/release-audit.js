@@ -58,7 +58,8 @@ const leastPrivilegeName = '20260831_database_least_privilege.sql';
 const leastPrivilegeIndex = migrationNames.indexOf(leastPrivilegeName);
 if (leastPrivilegeIndex < 0) fail('migração de menor privilégio ausente');
 const reviewedRpcReplacements = new Map([
-  ['20260902_device_portal_identity_dedup.sql', new Set(['paxinbot_list_my_devices','paxinbot_revoke_my_device'])]
+  ['20260902_device_portal_identity_dedup.sql', new Set(['paxinbot_list_my_devices','paxinbot_revoke_my_device'])],
+  ['20260903_authorized_devices_active_only.sql', new Set(['paxinbot_list_my_devices'])]
 ]);
 for (const file of migrations.slice(leastPrivilegeIndex + 1)) {
   const source = read(file);

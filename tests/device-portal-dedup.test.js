@@ -34,3 +34,12 @@ test('portal sends the stable device identity instead of treating it as a sessio
   assert.match(account, /p_session_id:\s*String\(body\.deviceIdentityId\s*\|\|\s*''\)/);
   assert.match(account, /action === 'revokeDevice'[\s\S]*?Dispositivo inválido/);
 });
+
+test('authorized computers omit revoked and expired legacy sessions', () => {
+  const migration = read('supabase/migrations/20260903_authorized_devices_active_only.sql');
+
+  assert.match(migration, /where s\.user_id=auth\.uid\(\)[\s\S]*?s\.revoked_at is null[\s\S]*?s\.expires_at > now\(\)/i);
+  assert.match(migration, /group by\s+coalesce\(s\.fingerprint_hash,\s*'legacy:'\s*\|\|\s*s\.id::text\)/i);
+  assert.match(migration, /'status',\s*'active'/i);
+  assert.doesNotMatch(migration, /delete\s+from\s+public\.desktop_sessions/i);
+});
