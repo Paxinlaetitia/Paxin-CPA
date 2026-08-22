@@ -5,9 +5,9 @@ const { json, requireTrustedHost, readBodyResult, browserSession, upstream, usag
 const DEFAULT_WINDOWS_RELEASE = Object.freeze({
   path: '/releases/PaxinbotSetup.exe',
   fileName: 'PaxinbotSetup.exe',
-  version: '1.0.5',
-  sizeBytes: 102736615,
-  sha256: '8a76d646eb4961e2c4adedc1d0daaa33c8db7c63988aa515262161ac1a7da7a6',
+  version: '2.7.0',
+  sizeBytes: 102737097,
+  sha256: '34f0915e2cd2f966d7ebfa38138684047d23ae809c29bf71a757a00a66215a16',
   expiresIn: 120
 });
 

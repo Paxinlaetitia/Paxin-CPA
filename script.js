@@ -171,7 +171,7 @@ async function loadPublicReleaseInfo() {
     const payload = res && res.ok ? await res.json().catch(() => null) : null;
     const data = payload?.data;
     if (!data) return;
-    const versionText = data.version ? (data.version.startsWith('v') ? data.version : `v${data.version}`) : 'v1.0.5';
+    const versionText = data.version ? (data.version.startsWith('v') ? data.version : `v${data.version}`) : 'v2.7.0';
     const sizeText = data.sizeFormatted || `${(data.sizeBytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
     const vElem = document.getElementById('public-download-version');
     if (vElem) vElem.textContent = versionText;
