@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "buildCommand": "node build-public.cjs",
+  "installCommand": "npm ci --ignore-scripts --no-fund",
+  "outputDirectory": "public-site",
+  "public": false,
   "git": {
     "deploymentEnabled": {
       "main": true,
@@ -40,6 +44,7 @@
     { "source": "/conta/dispositivos", "destination": "/conta/configuracoes/dispositivos", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/api/account/avatar", "destination": "/api/account?action=avatar" },
     { "source": "/conta", "destination": "/cliente" },
     { "source": "/conta/:path*", "destination": "/cliente" },
     { "source": "/gestao/e7fc8a8f64e6e0aed8e92b6a", "destination": "/api/admin?view=page" },

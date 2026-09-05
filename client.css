@@ -558,3 +558,19 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-eye.is-animating svg { animation: none; }
 }
+
+.portal-avatar { position: relative; overflow: hidden; flex-shrink: 0; }
+.portal-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.portal-avatar [hidden] { display: none; }
+.avatar-form { margin-bottom: 20px; }
+.avatar-form > label, #avatar-status { grid-column: 1 / -1; min-width: 0; }
+.avatar-editor { display: flex; align-items: center; gap: 18px; }
+.avatar-editor-preview { width: 80px; height: 80px; font-size: 32px; }
+.avatar-editor h4 { margin: 0 0 6px; font-size: 16px; }
+.avatar-editor p, #avatar-status { color: var(--muted, #999); font-size: 13px; line-height: 1.5; margin: 0; }
+.avatar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#account-avatar-file { box-sizing: border-box; max-width: 100%; min-width: 0; height: 48px; min-height: 48px; padding: 6px; overflow: hidden; color: var(--text-2); font-size: 12px; font-weight: 400; line-height: 34px; cursor: pointer; }
+#account-avatar-file::file-selector-button { height: 34px; margin: 0 12px 0 0; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--accent-soft); color: var(--accent-bright); font: inherit; font-weight: 700; line-height: normal; cursor: pointer; }
+#account-avatar-file:hover::file-selector-button { border-color: var(--accent); }
+#avatar-status[data-error="true"] { color: #ef8d8d; }
+.avatar-form button:disabled { opacity: .55; cursor: not-allowed; }

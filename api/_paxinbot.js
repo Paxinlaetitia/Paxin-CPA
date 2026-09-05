@@ -456,6 +456,10 @@ async function requestRateLimit(req, res, options = {}) {
     }, { 'retry-after':String(resetAfter) });
     return false;
   } catch {
+    if (options.failClosed === true) {
+      json(res, 503, { ok: false, code: 'rate_limit_unavailable', error: 'A proteção contra abuso está temporariamente indisponível.' });
+      return false;
+    }
     return true;
   }
 }

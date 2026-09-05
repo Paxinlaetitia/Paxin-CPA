@@ -9,6 +9,7 @@
 supabase/.temp/
 node_modules
 coverage
+public-site/
 release-evidence.local.json
 
 .env.release

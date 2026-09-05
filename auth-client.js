@@ -246,7 +246,11 @@ function renderClientDashboard(payload) {
   document.body.classList.toggle('client-guest', !user);
   document.body.classList.remove('client-auth-pending');
   document.body.setAttribute('aria-busy', 'false');
-  document.getElementById('dashboard-initials').textContent = displayName.slice(0, 2).toUpperCase() || 'PB';
+  const initial = Array.from(displayName.trim())[0]?.toLocaleUpperCase('pt-BR') || 'P';
+  document.getElementById('dashboard-initials').textContent = initial;
+  const avatarInitial = document.getElementById('account-avatar-initial');
+  if (avatarInitial) avatarInitial.textContent = initial;
+  refreshAccountAvatar(user?.id || '');
   document.getElementById('dashboard-email').textContent = email || 'Entre para consultar';
   document.getElementById('dashboard-greeting').textContent = user ? `Olá, ${displayName}` : 'Entre na sua conta';
   renderAccessSummary(payload);
@@ -259,6 +263,105 @@ function renderClientDashboard(payload) {
   document.getElementById('account-providers').textContent = providers.length ? providers.map(item => item === 'google' ? 'Google' : item === 'email' ? 'E-mail e senha' : item).join(' e ') : 'E-mail e senha';
   document.getElementById('passkey-state').textContent = 'VERIFICANDO';
   document.getElementById('passkey-copy').textContent = 'Use biometria ou PIN para entrar com segurança.';
+}
+
+let avatarAccountId = '';
+let avatarHasPhoto = false;
+let avatarPreviewUrl = '';
+let avatarBusy = false;
+
+function refreshAccountAvatar(userId, force = false) {
+  if (!force && avatarAccountId === userId) return;
+  avatarAccountId = userId;
+  avatarHasPhoto = false;
+  if (avatarPreviewUrl) { URL.revokeObjectURL(avatarPreviewUrl); avatarPreviewUrl = ''; }
+  const fileInput = document.getElementById('account-avatar-file');
+  if (fileInput) fileInput.value = '';
+  const save = document.getElementById('avatar-upload');
+  const remove = document.getElementById('avatar-remove');
+  if (save) save.disabled = true;
+  if (remove) remove.disabled = true;
+  const address = userId ? `${PaxinbotAuth.baseUrl}/api/account/avatar?revision=${Date.now()}` : '';
+  for (const [photoId, initialId] of [['dashboard-photo', 'dashboard-initials'], ['account-avatar-photo', 'account-avatar-initial']]) {
+    const photo = document.getElementById(photoId);
+    const initial = document.getElementById(initialId);
+    if (!photo || !initial) continue;
+    photo.hidden = true;
+    initial.hidden = false;
+    photo.onload = () => {
+      photo.hidden = false;
+      initial.hidden = true;
+      if (photoId === 'dashboard-photo') { avatarHasPhoto = true; if (remove) remove.disabled = avatarBusy; }
+    };
+    photo.onerror = () => { photo.hidden = true; initial.hidden = false; };
+    if (address) photo.src = address;
+    else photo.removeAttribute('src');
+  }
+}
+
+function setupAvatarUpload() {
+  const form = document.getElementById('account-avatar-form');
+  if (!form) return;
+  const input = document.getElementById('account-avatar-file');
+  const save = document.getElementById('avatar-upload');
+  const remove = document.getElementById('avatar-remove');
+  const status = document.getElementById('avatar-status');
+  const show = (message, error = false) => { status.textContent = message; status.dataset.error = String(error); };
+  const busy = value => { avatarBusy = value; form.setAttribute('aria-busy', String(value)); input.disabled = value; save.disabled = value || !input.files?.length; remove.disabled = value || !avatarHasPhoto; };
+  input.addEventListener('change', () => {
+    save.disabled = true;
+    if (avatarPreviewUrl) { URL.revokeObjectURL(avatarPreviewUrl); avatarPreviewUrl = ''; }
+    const file = input.files?.[0];
+    if (!file) { refreshAccountAvatar(avatarAccountId, true); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024 || !file.size) {
+      input.value = '';
+      refreshAccountAvatar(avatarAccountId, true);
+      show('Selecione JPG, PNG ou WebP de até 2 MB.', true);
+      return;
+    }
+    const photo = document.getElementById('account-avatar-photo');
+    photo.onerror = () => { photo.hidden = true; document.getElementById('account-avatar-initial').hidden = false; input.value = ''; save.disabled = true; show('Não foi possível abrir esta imagem.', true); };
+    avatarPreviewUrl = URL.createObjectURL(file);
+    photo.src = avatarPreviewUrl;
+    photo.hidden = false;
+    save.disabled = false;
+    show('Confira a prévia e clique em Salvar foto.');
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const file = input.files?.[0];
+    if (!file || avatarBusy) return;
+    const accountId = avatarAccountId;
+    busy(true);
+    show('Validando e salvando sua foto…');
+    try {
+      const encoded = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+        reader.readAsDataURL(file);
+      });
+      await PaxinbotAuth.request('/api/account/avatar', { method: 'POST', body: { image: encoded } });
+      if (avatarAccountId !== accountId || !currentAccount?.user) return;
+      refreshAccountAvatar(accountId, true);
+      show('Foto salva. Ela também aparecerá no aplicativo.');
+    } catch (error) { show(error.message, true); }
+    finally { busy(false); }
+  });
+  remove.addEventListener('click', async () => {
+    if (avatarBusy) return;
+    const accountId = avatarAccountId;
+    busy(true);
+    show('Removendo sua foto…');
+    try {
+      await PaxinbotAuth.request('/api/account/avatar', { method: 'DELETE' });
+      if (avatarAccountId !== accountId || !currentAccount?.user) return;
+      refreshAccountAvatar(accountId, true);
+      show('Foto removida. Sua inicial será exibida.');
+    } catch (error) { show(error.message, true); }
+    finally { busy(false); }
+  });
+  window.addEventListener('pagehide', () => { if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl); });
 }
 
 function renderUsageGrants(grants) {
@@ -372,7 +475,7 @@ function renderPreferences(preferences) {
 
 function renderActivity(activity) {
   const root = document.getElementById('account-activity-list'); if (!root) return;
-  const labels = { 'account.created':'Conta criada', 'account.profile_updated':'Perfil atualizado', 'account.preferences_updated':'Preferências atualizadas', 'device.approved':'Dispositivo autorizado', 'device.signed_in':'Aplicativo conectado', 'device.revoked':'Dispositivo revogado', 'device.revoked_all':'Todas as sessões foram revogadas', 'checkout.started':'Pagamento iniciado', 'checkout.resumed':'Pagamento retomado', 'payment.approved':'Pagamento confirmado', 'payment.refunded':'Pagamento reembolsado', 'payment.charged_back':'Pagamento contestado', 'support.ticket_created':'Chamado aberto' };
+  const labels = { 'account.created':'Conta criada', 'account.profile_updated':'Perfil atualizado', 'account.avatar_updated':'Foto de perfil atualizada', 'account.avatar_removed':'Foto de perfil removida', 'account.preferences_updated':'Preferências atualizadas', 'device.approved':'Dispositivo autorizado', 'device.signed_in':'Aplicativo conectado', 'device.revoked':'Dispositivo revogado', 'device.revoked_all':'Todas as sessões foram revogadas', 'checkout.started':'Pagamento iniciado', 'checkout.resumed':'Pagamento retomado', 'payment.approved':'Pagamento confirmado', 'payment.refunded':'Pagamento reembolsado', 'payment.charged_back':'Pagamento contestado', 'support.ticket_created':'Chamado aberto' };
   if (!activity?.length) { root.innerHTML = '<div class="portal-empty">Sua atividade aparecerá aqui após as primeiras ações.</div>'; return; }
   root.innerHTML = activity.map(item => `<article class="portal-list-row activity-row"><span class="portal-icon"><svg><use href="#i-file"></use></svg></span><div><b>${escapeHtml(labels[item.eventType] || 'Atividade da conta')}</b><small>${formatDate(item.createdAt)}</small></div></article>`).join('');
 }
@@ -655,6 +758,7 @@ async function initClientPage() {
   document.getElementById('order-receipt')?.addEventListener('click', async event => { if (!currentOrderId) return; event.currentTarget.disabled = true; try { await PaxinbotAuth.request('/api/checkout', { method:'POST', body:{ action:'receipt', orderId:currentOrderId } }); window.showToast?.('Comprovante enviado para o e-mail da conta.'); } catch (error) { window.showToast?.(error.message); } finally { event.currentTarget.disabled = false; } });
   document.querySelector('.portal-nav')?.addEventListener('keydown', event => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; const tabs = [...document.querySelectorAll('[data-account-view]')]; const current = tabs.indexOf(document.activeElement); if (current < 0) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; setAccountView(tabs[next].dataset.accountView, true); });
   window.addEventListener('popstate', () => { setAccountView(viewFromPath(), false, false); setAccountSection(accountSectionFromPath(), false, false); void renderAuthPurchaseContext(); });
+  setupAvatarUpload();
   document.getElementById('account-profile-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('button'); button.disabled = true; try { const displayName = new FormData(event.currentTarget).get('displayName'); const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'profile', displayName } }); currentAccount.profile = result.data; renderClientDashboard(currentAccount); window.showToast?.('Dados atualizados.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('account-preferences-form')?.addEventListener('submit', async event => { event.preventDefault(); const button = event.currentTarget.querySelector('[type="submit"]'); button.disabled = true; try { const result = await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'preferences', productUpdates:document.getElementById('preference-product-updates').checked, supportUpdates:document.getElementById('preference-support-updates').checked } }); renderPreferences(result.data); renderActivity((await PaxinbotAuth.request('/api/account?action=activity')).data); window.showToast?.('Preferências atualizadas.'); } catch (error) { window.showToast?.(error.message); } finally { button.disabled = false; } });
   document.getElementById('account-device-list')?.addEventListener('click', async event => { const button = event.target.closest('[data-revoke-device]'); if (!button || !confirm('Revogar o acesso deste computador?')) return; button.disabled = true; try { await PaxinbotAuth.request('/api/account', { method:'POST', body:{ action:'revokeDevice', deviceIdentityId:button.dataset.revokeDevice } }); renderDevices((await PaxinbotAuth.request('/api/account?action=devices')).data); window.showToast?.('Dispositivo revogado.'); } catch (error) { button.disabled = false; window.showToast?.(error.message); } });

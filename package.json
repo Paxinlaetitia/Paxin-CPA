@@ -1,0 +1,12 @@
+{
+  "name": "paxinbot-site",
+  "private": true,
+  "scripts": {
+    "build": "node build-public.cjs",
+    "test": "node --test tests/*.test.js",
+    "test:avatar": "node --test tests/avatar-upload.test.js"
+  },
+  "dependencies": {
+    "sharp": "0.35.4"
+  }
+}

@@ -20,7 +20,7 @@ function validSecurityEvent(body) {
   return entries.length <= 4 && entries.every(([key, value]) => SECURITY_DETAIL_KEYS.has(key) && typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(value));
 }
 
-module.exports = async (req, res) => {
+async function handleSession(req, res) {
   if (!requireTrustedHost(req, res)) return;
   if (!['GET', 'POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const match = String(req.headers.authorization || '').match(/^Bearer\s+([a-f0-9]{64})$/i); if (!match) return json(res, 401, { ok: false, error: 'Sessão do aplicativo ausente.' });
@@ -38,8 +38,17 @@ module.exports = async (req, res) => {
   }
   const pause = req.method === 'POST';
   if (!await serviceRateLimit(pause ? 'desktop_usage_pause' : 'desktop_session', match[1], pause ? 120 : 600, 3600)) return json(res, 429, { ok: false, error: 'Muitas validações de sessão. Aguarde e tente novamente.' }, { 'retry-after': '30' });
-  const rpc = pause ? 'paxinbot_pause_desktop_usage_v3' : 'paxinbot_desktop_session_v3';
-  const { response, payload } = await serviceUpstream(`/rest/v1/rpc/${rpc}`, { method: 'POST', body: { p_token_hash: sha256(match[1]) } });
-  if (!response.ok || payload?.active === false) return json(res, 401, { ok: false, error: payload?.reason === 'usage_exhausted' ? 'Seu saldo de uso terminou.' : payload?.reason === 'risk_reauthentication_required' ? 'Uma verificação de segurança exige nova autorização deste computador.' : 'Sessão do aplicativo inválida, expirada ou sem acesso ativo.', reason: payload?.reason || 'session_invalid' });
+  const action = pause ? (req.query?.action === 'logout' ? 'logout' : 'pause') : (req.query?.action === 'profile' ? 'profile' : 'session');
+  const { response, payload } = await serviceUpstream('/rest/v1/rpc/paxinbot_desktop_session_v4', { method: 'POST', body: { p_token_hash: sha256(match[1]), p_action: action }, signal: AbortSignal.timeout(10000) });
+  if (!response.ok || !payload || typeof payload.active !== 'boolean') return json(res, 503, { ok: false, error: 'A validação da sessão está temporariamente indisponível.' });
+  if (action === 'logout' && payload.loggedOut === true && payload.paused === true) return json(res, 200, { ok: true, active: false, loggedOut: true, paused: true });
+  if (payload.active === false) return json(res, 401, { ok: false, error: payload.reason === 'usage_exhausted' ? 'Seu saldo de uso terminou.' : payload.reason === 'risk_reauthentication_required' ? 'Uma verificação de segurança exige nova autorização deste computador.' : 'Sessão do aplicativo inválida, expirada ou sem acesso ativo.', reason: payload.reason || 'session_invalid' });
+  if (action === 'logout') return json(res, 503, { ok: false, error: 'Não foi possível confirmar a revogação da sessão.' });
+  if (!pause && (typeof payload.profile?.nickname !== 'string' || !(payload.profile.avatarUrl === null || typeof payload.profile.avatarUrl === 'string'))) return json(res, 503, { ok: false, error: 'O perfil da sessão está temporariamente indisponível.' });
   return json(res, 200, { ok: true, ...payload, ...(pause ? {} : { minAppVersion: '1.0.0' }) });
+}
+
+module.exports = async (req, res) => {
+  try { return await handleSession(req, res); }
+  catch { return json(res, 503, { ok: false, error: 'A validação da sessão está temporariamente indisponível.' }); }
 };

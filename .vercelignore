@@ -11,6 +11,10 @@ tests
 docs
 supabase
 coverage
+public-site
+backup
+backups
+**/*.map
 node_modules
 scripts
 cloudflare

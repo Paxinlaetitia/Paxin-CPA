@@ -36,7 +36,14 @@ function getWindowsRelease() {
 
 async function signedWindowsRelease(req, res) {
   try {
-    const release = getWindowsRelease();
+    // Keep legacy discovery unchanged; hardened clients never fall back to it.
+    const manifest = req.query?.protocol === 'signed-v1'
+      ? require('../../server/update-manifest').readUpdateManifest() : null;
+    const release = manifest ? {
+      ...DEFAULT_WINDOWS_RELEASE, version: manifest.version,
+      sizeBytes: manifest.installer.size, sha256: manifest.installer.sha256,
+      sizeFormatted: `${(manifest.installer.size / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`
+    } : getWindowsRelease();
     const expires=Math.floor(Date.now()/1000)+release.expiresIn;
     const nonce=crypto.randomBytes(18).toString('base64url');
     const canonical=`GET\n${release.path}\n${expires}\n${nonce}`;
@@ -51,7 +58,7 @@ async function signedWindowsRelease(req, res) {
       res.setHeader('X-Content-Type-Options','nosniff');
       return res.end();
     }
-    return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:release.fileName, version:release.version, sizeBytes:release.sizeBytes, sizeFormatted:release.sizeFormatted, sha256:release.sha256, expiresIn:release.expiresIn } });
+    return json(res, 200, { ok:true, data:{ url:url.toString(), fileName:release.fileName, version:release.version, sizeBytes:release.sizeBytes, sizeFormatted:release.sizeFormatted, sha256:release.sha256, expiresIn:release.expiresIn, ...(manifest ? { manifest } : {}) } });
   } catch {
     return json(res, 503, { ok:false, error:'O instalador está temporariamente indisponível.' });
   }
@@ -139,6 +146,7 @@ async function portalBootstrap(req, res, session) {
 
 module.exports = async (req, res) => {
   if (!requireTrustedHost(req, res)) return;
+  if (req.query?.action === 'avatar') return require('../../server/account-avatar')(req, res);
   if (!['GET','POST'].includes(req.method)) return json(res, 405, { ok: false, error: 'Método não permitido.' });
   const queryAction = String(req.query?.action || 'overview');
   if (req.method === 'GET' && queryAction === 'download') return signedWindowsRelease(req, res);

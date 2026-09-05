@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
@@ -61,8 +62,18 @@ const reviewedRpcReplacements = new Map([
   ['20260902_device_portal_identity_dedup.sql', new Set(['paxinbot_list_my_devices','paxinbot_revoke_my_device'])],
   ['20260903_authorized_devices_active_only.sql', new Set(['paxinbot_list_my_devices'])]
 ]);
+const reviewedPrivilegedMigrations = new Map([
+  ['20260904_desktop_persistent_session.sql', '4afd3ab9b8640466a9d3cf8703ec3da617d7ab93fccc3b8f1f07f7944c48ee7b'],
+  ['20260905_profile_avatar.sql', '06702334458c680db7fb479720f32a9e93edca29a464c2958e6ed9d350416705']
+]);
 for (const file of migrations.slice(leastPrivilegeIndex + 1)) {
   const source = read(file);
+  const reviewedHash = reviewedPrivilegedMigrations.get(path.posix.basename(file));
+  if (reviewedHash) {
+    const actualHash = crypto.createHash('sha256').update(source.replace(/\r\n/g, '\n')).digest('hex');
+    if (actualHash !== reviewedHash) fail(`migração privilegiada mudou desde a revisão: ${file}`);
+    continue;
+  }
   if (/\b(?:create\s+(?:or\s+replace\s+)?function|create\s+table|alter\s+default\s+privileges|grant\s|revoke\s)/i.test(source)) {
     const allowed = reviewedRpcReplacements.get(path.posix.basename(file));
     const declared = [...source.matchAll(/create\s+or\s+replace\s+function\s+public\.([a-z0-9_]+)\s*\(/gi)].map(match => match[1]);

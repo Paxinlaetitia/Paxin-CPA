@@ -109,3 +109,52 @@ test('public download actions point directly to the short-lived download endpoin
   assert.match(publicFiles,/\/api\/account\?action=download&amp;redirect=1/);
   assert.doesNotMatch(publicFiles,/\/conta\/downloads\?mode=signup/);
 });
+
+test('hardened update discovery fails closed without an offline-signed manifest', async t => {
+  const previous = process.env.PAXINBOT_UPDATE_MANIFEST;
+  delete process.env.PAXINBOT_UPDATE_MANIFEST;
+  t.after(() => { if (previous === undefined) delete process.env.PAXINBOT_UPDATE_MANIFEST; else process.env.PAXINBOT_UPDATE_MANIFEST = previous; });
+  const handler = loadHandler(false);
+  const res = response();
+  await handler({ method: 'GET', query: { action: 'download', protocol: 'signed-v1' }, headers: {}, socket: {} }, res);
+  assert.equal(res.statusCode, 503);
+  assert.doesNotMatch(res.body, /secret|signature|keyId/);
+});
+
+test('hardened discovery uses signed fields and rejects tampering; legacy discovery remains compatible', async t => {
+  const modulePath = require.resolve('../server/update-manifest');
+  const keyPath = require.resolve('../server/release-public-key.json');
+  const oldModule = require.cache[modulePath], oldKey = require.cache[keyPath];
+  const previous = process.env.PAXINBOT_UPDATE_MANIFEST;
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const der = publicKey.export({ format: 'der', type: 'spki' });
+  const trust = { algorithm: 'Ed25519', keyId: crypto.createHash('sha256').update(der).digest('hex').slice(0, 24), publicKey: der.toString('base64url') };
+  require.cache[keyPath] = { id: keyPath, filename: keyPath, loaded: true, exports: trust };
+  delete require.cache[modulePath];
+  t.after(() => {
+    if (oldModule) require.cache[modulePath] = oldModule; else delete require.cache[modulePath];
+    if (oldKey) require.cache[keyPath] = oldKey; else delete require.cache[keyPath];
+    if (previous === undefined) delete process.env.PAXINBOT_UPDATE_MANIFEST; else process.env.PAXINBOT_UPDATE_MANIFEST = previous;
+  });
+  const stable = value => value === null || typeof value !== 'object' ? JSON.stringify(value) :
+    `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}`;
+  const document = { schema: 'paxinbot.update/v1', product: 'Paxinbot', platform: 'win32-x64', channel: 'stable', version: '1.0.8', sequence: 32,
+    createdAt: new Date(Date.now() - 1000).toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), integrityDigest: 'a'.repeat(64),
+    installer: { url: 'https://paxincpa.store/releases/PaxinbotSetup.exe', size: 1048576, sha256: 'b'.repeat(64) } };
+  const sign = value => ({ ...value, signature: { algorithm: 'Ed25519', keyId: trust.keyId, value: crypto.sign(null, Buffer.from(stable(value)), privateKey).toString('base64url') } });
+  process.env.PAXINBOT_UPDATE_MANIFEST = JSON.stringify(sign(document));
+  const handler = loadHandler(false), res = response();
+  const req = { method: 'GET', query: { action: 'download', protocol: 'signed-v1' }, headers: {}, socket: {} };
+  await handler(req, res);
+  assert.equal(res.statusCode, 200);
+  const data = JSON.parse(res.body).data;
+  assert.equal(data.version, document.version);
+  assert.equal(data.sha256, document.installer.sha256);
+  assert.equal(data.sizeBytes, document.installer.size);
+  assert.deepEqual(data.manifest, sign(document));
+  process.env.PAXINBOT_UPDATE_MANIFEST = JSON.stringify({ ...sign(document), version: '9.0.0' });
+  const tampered = response(); await handler(req, tampered); assert.equal(tampered.statusCode, 503);
+  process.env.PAXINBOT_UPDATE_MANIFEST = JSON.stringify(sign({ ...document, expiresAt: new Date(Date.now() - 1).toISOString() }));
+  const expired = response(); await handler(req, expired); assert.equal(expired.statusCode, 503);
+  const legacy = response(); await handler({ ...req, query: { action: 'download' } }, legacy); assert.equal(legacy.statusCode, 200);
+});
