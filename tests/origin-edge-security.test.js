@@ -88,7 +88,7 @@ test('production origin is strict HTTPS without paths or credentials',()=>{
 test('every deployed API handler rejects an untrusted origin host first',()=>{
   const files=[];
   (function walk(directory){ for(const entry of fs.readdirSync(directory,{withFileTypes:true})) { const item=path.join(directory,entry.name); if(entry.isDirectory()) walk(item); else if(entry.name.endsWith('.js')&&!item.endsWith('_paxinbot.js')) files.push(item); } })(path.join(root,'api'));
-  assert.equal(files.length,11);
+  assert.equal(files.length,12);
   for(const file of files) assert.match(fs.readFileSync(file,'utf8'),/requireTrustedHost\(req, res\)/,path.relative(root,file));
 });
 

@@ -64,7 +64,8 @@ const reviewedRpcReplacements = new Map([
 ]);
 const reviewedPrivilegedMigrations = new Map([
   ['20260904_desktop_persistent_session.sql', '4afd3ab9b8640466a9d3cf8703ec3da617d7ab93fccc3b8f1f07f7944c48ee7b'],
-  ['20260905_profile_avatar.sql', '06702334458c680db7fb479720f32a9e93edca29a464c2958e6ed9d350416705']
+  ['20260905_profile_avatar.sql', '06702334458c680db7fb479720f32a9e93edca29a464c2958e6ed9d350416705'],
+  ['20260929_cpa_licenses.sql', '5a1a98da6335297bb157ac8960a2de28f3a1486e2ffc430754e07cb3099b9b17']
 ]);
 for (const file of migrations.slice(leastPrivilegeIndex + 1)) {
   const source = read(file);
@@ -87,7 +88,7 @@ try { JSON.parse(read('vercel.json')); }
 catch (error) { fail(`vercel.json inválido: ${error.message}`); }
 
 const handlers = walk('api').filter(file => file.endsWith('.js') && file !== 'api/_paxinbot.js');
-if (handlers.length > 11) fail(`orçamento conservador da Vercel excedido: ${handlers.length}/11 handlers`);
+if (handlers.length > 12) fail(`orçamento conservador da Vercel excedido: ${handlers.length}/12 handlers`);
 for (const handler of handlers) {
   if (!read(handler).includes('requireTrustedHost')) fail(`handler sem barreira de origem: ${handler}`);
 }

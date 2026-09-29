@@ -3,14 +3,15 @@
 
 const Admin = (() => {
   const adminRoot = '/gestao/e7fc8a8f64e6e0aed8e92b6a';
-  const routes = { overview:adminRoot, customers:`${adminRoot}/clientes`, access:`${adminRoot}/acessos`, products:`${adminRoot}/produtos`, coupons:`${adminRoot}/cupons`, promotions:`${adminRoot}/promocoes`, devices:`${adminRoot}/dispositivos`, security:`${adminRoot}/seguranca`, orders:`${adminRoot}/pedidos`, tickets:`${adminRoot}/atendimento`, audit:`${adminRoot}/auditoria` };
-  const state = { users:[], products:[], coupons:[], promotions:[], devices:[], security:[], orders:[], tickets:[], audit:[], currentTicket:null };
+  const routes = { overview:adminRoot, customers:`${adminRoot}/clientes`, access:`${adminRoot}/acessos`, 'cash-licenses':`${adminRoot}/licencas-cash-hunters`, products:`${adminRoot}/produtos`, coupons:`${adminRoot}/cupons`, promotions:`${adminRoot}/promocoes`, devices:`${adminRoot}/dispositivos`, security:`${adminRoot}/seguranca`, orders:`${adminRoot}/pedidos`, tickets:`${adminRoot}/atendimento`, audit:`${adminRoot}/auditoria` };
+  const state = { users:[], products:[], coupons:[], promotions:[], devices:[], security:[], orders:[], tickets:[], audit:[], cashLicenses:[], cashAudit:[], currentTicket:null };
   let csrfToken='';
   const csrf=async()=>{ if(csrfToken) return csrfToken; const response=await fetch('/api/auth/csrf',{ credentials:'include',headers:{ accept:'application/json' } }); const payload=await response.json().catch(()=>null); if(!response.ok || !payload?.token) throw new Error('Não foi possível preparar a solicitação segura.'); csrfToken=payload.token; return csrfToken; };
   const call = async (path, options = {}) => { const method=String(options.method || 'GET').toUpperCase(); const hasBody=options.body!==undefined; const headers={ accept:'application/json', ...(hasBody ? { 'content-type':'application/json' } : {}) }; if(!['GET','HEAD','OPTIONS'].includes(method)) headers['x-paxinbot-csrf']=await csrf(); const response = await fetch(`/api/admin${path}`, { method, credentials:'include', headers, body:hasBody ? JSON.stringify(options.body) : undefined }); const payload = await response.json().catch(() => ({})); if (!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível concluir a operação.'); return payload.data; };
+  const licenseCall = async (path = '', options = {}) => { const method=String(options.method || 'GET').toUpperCase(); const hasBody=options.body!==undefined; const headers={ accept:'application/json', ...(hasBody ? { 'content-type':'application/json' } : {}) }; if(!['GET','HEAD','OPTIONS'].includes(method)) headers['x-paxinbot-csrf']=await csrf(); const response=await fetch(`/api/licenses-admin${path}`,{method,credentials:'include',headers,body:hasBody ? JSON.stringify(options.body) : undefined}); const payload=await response.json().catch(()=>({})); if(!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível concluir a operação da licença.'); return payload.data; };
   const escape = value => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[character]);
   const money = (cents, currency = 'BRL') => new Intl.NumberFormat('pt-BR', { style:'currency', currency }).format((Number(cents) || 0) / 100);
-  const date = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : '—';
+  const date = value => { if (!value) return '—'; const parsed=new Date(value); return Number.isNaN(parsed.getTime()) ? 'Data inválida' : new Intl.DateTimeFormat('pt-BR', { dateStyle:'medium', timeStyle:'short' }).format(parsed); };
   const rows = (selector, html, empty, colspan) => { document.querySelector(selector).innerHTML = html || `<tr><td colspan="${colspan}">${empty}</td></tr>`; };
   const viewFromPath = () => Object.entries(routes).find(([, route]) => route === location.pathname.replace(/\/$/, ''))?.[0] || 'overview';
 
@@ -148,7 +149,47 @@ const Admin = (() => {
 
   function renderAudit(events) {
     state.audit = events || [];
-    rows('#admin-audit-list', state.audit.map(event => `<tr><td>${escape(event.eventType)}</td><td>${escape(event.email || 'Sistema')}</td><td>${date(event.createdAt)}</td></tr>`).join(''), 'Nenhum evento de auditoria encontrado.', 3);
+    rows('#admin-audit-list', state.audit.map(event => `<tr><td>${escape(event.eventType || event.event || event.category || 'Evento')}</td><td>${escape(event.email || 'Sistema')}</td><td>${date(event.createdAt)}</td></tr>`).join(''), 'Nenhum evento de auditoria encontrado.', 3);
+  }
+
+  const text = (value, fallback = '—') => String(value ?? fallback);
+  const clearNode = node => { while (node.firstChild) node.removeChild(node.firstChild); };
+  const cell = (value, className) => { const node=document.createElement('td'); node.textContent=text(value); if(className) node.className=className; return node; };
+  const button = (label, action, id, danger = false) => { const node=document.createElement('button'); node.type='button'; node.textContent=label; node.dataset.licenseAction=action; node.dataset.licenseId=id; if(danger) node.className='danger'; return node; };
+  const durationLabel = license => { if (license?.status === 'pending' || license?.activationStatus === 'pending') return license.configuredDuration || 'Aguardando ativação'; if (Number.isFinite(Number(license?.remainingSeconds))) return formatDuration(Math.max(0,Number(license.remainingSeconds))); if (license?.expiresAt) { const parsed=Date.parse(license.expiresAt); return Number.isNaN(parsed) ? 'Data inválida' : formatDuration(Math.max(0,Math.floor((parsed-Date.now())/1000))); } return 'Vitalício'; };
+  function renderCashLicenses(items) {
+    state.cashLicenses=Array.isArray(items) ? items : [];
+    const root=document.getElementById('cash-licenses-list'); if(!root) return; clearNode(root);
+    if(!state.cashLicenses.length){ const row=document.createElement('tr'); const empty=cell('Nenhuma licença encontrada.'); empty.colSpan=7; row.append(empty); root.append(row); return; }
+    state.cashLicenses.forEach(license=>{
+      const row=document.createElement('tr');
+      const id=license.id || license.licenseId;
+      const key=license.keyPrefix || license.publicId || id;
+      const identity=cell(''); const keyNode=document.createElement('b'); keyNode.textContent=key; identity.append(keyNode); const customerLabel=license.customerLabel || license.customerEmail || license.customerId; if(customerLabel){const customerNode=document.createElement('small'); customerNode.className='admin-cell-note'; customerNode.textContent=customerLabel; identity.append(customerNode);} if(license.email){const emailNode=document.createElement('small'); emailNode.className='admin-cell-note'; emailNode.textContent=license.email; identity.append(emailNode);} row.append(identity,cell(license.status)); row.append(cell(license.expiresAt ? date(license.expiresAt) : 'Sem expiração')); row.append(cell(durationLabel(license)));
+      const device=cell(''); const hwidNode=document.createElement('code'); hwidNode.textContent=license.hwid || 'Sem dispositivo'; hwidNode.title=license.hwid || ''; device.append(hwidNode); const sessionNode=document.createElement('small'); sessionNode.className='admin-cell-note'; sessionNode.textContent=`${Number(license.activeSessions)||0} sessão(ões)${license.deviceBanned ? ' · dispositivo bloqueado' : ''}`; device.append(sessionNode); row.append(device);
+      const activity=cell(''); [['Criada',license.createdAt||license.created_at],['Ativada',license.activatedAt||license.activated_at],['Última autenticação',license.lastAuth||license.last_auth_at],['Heartbeat',license.heartbeatAt||license.lastHeartbeat||license.last_heartbeat_at]].forEach(([label,value])=>{if(value){const item=document.createElement('small');item.className='admin-cell-note';item.textContent=`${label}: ${date(value)}`;activity.append(item);}}); row.append(activity);
+      const actions=cell(''); const wrap=document.createElement('div'); wrap.className='admin-row-actions';
+      const statusAction=['suspended','inactive'].includes(license.status) ? ['activate','Reativar'] : license.status==='banned' ? ['unban','Desbanir'] : ['suspend','Suspender'];
+      [[statusAction[0],statusAction[1],false],['deactivate','Desativar',license.status==='revoked'],['revoke','Revogar',license.status==='revoked'],['ban','Banir',license.status==='banned'],['reset_device','Resetar dispositivo',false],['replace_device','Substituir dispositivo',false],['extend','Estender',false],['set_expiration','Definir expiração',false],['terminate_sessions','Terminar sessões',false],['device',license.deviceBanned ? 'Desbloquear dispositivo' : 'Bloquear dispositivo',!license.hwid]].forEach(([action,label,done])=>{ if(!done) wrap.append(button(label,action,id,['revoke','ban','device'].includes(action))); });
+      actions.append(wrap); row.append(actions); root.append(row);
+    });
+  }
+  function renderCashAudit(items) {
+    state.cashAudit=Array.isArray(items) ? items : []; const root=document.getElementById('cash-license-audit-list'); if(!root) return; clearNode(root);
+    if(!state.cashAudit.length){const row=document.createElement('tr'); const empty=cell('Nenhum evento recente.'); empty.colSpan=4; row.append(empty); root.append(row); return;}
+    state.cashAudit.slice(0,200).forEach(event=>{const row=document.createElement('tr'); row.append(cell(event.event || event.eventType || event.category || 'Evento'),cell(event.licenseId || event.licenseKeyPrefix || '—'),cell(event.category || 'licença'),cell(date(event.createdAt))); root.append(row);});
+  }
+  async function loadCashLicenses(query='') { const [list,audit]=await Promise.all([licenseCall(`?action=list${query ? `&${query}` : ''}`),licenseCall('?action=audit')]); renderCashLicenses(list?.licenses || list || []); renderCashAudit(audit?.events || audit || []); }
+  function cashLicenseDuration(form) { const unit=String(form.elements.unit.value || 'days'); if(unit==='custom') return {unit,expiresAt:new Date(form.elements.expiresAt.value).toISOString()}; if(unit==='lifetime') return {unit}; return {unit,value:Number(form.elements.value.value)}; }
+  async function createCashLicense(event) { event.preventDefault(); const form=event.currentTarget; const button=form.querySelector('[type=submit]'); button.disabled=true; try { const data=await licenseCall('',{method:'POST',body:{action:'create',duration:cashLicenseDuration(form),activationPolicy:form.elements.activationPolicy.value,customerId:form.elements.customerId.value.trim() || undefined}}); const reveal=document.getElementById('cash-license-created'); reveal.hidden=false; reveal.querySelector('[data-license-key]').textContent=data.licenseKey; form.reset(); form.elements.unit.value='days'; form.elements.value.value=30; window.showToast?.('Licença criada. Copie a chave agora.'); await loadCashLicenses(); } catch(error){window.showToast?.(error.message);} finally{button.disabled=false;} }
+  async function cashLicenseAction(action,id) { if(action==='replace_device'){const license=state.cashLicenses.find(item=>(item.id||item.licenseId)===id); const form=document.getElementById('cash-license-device-form'); form.elements.licenseId.value=id; form.elements.hwid.value=license?.hwid || ''; form.elements.publicKey.value=license?.publicKey || ''; document.getElementById('cash-license-device-dialog').showModal(); return;} let body={action:'update',licenseId:id,operation:action}; if(action==='device'){const license=state.cashLicenses.find(item=>(item.id||item.licenseId)===id);body={action:'device',hwid:license?.hwid,banned:!license?.deviceBanned};} else if(['extend','set_expiration'].includes(action)){ const value=prompt(action==='extend'?'Quantidade de dias para estender:':'Nova expiração UTC (ISO):',action==='extend'?'30':''); if(!value) return; if(action==='extend'){const days=Number(value); if(!Number.isFinite(days) || days<=0){window.showToast?.('Informe uma duração válida.'); return;} body={...body,duration:{unit:'days',value:days}};} else {const parsed=new Date(value); if(Number.isNaN(parsed.getTime())){window.showToast?.('Informe uma data UTC válida.'); return;} body={...body,expiresAt:parsed.toISOString()};} } else if(!confirm(`Confirmar ação: ${action}?`)) return; try { await licenseCall('',{method:'POST',body}); await loadCashLicenses(); window.showToast?.('Licença atualizada.'); } catch(error){window.showToast?.(error.message);} }
+  function bindCashLicenses() {
+    const form=document.getElementById('cash-license-create-form'); form?.addEventListener('submit',createCashLicense); form?.elements.unit.addEventListener('change',()=>{const custom=form.elements.unit.value==='custom'; form.elements.expiresAt.disabled=!custom; form.elements.value.disabled=custom || form.elements.unit.value==='lifetime';});
+    document.getElementById('cash-license-search')?.addEventListener('submit',async event=>{event.preventDefault();const data=new FormData(event.currentTarget);try{await loadCashLicenses(`q=${encodeURIComponent(data.get('q')||'')}&status=${encodeURIComponent(data.get('status')||'')}`);}catch(error){window.showToast?.(error.message);}});
+    document.getElementById('cash-licenses-list')?.addEventListener('click',event=>{const action=event.target.closest('[data-license-action]');if(action) cashLicenseAction(action.dataset.licenseAction,action.dataset.licenseId);});
+    document.getElementById('cash-license-device-form')?.addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;const submit=form.querySelector('[type=submit]');submit.disabled=true;try{await licenseCall('',{method:'POST',body:{action:'update',licenseId:form.elements.licenseId.value,operation:'replace_device',hwid:form.elements.hwid.value.trim(),publicKey:form.elements.publicKey.value.trim()}});form.closest('dialog').close();await loadCashLicenses();window.showToast?.('Dispositivo substituído.');}catch(error){window.showToast?.(error.message);}finally{submit.disabled=false;}});
+    document.querySelector('[data-copy-license]')?.addEventListener('click',async()=>{const key=document.querySelector('[data-license-key]')?.textContent || '';if(!key)return;await navigator.clipboard?.writeText(key);window.showToast?.('Chave copiada.');});
+    document.querySelector('[data-dismiss-license]')?.addEventListener('click',()=>{const reveal=document.getElementById('cash-license-created');reveal.querySelector('[data-license-key]').textContent='';reveal.hidden=true;});
   }
 
   function renderTickets(tickets) {
@@ -194,6 +235,7 @@ const Admin = (() => {
     ]);
     const combinedAudit = [...audit, ...siteSecurity].sort((left,right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)).slice(0,400);
     renderSecurity(security); renderOrders(orders); renderTickets(tickets); renderAudit(combinedAudit);
+    await loadCashLicenses().catch(() => { renderCashLicenses([]); renderCashAudit([]); });
     renderOverview(overview);
   }
 
@@ -240,6 +282,7 @@ const Admin = (() => {
     document.getElementById('new-product').addEventListener('click', () => configureProductForm());
     document.getElementById('new-coupon').addEventListener('click', () => configureCouponForm());
     document.getElementById('new-promotion').addEventListener('click', () => configurePromotionForm());
+    bindCashLicenses();
     document.getElementById('admin-product-form').elements.accessKind.addEventListener('change', updateDurationField);
     document.getElementById('admin-access-form').elements.kind.addEventListener('change', updateAccessExpiry); updateAccessExpiry();
     document.getElementById('admin-user-search').addEventListener('submit', async event => { event.preventDefault(); try { renderUsers(await call(`?action=users&q=${encodeURIComponent(new FormData(event.currentTarget).get('query') || '')}`)); } catch (error) { window.showToast?.(error.message); } });

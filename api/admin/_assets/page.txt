@@ -11,6 +11,7 @@
         <button class="is-active" type="button" role="tab" data-admin-view="overview" aria-selected="true"><svg><use href="#i-grid"></use></svg>Visão geral</button>
         <button type="button" role="tab" data-admin-view="customers" aria-selected="false"><svg><use href="#i-user"></use></svg>Clientes</button>
         <button type="button" role="tab" data-admin-view="access" aria-selected="false"><svg><use href="#i-lock"></use></svg>Acessos</button>
+        <button type="button" role="tab" data-admin-view="cash-licenses" aria-selected="false"><svg><use href="#i-shield"></use></svg>Licenças Cash Hunters</button>
         <button type="button" role="tab" data-admin-view="products" aria-selected="false"><svg><use href="#i-card"></use></svg>Produtos</button>
         <button type="button" role="tab" data-admin-view="coupons" aria-selected="false"><svg><use href="#i-bolt"></use></svg>Cupons</button>
         <button type="button" role="tab" data-admin-view="promotions" aria-selected="false"><svg><use href="#i-bolt"></use></svg>Promoções</button>
@@ -94,6 +95,30 @@
             </article>
           </div>
         </section>
+
+        <section class="admin-page-panel" data-admin-panel="cash-licenses" hidden>
+          <div class="admin-cash-license-grid">
+            <article class="admin-card admin-cash-license-create">
+              <header class="admin-card-header"><div class="admin-card-badge">CASH HUNTERS</div><h2>Emitir licença</h2><p>A chave é exibida uma única vez. O servidor continua sendo a autoridade de ativação.</p></header>
+              <form id="cash-license-create-form" class="admin-form">
+                <label>Unidade<input name="unit" type="text" list="cash-license-units" value="days" required /><datalist id="cash-license-units"><option value="hours">Horas</option><option value="days">Dias</option><option value="weeks">Semanas</option><option value="months">Meses de calendário</option><option value="custom">Instante customizado</option><option value="lifetime">Vitalício</option></datalist></label>
+                <label>Quantidade<input name="value" type="number" min="1" step="1" value="30" /></label>
+                <label class="admin-full">Expiração customizada<input name="expiresAt" type="datetime-local" disabled /></label>
+                <label>Ativação<select name="activationPolicy"><option value="first">Primeira ativação</option><option value="immediate">Imediata</option></select></label>
+                <label>Cliente UUID (opcional)<input name="customerId" type="text" autocomplete="off" /></label>
+                <p class="admin-note admin-full">Meses usam calendário UTC. A resposta não é salva no navegador nem em localStorage.</p>
+                <button class="button button-primary admin-submit-btn admin-full" type="submit">Gerar chave</button>
+              </form>
+              <div id="cash-license-created" class="admin-license-reveal" hidden role="status" aria-live="polite"><strong>Chave gerada — copie agora</strong><code data-license-key></code><div><button type="button" data-copy-license>Copiar chave</button><button type="button" data-dismiss-license>Fechar</button></div></div>
+            </article>
+            <article class="admin-card admin-cash-license-list">
+              <div class="admin-panel-toolbar"><form class="admin-search" id="cash-license-search"><input name="q" type="search" placeholder="Pesquisar chave, licença ou HWID" /><select name="status"><option value="">Todos os status</option><option value="pending">Pendentes</option><option value="inactive">Inativas</option><option value="active">Ativas</option><option value="suspended">Suspensas</option><option value="revoked">Revogadas</option><option value="banned">Banidas</option><option value="expired">Expiradas</option></select><button type="submit">Filtrar</button></form></div>
+              <div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Licença / cliente</th><th>Status</th><th>Expiração</th><th>Restante</th><th>Dispositivo / sessão</th><th>Atividade</th><th>Ações</th></tr></thead><tbody id="cash-licenses-list"><tr><td colspan="7">Carregando…</td></tr></tbody></table></div></div>
+            </article>
+          </div>
+          <article class="admin-card admin-cash-audit"><header class="admin-card-header"><div class="admin-card-badge">AUDITORIA</div><h2>Eventos recentes</h2></header><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Evento</th><th>Licença</th><th>Categoria</th><th>Data</th></tr></thead><tbody id="cash-license-audit-list"><tr><td colspan="4">Carregando…</td></tr></tbody></table></div></div></article>
+        </section>
+        <dialog id="cash-license-device-dialog" class="admin-dialog"><form id="cash-license-device-form" class="admin-form"><header><button type="button" class="dialog-close" data-close-dialog="cash-license-device-dialog">×</button><span class="admin-card-badge">DISPOSITIVO</span><h2>Substituir dispositivo</h2><p>Informe os novos identificadores. O backend valida o vínculo.</p></header><input type="hidden" name="licenseId" /><label class="admin-full">HWID<input name="hwid" type="text" required autocomplete="off" /></label><label class="admin-full">Chave pública<input name="publicKey" type="text" required autocomplete="off" /></label><button class="button button-primary admin-submit-btn" type="submit">Substituir dispositivo</button></form></dialog>
 
         <section class="admin-page-panel" data-admin-panel="products" hidden><div class="admin-panel-toolbar"><button class="button button-primary" id="new-product" type="button">Novo produto</button></div><div class="admin-table-card"><div class="admin-table-wrap"><table><thead><tr><th>Produto</th><th>Código</th><th>Duração</th><th>Preço</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-products-list"><tr><td colspan="6">Carregando…</td></tr></tbody></table></div></div></section>
 

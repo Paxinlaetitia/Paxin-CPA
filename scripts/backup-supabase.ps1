@@ -37,6 +37,45 @@ function Assert-NoReparsePoint {
     }
 }
 
+function Read-PublicRootCertificate {
+    param([string]$CertificatePath)
+    if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
+        throw "Certificado CA ausente no caminho configurado: $CertificatePath. Baixe o certificado publico atual do Supabase e informe -RootCertificatePath. Nao desative TLS."
+    }
+    $raw = [IO.File]::ReadAllBytes($CertificatePath)
+    $text = [Text.Encoding]::ASCII.GetString($raw)
+    if ($text -match 'PRIVATE KEY') { throw 'Informe somente o certificado publico da CA.' }
+    if ($text -match 'BEGIN CERTIFICATE') {
+        $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPem($text)
+    } else {
+        if ([Security.Cryptography.X509Certificates.X509Certificate2]::GetCertContentType($raw) -ne [Security.Cryptography.X509Certificates.X509ContentType]::Cert) {
+            throw 'Informe um certificado CA publico PEM ou DER; arquivos PFX/P12 nao sao aceitos.'
+        }
+        $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($raw)
+    }
+    if ($certificate.HasPrivateKey) {
+        $certificate.Dispose()
+        throw 'Informe somente o certificado publico da CA.'
+    }
+    return $certificate
+}
+
+function Assert-PublicRootCertificate {
+    param([string]$CertificatePath)
+    $certificate = $null
+    try {
+        $certificate = Read-PublicRootCertificate $CertificatePath
+        $constraints = @($certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.19' })
+        if ($constraints.Count -ne 1 -or -not $constraints[0].CertificateAuthority -or
+            $certificate.NotBefore.ToUniversalTime() -gt [DateTime]::UtcNow -or
+            $certificate.NotAfter.ToUniversalTime() -le [DateTime]::UtcNow) {
+            throw 'Certificado CA invalido ou fora da validade. Baixe o certificado atual no Supabase.'
+        }
+    } finally {
+        if ($null -ne $certificate) { $certificate.Dispose() }
+    }
+}
+
 function New-PrivateBackupDirectory {
     param([string]$DirectoryPath)
     Assert-NoReparsePoint $DirectoryPath
@@ -68,10 +107,7 @@ function Export-TrustedRoots {
     $certificates = @(Get-ChildItem Cert:\CurrentUser\Root, Cert:\LocalMachine\Root |
         Sort-Object Thumbprint -Unique)
     if ($AdditionalCertificatePath) {
-        Assert-NoReparsePoint $AdditionalCertificatePath
-        $certificateText = [IO.File]::ReadAllText($AdditionalCertificatePath)
-        if ($certificateText -match 'PRIVATE KEY') { throw 'Informe somente o certificado publico da CA.' }
-        $additionalCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPem($certificateText)
+        $additionalCertificate = Read-PublicRootCertificate $AdditionalCertificatePath
         try {
             $constraints = @($additionalCertificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.19' })
             if ($constraints.Count -ne 1 -or -not $constraints[0].CertificateAuthority -or
@@ -242,6 +278,12 @@ if ([string]::IsNullOrWhiteSpace($localDataDirectory) -or -not [IO.Path]::IsPath
 $toolsDirectory = Join-Path $localDataDirectory 'PAXINBOT\BackupTools\postgresql-18.6\bin'
 $backupRoot = Join-Path $localDataDirectory 'PAXINBOT\DatabaseBackups'
 if (-not $CheckOnly) { Write-Host "Ferramentas: $toolsDirectory" }
+$defaultCertificatePath = Join-Path $localDataDirectory 'PAXINBOT\BackupTools\supabase-ca.crt'
+$explicitCertificatePath = -not [string]::IsNullOrWhiteSpace($RootCertificatePath)
+if (-not $explicitCertificatePath) {
+    $projectCertificatePath = Join-Path $PSScriptRoot 'certificates\supabase-ca.crt'
+    $RootCertificatePath = if (Test-Path -LiteralPath $projectCertificatePath -PathType Leaf) { $projectCertificatePath } else { $defaultCertificatePath }
+}
 Assert-NoReparsePoint $toolsDirectory
 $requiredExecutables = @('pg_dump', 'pg_dumpall', 'pg_restore', 'psql')
 $missingTools = @($requiredExecutables | Where-Object {
@@ -259,7 +301,9 @@ foreach ($tool in $requiredExecutables) {
     if ($version -notmatch 'PostgreSQL\) 18\.6\b') { throw 'Versao inesperada das ferramentas.' }
 }
 if ($CheckOnly) {
+    Assert-PublicRootCertificate $RootCertificatePath
     [pscustomobject]@{ toolsReady = $true; credentialRequested = $false; databaseTouched = $false;
+        certificateReady = $true; certificatePath = $RootCertificatePath;
         toolsDirectory = $toolsDirectory; outputRoot = $backupRoot } | ConvertTo-Json
     return
 }
@@ -267,14 +311,7 @@ if ($PrepareToolsOnly) {
     Write-Host 'PREPARACAO CONCLUIDA. Agora abra o iniciador normalmente para fazer o backup.'
     return
 }
-
-if (-not $RootCertificatePath) {
-    $RootCertificatePath = Join-Path $localDataDirectory 'PAXINBOT\BackupTools\supabase-ca.crt'
-}
-Assert-NoReparsePoint $RootCertificatePath
-if (-not (Test-Path -LiteralPath $RootCertificatePath -PathType Leaf)) {
-    throw 'Certificado CA ausente. Baixe no painel Supabase e configure RootCertificatePath. Nao desative TLS.'
-}
+Assert-PublicRootCertificate $RootCertificatePath
 
 $Host.UI.RawUI.WindowTitle = 'PAXINBOT - backup local do Supabase'
 Write-Host 'Backup manual gratuito. Nao aplica SQL nem altera os dados do banco.'

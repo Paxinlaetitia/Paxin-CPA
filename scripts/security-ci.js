@@ -62,7 +62,7 @@ for (const file of javascript) {
   if (checked.status !== 0) fail(`JavaScript inválido em ${file}: ${String(checked.stderr || checked.stdout).trim()}`);
 }
 
-const apiHandlers = javascript.filter(file => file.startsWith('api/') && file.endsWith('.js'));
+const apiHandlers = javascript.filter(file => file.startsWith('api/') && file.endsWith('.js') && file !== 'api/_paxinbot.js');
 if (apiHandlers.length > 12) fail(`Vercel Hobby aceita 12 funções; foram encontradas ${apiHandlers.length}`);
 
 try { JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8')); }

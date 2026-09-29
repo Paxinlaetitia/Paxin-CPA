@@ -13,8 +13,12 @@ test('backup launcher prefills only the user-supplied connection identifiers', (
   assert.match(launcher, /-DatabaseHost "aws-0-us-east-1\.pooler\.supabase\.com"/);
   assert.match(launcher, /-DatabaseUser "postgres\.drkyjgnctbxmupbfarnj"/);
   assert.doesNotMatch(launcher, /PGPASSWORD|postgresql:\/\/|-(?:Database)?Password/i);
+  assert.match(launcher, /--certificate/);
+  assert.match(launcher, /RootCertificatePath/);
   assert.ok(script.indexOf('Assert-BackupConnection $DatabaseHost $DatabaseUser') < script.indexOf('if ($CheckOnly)'));
   assert.ok(script.indexOf("Ctrl+C cancela.") < script.indexOf("Read-Host 'Senha do BANCO"));
+  assert.ok(script.includes("certificates\\supabase-ca.crt"));
+  assert.match(script, /Read-PublicRootCertificate/);
 });
 
 test('double-click launcher works without PowerShell on PATH and never prompts in check mode', { skip: process.platform !== 'win32' }, () => {
@@ -32,6 +36,14 @@ test('double-click launcher works without PowerShell on PATH and never prompts i
   assert.equal(result.toolsReady, true);
   assert.equal(result.credentialRequested, false);
   assert.equal(result.databaseTouched, false);
+  assert.equal(result.certificateReady, true);
+  assert.match(result.certificatePath, /supabase-ca\.crt$/i);
+});
+
+test('prepare-only does not require a certificate and explicit missing CA fails safely', () => {
+  assert.ok(script.indexOf("if ($PrepareToolsOnly)") < script.lastIndexOf('Assert-PublicRootCertificate $RootCertificatePath'));
+  assert.match(script, /Certificado CA ausente no caminho configurado/);
+  assert.ok(script.includes('PFX/P12 nao sao aceitos'));
 });
 
 test('tools and output use the Windows known folder even when LOCALAPPDATA differs', { skip: process.platform !== 'win32' }, () => {
@@ -45,6 +57,7 @@ test('tools and output use the Windows known folder even when LOCALAPPDATA diffe
   assert.equal(result.toolsReady, true);
   assert.equal(result.credentialRequested, false);
   assert.equal(result.databaseTouched, false);
+  assert.equal(result.certificateReady, true);
   assert.ok(fs.existsSync(path.join(result.toolsDirectory, 'pg_dump.exe')));
   assert.ok(!result.outputRoot.includes('not-the-windows-known-folder'));
   assert.ok(!result.toolsDirectory.includes('not-the-windows-known-folder'));
@@ -85,6 +98,8 @@ test('backup uses explicit TLS, restricted local output and no credential comman
   assert.match(script, /\$info\.ArgumentList\.Add/);
   assert.match(script, /SetAccessRuleProtection\(\$true, \$false\)/);
   assert.match(script, /PAXINBOT\\DatabaseBackups/);
+  assert.match(script, /Assert-PublicRootCertificate \$RootCertificatePath/);
+  assert.match(script, /certificateReady = \$true/);
   assert.doesNotMatch(script, /--clean|--no-privileges|--enable-row-security|sslmode=require|Start-Transcript/i);
 });
 

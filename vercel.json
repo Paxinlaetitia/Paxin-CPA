@@ -44,6 +44,7 @@
     { "source": "/conta/dispositivos", "destination": "/conta/configuracoes/dispositivos", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/api/licenses-admin", "destination": "/api/licenses?channel=admin" },
     { "source": "/api/account/avatar", "destination": "/api/account?action=avatar" },
     { "source": "/conta", "destination": "/cliente" },
     { "source": "/conta/:path*", "destination": "/cliente" },
