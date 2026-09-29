@@ -4,7 +4,6 @@
   "buildCommand": "node build-public.cjs",
   "installCommand": "npm ci --ignore-scripts --no-fund",
   "outputDirectory": "public-site",
-  "public": false,
   "git": {
     "deploymentEnabled": {
       "main": true,
